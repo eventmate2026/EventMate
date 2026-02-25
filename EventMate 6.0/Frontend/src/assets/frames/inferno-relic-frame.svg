@@ -1,0 +1,79 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="outerMetal" x1="214" y1="214" x2="810" y2="810" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E7C885"/>
+      <stop offset="0.25" stop-color="#8C6531"/>
+      <stop offset="0.55" stop-color="#2C231A"/>
+      <stop offset="0.8" stop-color="#A3783D"/>
+      <stop offset="1" stop-color="#F2DDA8"/>
+    </linearGradient>
+    <linearGradient id="innerEmber" x1="512" y1="220" x2="512" y2="840" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B0909"/>
+      <stop offset="0.35" stop-color="#9F1016"/>
+      <stop offset="0.7" stop-color="#42080A"/>
+      <stop offset="1" stop-color="#B51A1B"/>
+    </linearGradient>
+    <linearGradient id="featherRed" x1="118" y1="582" x2="404" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF4B4B"/>
+      <stop offset="0.45" stop-color="#B4111B"/>
+      <stop offset="1" stop-color="#45070D"/>
+    </linearGradient>
+    <linearGradient id="featherDark" x1="122" y1="580" x2="404" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1A1412"/>
+      <stop offset="0.46" stop-color="#3A2A1C"/>
+      <stop offset="1" stop-color="#050506"/>
+    </linearGradient>
+    <radialGradient id="rubyTop" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 204) rotate(90) scale(26)">
+      <stop stop-color="#FF7681"/>
+      <stop offset="0.5" stop-color="#C6192A"/>
+      <stop offset="1" stop-color="#49030A"/>
+    </radialGradient>
+    <radialGradient id="rubyBottom" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 820) rotate(90) scale(28)">
+      <stop stop-color="#FF6A75"/>
+      <stop offset="0.5" stop-color="#C0131F"/>
+      <stop offset="1" stop-color="#3D0208"/>
+    </radialGradient>
+    <filter id="halo" x="74" y="96" width="876" height="872" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.89 0 0 0 0 0.25 0 0 0 0 0.2 0 0 0 0.5 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#halo)">
+    <circle cx="512" cy="512" r="286" stroke="url(#outerMetal)" stroke-width="22"/>
+    <circle cx="512" cy="512" r="262" stroke="url(#innerEmber)" stroke-width="30"/>
+
+    <g id="infernoWingLeft">
+      <path d="M302 744C238 700 184 656 122 622C162 688 220 746 292 802L334 774L302 744Z" fill="url(#featherDark)"/>
+      <path d="M278 708C228 666 184 630 138 594C164 654 204 708 266 758L308 740L278 708Z" fill="url(#featherRed)"/>
+      <path d="M314 700C272 650 236 614 198 578C220 634 258 686 312 734L350 720L314 700Z" fill="url(#featherDark)"/>
+      <path d="M344 686C306 638 274 602 242 568C260 620 292 670 342 712L378 700L344 686Z" fill="url(#featherRed)"/>
+      <path d="M374 668C338 624 306 590 274 560C290 608 320 652 364 692L396 682L374 668Z" fill="url(#featherDark)"/>
+      <path d="M400 646C368 606 340 576 310 548C324 594 350 634 390 668L418 662L400 646Z" fill="url(#featherRed)"/>
+
+      <path d="M296 790C246 754 198 726 146 706C182 754 232 798 290 832L328 818L296 790Z" fill="url(#featherDark)"/>
+      <path d="M356 776C308 742 262 716 214 698C248 742 292 782 348 816L384 804L356 776Z" fill="url(#featherRed)"/>
+      <path d="M404 752C360 722 318 698 276 682C306 724 346 760 396 790L424 778L404 752Z" fill="url(#featherDark)"/>
+      <path d="M430 724C390 696 352 676 314 662C342 700 376 732 422 760L446 748L430 724Z" fill="url(#featherRed)"/>
+
+      <path d="M430 348C394 334 358 322 324 314C358 350 392 378 430 406L452 394L430 348Z" fill="url(#featherDark)"/>
+      <path d="M404 306C370 292 336 282 304 274C336 306 366 334 402 358L424 346L404 306Z" fill="url(#featherRed)"/>
+    </g>
+    <use href="#infernoWingLeft" transform="translate(1024 0) scale(-1 1)"/>
+
+    <path d="M468 230L512 184L556 230L544 262H480L468 230Z" fill="url(#outerMetal)" stroke="#5E4323" stroke-width="9"/>
+    <path d="M486 224L512 196L538 224L512 250L486 224Z" fill="url(#rubyTop)"/>
+
+    <path d="M432 776H592L572 808L512 852L452 808L432 776Z" fill="url(#outerMetal)" stroke="#5A3F1F" stroke-width="10"/>
+    <circle cx="512" cy="820" r="42" fill="url(#rubyBottom)" stroke="#5E0A12" stroke-width="8"/>
+
+    <path d="M222 248L278 220L312 248L266 278L222 248Z" fill="#1D1512" stroke="#6F4C22" stroke-width="7"/>
+    <path d="M802 248L746 220L712 248L758 278L802 248Z" fill="#1D1512" stroke="#6F4C22" stroke-width="7"/>
+  </g>
+</svg>

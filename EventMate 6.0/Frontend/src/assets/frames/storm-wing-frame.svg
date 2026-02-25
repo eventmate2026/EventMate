@@ -1,0 +1,54 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sunRing" x1="192" y1="214" x2="832" y2="824" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFD37A"/>
+      <stop offset="0.24" stop-color="#FF9B1D"/>
+      <stop offset="0.5" stop-color="#E63946"/>
+      <stop offset="0.78" stop-color="#FF4DA6"/>
+      <stop offset="1" stop-color="#FFE48E"/>
+    </linearGradient>
+    <linearGradient id="sunInner" x1="512" y1="220" x2="512" y2="850" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FD7A00"/>
+      <stop offset="0.34" stop-color="#D2252A"/>
+      <stop offset="0.7" stop-color="#A60A5E"/>
+      <stop offset="1" stop-color="#F64F1A"/>
+    </linearGradient>
+    <linearGradient id="flameGold" x1="126" y1="578" x2="410" y2="774" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF9D00"/>
+      <stop offset="0.4" stop-color="#FFC81F"/>
+      <stop offset="0.68" stop-color="#FFF0A5"/>
+      <stop offset="1" stop-color="#FFAA24"/>
+    </linearGradient>
+    <linearGradient id="flamePink" x1="176" y1="548" x2="364" y2="732" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF2A5B"/>
+      <stop offset="0.45" stop-color="#FF006E"/>
+      <stop offset="1" stop-color="#B5004E"/>
+    </linearGradient>
+    <radialGradient id="sunOrb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 772) rotate(90) scale(76)">
+      <stop stop-color="#FFE0FB"/>
+      <stop offset="0.38" stop-color="#FF4D8F"/>
+      <stop offset="1" stop-color="#A0093B"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="536" r="286" stroke="url(#sunRing)" stroke-width="24"/>
+  <circle cx="512" cy="536" r="260" stroke="url(#sunInner)" stroke-width="34"/>
+
+  <path d="M458 224L512 178L566 224L554 260H470L458 224Z" fill="#FFD67A" stroke="#8C4D15" stroke-width="8"/>
+  <path d="M512 194L522 218H548L528 233L536 256L512 242L488 256L496 233L476 218H502L512 194Z" fill="#FFF8CE"/>
+
+  <g id="solarWingLeft">
+    <path d="M278 742C214 694 164 654 106 624C140 688 198 750 270 804L316 770L278 742Z" fill="url(#flameGold)"/>
+    <path d="M248 700C198 654 158 616 116 584C134 648 170 704 236 756L282 736L248 700Z" fill="url(#flamePink)"/>
+    <path d="M304 696C264 642 226 604 188 570C208 636 244 690 300 734L342 716L304 696Z" fill="url(#flameGold)"/>
+    <path d="M340 682C306 632 276 594 246 558C262 618 292 666 340 706L380 692L340 682Z" fill="#FFF0A8"/>
+    <path d="M364 662C330 614 302 578 272 542C286 598 312 642 356 684L390 674L364 662Z" fill="url(#flamePink)"/>
+    <path d="M288 786C234 750 186 724 132 704C172 754 224 796 286 830L326 816L288 786Z" fill="url(#flameGold)"/>
+    <path d="M356 774C304 742 252 716 202 698C238 746 286 782 348 816L386 802L356 774Z" fill="url(#flameGold)"/>
+    <path d="M404 748C358 716 314 692 270 676C302 722 344 756 396 786L426 772L404 748Z" fill="url(#flamePink)"/>
+  </g>
+  <use href="#solarWingLeft" transform="translate(1024 0) scale(-1 1)"/>
+
+  <path d="M430 752H594L574 782L512 834L450 782L430 752Z" fill="#FFC75A" stroke="#8D4E16" stroke-width="8"/>
+  <circle cx="512" cy="772" r="52" fill="url(#sunOrb)" stroke="#A0113E" stroke-width="9"/>
+</svg>

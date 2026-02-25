@@ -1,0 +1,67 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="rgRing" x1="212" y1="220" x2="810" y2="810" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE7B8"/>
+      <stop offset="0.28" stop-color="#E2A84A"/>
+      <stop offset="0.55" stop-color="#A76722"/>
+      <stop offset="0.8" stop-color="#F4CC73"/>
+      <stop offset="1" stop-color="#FFF1CE"/>
+    </linearGradient>
+    <linearGradient id="rgCore" x1="512" y1="230" x2="512" y2="846" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C40A1A"/>
+      <stop offset="0.34" stop-color="#7D0713"/>
+      <stop offset="0.68" stop-color="#B10B1B"/>
+      <stop offset="1" stop-color="#E0322A"/>
+    </linearGradient>
+    <linearGradient id="wingGold" x1="114" y1="612" x2="430" y2="792" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#80511A"/>
+      <stop offset="0.4" stop-color="#E6B45A"/>
+      <stop offset="0.7" stop-color="#FFF0C6"/>
+      <stop offset="1" stop-color="#A76A28"/>
+    </linearGradient>
+    <linearGradient id="wingRed" x1="160" y1="560" x2="358" y2="744" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF1E2E"/>
+      <stop offset="0.5" stop-color="#C20B17"/>
+      <stop offset="1" stop-color="#6D040B"/>
+    </linearGradient>
+    <radialGradient id="ruby" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 768) rotate(90) scale(82)">
+      <stop stop-color="#FF5B67"/>
+      <stop offset="0.45" stop-color="#C6111D"/>
+      <stop offset="1" stop-color="#55020A"/>
+    </radialGradient>
+    <filter id="glow" x="56" y="146" width="912" height="816" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 0.36 0 0 0 0 0.2 0 0 0 0.58 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#glow)">
+    <circle cx="512" cy="536" r="282" stroke="url(#rgRing)" stroke-width="26"/>
+    <circle cx="512" cy="536" r="258" stroke="url(#rgCore)" stroke-width="34"/>
+
+    <path d="M442 232L512 174L582 232L567 274H457L442 232Z" fill="url(#rgRing)" stroke="#7F4A19" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M512 196L525 225H557L531 244L541 274L512 256L483 274L493 244L467 225H499L512 196Z" fill="#FFCF5F"/>
+
+    <g id="crimsonWingLeft">
+      <path d="M300 732C232 678 178 632 118 600C158 658 208 718 282 776L326 742L300 732Z" fill="url(#wingGold)"/>
+      <path d="M290 700C244 650 206 616 162 584C186 636 222 680 274 730L312 716L290 700Z" fill="url(#wingRed)"/>
+      <path d="M324 690C286 638 252 602 216 572C236 622 270 666 312 708L342 700L324 690Z" fill="url(#wingGold)"/>
+      <path d="M356 678C328 630 304 598 274 566C290 614 314 652 348 688L372 682L356 678Z" fill="#FFF4D8"/>
+      <path d="M272 760C214 724 164 702 112 684C154 730 206 770 268 804L302 790L272 760Z" fill="url(#wingGold)"/>
+      <path d="M332 756C278 722 228 696 178 678C212 720 260 760 326 796L358 782L332 756Z" fill="url(#wingRed)"/>
+      <path d="M380 738C332 706 286 682 242 666C272 704 314 742 372 774L398 760L380 738Z" fill="url(#wingGold)"/>
+      <path d="M392 682C354 646 324 618 292 592L302 646L356 700L392 682Z" fill="#8F5A1E"/>
+    </g>
+    <use href="#crimsonWingLeft" transform="translate(1024 0) scale(-1 1)"/>
+
+    <path d="M424 748L600 748L574 788L512 840L450 788L424 748Z" fill="url(#rgRing)" stroke="#764617" stroke-width="10" stroke-linejoin="round"/>
+    <circle cx="512" cy="768" r="58" fill="url(#ruby)" stroke="#6E0A11" stroke-width="10"/>
+    <path d="M470 734L512 700L554 734L512 782L470 734Z" fill="#EA202D" fill-opacity="0.56"/>
+  </g>
+</svg>

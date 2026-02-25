@@ -1,0 +1,56 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="floralGold" x1="220" y1="220" x2="804" y2="804" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF6D8"/>
+      <stop offset="0.35" stop-color="#E3C276"/>
+      <stop offset="0.65" stop-color="#A7762D"/>
+      <stop offset="1" stop-color="#FCE7B3"/>
+    </linearGradient>
+    <linearGradient id="floralBlue" x1="222" y1="306" x2="398" y2="826" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7F8FF"/>
+      <stop offset="0.42" stop-color="#C8D3FF"/>
+      <stop offset="1" stop-color="#7E8ECC"/>
+    </linearGradient>
+    <radialGradient id="heartGem" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 776) rotate(90) scale(70)">
+      <stop stop-color="#FFF4FF"/>
+      <stop offset="0.45" stop-color="#B98DFF"/>
+      <stop offset="1" stop-color="#7B57C6"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="532" r="282" stroke="url(#floralGold)" stroke-width="14"/>
+
+  <g id="frostBranchLeft">
+    <ellipse cx="310" cy="402" rx="54" ry="22" transform="rotate(-32 310 402)" fill="url(#floralBlue)" stroke="#8A94C9" stroke-width="4"/>
+    <ellipse cx="272" cy="454" rx="60" ry="24" transform="rotate(-38 272 454)" fill="url(#floralBlue)" stroke="#7E89BE" stroke-width="4"/>
+    <ellipse cx="248" cy="516" rx="72" ry="27" transform="rotate(-48 248 516)" fill="url(#floralBlue)" stroke="#7683BB" stroke-width="4"/>
+    <ellipse cx="238" cy="584" rx="76" ry="29" transform="rotate(-58 238 584)" fill="url(#floralBlue)" stroke="#6E7AB1" stroke-width="4"/>
+    <ellipse cx="252" cy="652" rx="72" ry="28" transform="rotate(-62 252 652)" fill="url(#floralBlue)" stroke="#6673A8" stroke-width="4"/>
+    <ellipse cx="286" cy="712" rx="68" ry="26" transform="rotate(-58 286 712)" fill="url(#floralBlue)" stroke="#5E6A9E" stroke-width="4"/>
+    <ellipse cx="338" cy="756" rx="56" ry="22" transform="rotate(-46 338 756)" fill="url(#floralBlue)" stroke="#5A679A" stroke-width="4"/>
+
+    <g fill="#EEF0FF" stroke="#93A0D5" stroke-width="4">
+      <circle cx="324" cy="430" r="18"/>
+      <circle cx="286" cy="484" r="16"/>
+      <circle cx="268" cy="548" r="17"/>
+      <circle cx="280" cy="616" r="15"/>
+      <circle cx="314" cy="674" r="16"/>
+      <circle cx="356" cy="724" r="14"/>
+    </g>
+    <g fill="#AAB6EA">
+      <circle cx="324" cy="430" r="5"/>
+      <circle cx="286" cy="484" r="5"/>
+      <circle cx="268" cy="548" r="5"/>
+      <circle cx="280" cy="616" r="5"/>
+      <circle cx="314" cy="674" r="5"/>
+      <circle cx="356" cy="724" r="5"/>
+    </g>
+  </g>
+  <use href="#frostBranchLeft" transform="translate(1024 0) scale(-1 1)"/>
+
+  <path d="M468 234L512 198L556 234L542 260H482L468 234Z" fill="#F9E8B8" stroke="#9C7131" stroke-width="7"/>
+  <circle cx="512" cy="220" r="12" fill="#E9D082"/>
+
+  <path d="M432 748C432 700 474 670 512 706C550 670 592 700 592 748C592 792 556 818 512 844C468 818 432 792 432 748Z" fill="url(#heartGem)" stroke="#9A7BC9" stroke-width="8"/>
+  <path d="M454 748C454 714 484 696 512 726C540 696 570 714 570 748C570 778 546 798 512 820C478 798 454 778 454 748Z" fill="#D6C5FF" fill-opacity="0.5"/>
+</svg>

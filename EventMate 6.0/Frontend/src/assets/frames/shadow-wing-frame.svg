@@ -1,0 +1,43 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ravenRing" x1="210" y1="212" x2="804" y2="804" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#CBD0E0"/>
+      <stop offset="0.38" stop-color="#6B7188"/>
+      <stop offset="0.68" stop-color="#2A3047"/>
+      <stop offset="1" stop-color="#A1A8C5"/>
+    </linearGradient>
+    <linearGradient id="ravenPurple" x1="512" y1="222" x2="512" y2="846" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8F4CFF"/>
+      <stop offset="0.42" stop-color="#4E1D8B"/>
+      <stop offset="1" stop-color="#B781FF"/>
+    </linearGradient>
+    <radialGradient id="ravenSmoke" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 756) rotate(90) scale(128)">
+      <stop stop-color="#8F4CFF" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#2D0F4F" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="528" r="278" stroke="url(#ravenRing)" stroke-width="18"/>
+  <circle cx="512" cy="528" r="258" stroke="url(#ravenPurple)" stroke-width="10" stroke-dasharray="8 12"/>
+
+  <g transform="translate(246 178)">
+    <path d="M0 62L52 8L112 20L136 70L82 92L0 62Z" fill="#2B3148" stroke="#7E86A9" stroke-width="8"/>
+    <circle cx="90" cy="46" r="12" fill="#A46BFF"/>
+    <path d="M20 54L40 26L64 42L44 68L20 54Z" fill="#111626"/>
+    <path d="M62 22L88 4L104 24L76 40L62 22Z" fill="#1B2032"/>
+  </g>
+
+  <circle cx="332" cy="532" r="34" fill="#5A2DA3" stroke="#9CA5C8" stroke-width="8"/>
+  <circle cx="692" cy="532" r="34" fill="#5A2DA3" stroke="#9CA5C8" stroke-width="8"/>
+
+  <g transform="translate(512 730)">
+    <path d="M-168 0C-112 -22 -66 -30 -18 -34C-44 -8 -64 18 -88 42C-122 40 -150 26 -168 0Z" fill="#323A55"/>
+    <path d="M168 0C112 -22 66 -30 18 -34C44 -8 64 18 88 42C122 40 150 26 168 0Z" fill="#323A55"/>
+    <path d="M0 -24C40 -24 68 6 68 42C68 72 40 98 0 120C-40 98 -68 72 -68 42C-68 6 -40 -24 0 -24Z" fill="#505A7A" stroke="#AAB3D2" stroke-width="8"/>
+    <path d="M0 10L18 44L0 78L-18 44L0 10Z" fill="#1A1F31"/>
+    <circle cx="-18" cy="42" r="7" fill="#B784FF"/>
+    <circle cx="18" cy="42" r="7" fill="#B784FF"/>
+  </g>
+
+  <ellipse cx="512" cy="770" rx="240" ry="118" fill="url(#ravenSmoke)"/>
+</svg>

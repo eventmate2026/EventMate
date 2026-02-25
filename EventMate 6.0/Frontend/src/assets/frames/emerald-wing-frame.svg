@@ -1,0 +1,41 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="emRing" x1="206" y1="222" x2="808" y2="806" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ECFFD8"/>
+      <stop offset="0.3" stop-color="#9FD35A"/>
+      <stop offset="0.62" stop-color="#2F8A4F"/>
+      <stop offset="1" stop-color="#D7F8AE"/>
+    </linearGradient>
+    <linearGradient id="emWing" x1="112" y1="620" x2="402" y2="790" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#225E3D"/>
+      <stop offset="0.34" stop-color="#4FAE67"/>
+      <stop offset="0.72" stop-color="#D0F8A2"/>
+      <stop offset="1" stop-color="#357F51"/>
+    </linearGradient>
+    <radialGradient id="emGem" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(512 760) rotate(90) scale(72)">
+      <stop stop-color="#C6FFD8"/>
+      <stop offset="0.45" stop-color="#4CB272"/>
+      <stop offset="1" stop-color="#1D5B3D"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="534" r="284" stroke="url(#emRing)" stroke-width="22"/>
+  <circle cx="512" cy="534" r="262" stroke="#204F38" stroke-width="10"/>
+
+  <path d="M468 228L512 188L556 228L542 258H482L468 228Z" fill="#D8F4A9" stroke="#2A6A43" stroke-width="8"/>
+  <path d="M490 228L512 206L534 228L512 250L490 228Z" fill="#5ABC78"/>
+
+  <g id="emeraldWingLeft">
+    <path d="M300 734C236 688 180 646 120 614C160 678 220 744 294 798L334 768L300 734Z" fill="url(#emWing)"/>
+    <path d="M314 704C274 658 238 622 198 590C220 648 254 698 308 742L344 724L314 704Z" fill="#BCEFA1"/>
+    <path d="M342 682C308 636 278 602 248 570C266 624 294 668 340 708L374 694L342 682Z" fill="url(#emWing)"/>
+    <path d="M370 666C338 624 310 590 282 560C296 610 322 648 364 686L396 676L370 666Z" fill="#2B734B"/>
+    <path d="M280 784C228 748 182 722 132 702C170 752 220 794 280 826L320 812L280 784Z" fill="#9FE37F"/>
+    <path d="M346 770C298 738 252 714 206 696C240 744 286 780 342 812L378 798L346 770Z" fill="#56B770"/>
+    <path d="M394 748C354 718 314 696 274 680C306 722 344 754 392 784L420 772L394 748Z" fill="#C8F6A8"/>
+  </g>
+  <use href="#emeraldWingLeft" transform="translate(1024 0) scale(-1 1)"/>
+
+  <path d="M434 748H590L570 782L512 832L454 782L434 748Z" fill="#D5F6A8" stroke="#2D724A" stroke-width="8"/>
+  <circle cx="512" cy="760" r="54" fill="url(#emGem)" stroke="#2E714A" stroke-width="8"/>
+</svg>
