@@ -18,6 +18,7 @@ import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
 
 const normalizeId = (value) => String(value || "").trim();
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 const parseRegistrationRows = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -70,6 +71,17 @@ const resolveTokenFromQrImageUrl = (value) => {
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "").trim() || "Pending";
+  const departmentLookup = new Map();
+  const structuredParticipants = [
+    registration?.teamLeader,
+    ...(Array.isArray(registration?.teamMembers) ? registration.teamMembers : []),
+  ].filter(Boolean);
+  structuredParticipants.forEach((participant) => {
+    const email = normalizeEmail(participant?.email);
+    if (!email) return;
+    const department = String(participant?.branch || participant?.department || "").trim();
+    if (department) departmentLookup.set(email, department);
+  });
 
   const listedParticipants =
     Array.isArray(registration?.participants) && registration.participants.length > 0
@@ -96,17 +108,23 @@ const toParticipantRows = (registration) => {
           },
         ];
 
-  return listedParticipants.map((participant, index) => ({
-    id: normalizeId(participant?._id || participant?.id || `${registrationId}-${participant?.email || index}`),
-    registrationId,
-    registrationStatus,
-    participantName: String(participant?.name || "Participant").trim() || "Participant",
-    participantEmail: String(participant?.email || "").trim(),
-    role: String(participant?.role || "participant").trim(),
-    attendanceMarked: Boolean(participant?.attendanceMarked),
-    attendanceMarkedAt: participant?.attendanceMarkedAt || null,
-    token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
-  }));
+  return listedParticipants.map((participant, index) => {
+    const participantEmail = String(participant?.email || "").trim();
+    const participantDepartment = departmentLookup.get(normalizeEmail(participantEmail)) || "";
+
+    return {
+      id: normalizeId(participant?._id || participant?.id || `${registrationId}-${participantEmail || index}`),
+      registrationId,
+      registrationStatus,
+      participantName: String(participant?.name || "Participant").trim() || "Participant",
+      participantEmail,
+      participantDepartment,
+      role: String(participant?.role || "participant").trim(),
+      attendanceMarked: Boolean(participant?.attendanceMarked),
+      attendanceMarkedAt: participant?.attendanceMarkedAt || null,
+      token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
+    };
+  });
 };
 
 const parseParticipantRows = (payload) => parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
@@ -365,6 +383,7 @@ export default function CoordinatorAttendanceScanner() {
       sourceLabel,
       participantName: participant?.participantName || "Unknown participant",
       participantEmail: participant?.participantEmail || "",
+      participantDepartment: participant?.participantDepartment || "",
       registrationStatus: participant?.registrationStatus || "Unknown",
       alreadyMarked: Boolean(participant?.attendanceMarked),
     });
@@ -514,6 +533,7 @@ export default function CoordinatorAttendanceScanner() {
         const payload = response?.data?.data || {};
         const participantName = String(payload?.participantName || participant?.participantName || "Participant");
         const participantEmail = String(payload?.email || participant?.participantEmail || "");
+        const participantDepartment = participant?.participantDepartment || "";
         const markedAt = payload?.markedAt || new Date().toISOString();
         const successText = response.data?.message || `Attendance marked for ${participantName}.`;
 
@@ -521,6 +541,7 @@ export default function CoordinatorAttendanceScanner() {
           type: "success",
           participantName,
           participantEmail,
+          participantDepartment,
           text: successText,
           sourceLabel,
           at: Date.now(),
@@ -531,6 +552,7 @@ export default function CoordinatorAttendanceScanner() {
             type: "success",
             participantName,
             participantEmail,
+            participantDepartment,
             sourceLabel,
           },
           { countForRate: true }
@@ -545,6 +567,7 @@ export default function CoordinatorAttendanceScanner() {
               ...next[index],
               participantName: participantName || next[index].participantName,
               participantEmail: participantEmail || next[index].participantEmail,
+              participantDepartment: participantDepartment || next[index].participantDepartment,
               attendanceMarked: true,
               attendanceMarkedAt: markedAt,
               token: tokenText || next[index].token,
@@ -559,6 +582,7 @@ export default function CoordinatorAttendanceScanner() {
               registrationStatus: "Confirmed",
               participantName: participantName || "Participant",
               participantEmail,
+              participantDepartment,
               role: String(payload?.role || "participant").trim(),
               attendanceMarked: true,
               attendanceMarkedAt: markedAt,
@@ -578,11 +602,13 @@ export default function CoordinatorAttendanceScanner() {
         const parsedName = extractParticipantNameFromError(errorText);
         const participantName = participant?.participantName || parsedName || "Unknown participant";
         const participantEmail = participant?.participantEmail || "";
+        const participantDepartment = participant?.participantDepartment || "";
 
         setLastResult({
           type: "error",
           participantName,
           participantEmail,
+          participantDepartment,
           text: errorText,
           sourceLabel,
           at: Date.now(),
@@ -592,6 +618,7 @@ export default function CoordinatorAttendanceScanner() {
           type: "error",
           participantName,
           participantEmail,
+          participantDepartment,
           sourceLabel,
         });
 
@@ -879,6 +906,9 @@ export default function CoordinatorAttendanceScanner() {
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{pendingScan.participantName}</p>
                           <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate">{pendingScan.participantEmail || "Email unavailable"}</p>
+                          {pendingScan.participantDepartment ? (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate">{pendingScan.participantDepartment}</p>
+                          ) : null}
                           <div className="mt-2 inline-flex rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                             Event Status: {pendingScan.registrationStatus}
                           </div>
@@ -906,6 +936,9 @@ export default function CoordinatorAttendanceScanner() {
                       </div>
                       <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">{lastResult.participantName}</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-300">{lastResult.participantEmail || "Email unavailable"}</p>
+                      {lastResult.participantDepartment ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-300">{lastResult.participantDepartment}</p>
+                      ) : null}
                       <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{lastResult.text}</p>
                     </div>
                   ) : (
@@ -956,6 +989,9 @@ export default function CoordinatorAttendanceScanner() {
                         >
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{scan.participantName}</p>
+                            {scan.participantDepartment ? (
+                              <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate">{scan.participantDepartment}</p>
+                            ) : null}
                             <p className="text-[11px] text-slate-500 dark:text-slate-300">{formatClock(scan.at)}</p>
                           </div>
                           {scan.type === "success" ? (

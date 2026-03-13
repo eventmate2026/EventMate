@@ -1,4 +1,4 @@
 import jwt from "jsonwebtoken";
 
-export default (id) =>
-  jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+export default (id, expiresIn = "1h") =>
+  jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn });

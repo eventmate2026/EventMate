@@ -15,6 +15,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -97,16 +98,17 @@ export default function AdminOrganizerManagement() {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return organizers;
 
-    return organizers.filter((organizer) =>
-      [
+    return organizers.filter((organizer) => {
+      const department = resolveUserDepartment(organizer);
+      return [
         organizer?.fullName,
         organizer?.email,
         organizer?.mobileNumber,
-        organizer?.professionalProfile?.department,
+        department,
       ]
         .map((value) => String(value || "").toLowerCase())
-        .some((value) => value.includes(term))
-    );
+        .some((value) => value.includes(term));
+    });
   }, [organizers, searchTerm]);
 
   const metrics = useMemo(() => {
@@ -166,6 +168,7 @@ export default function AdminOrganizerManagement() {
 
     const fullName = formValues.fullName.trim();
     const email = formValues.email.trim().toLowerCase();
+    const department = formValues.department.trim();
 
     if (fullName.length < 3) {
       setFormError("Full name must be at least 3 characters.");
@@ -191,6 +194,7 @@ export default function AdminOrganizerManagement() {
             fullName,
             email,
             password: formValues.password,
+            ...(department ? { professionalProfile: { department } } : {}),
           },
         });
 
@@ -330,6 +334,7 @@ export default function AdminOrganizerManagement() {
                     const isPending = pendingId === organizer._id;
                     const isInactive = !organizer.isActive;
                     const totalEvents = Number(eventCounts[organizer._id] || 0);
+                    const department = resolveUserDepartment(organizer);
 
                     return (
                       <tr key={organizer._id}>
@@ -345,6 +350,9 @@ export default function AdminOrganizerManagement() {
                             <div className="min-w-0">
                               <p className="truncate font-semibold text-slate-900 dark:text-white">{organizer.fullName}</p>
                               <p className="truncate text-xs text-slate-500 dark:text-slate-400">{organizer.email}</p>
+                              {department ? (
+                                <p className="truncate text-xs text-slate-500 dark:text-slate-400">{department}</p>
+                              ) : null}
                             </div>
                           </div>
                         </td>
@@ -540,8 +548,8 @@ export default function AdminOrganizerManagement() {
                 </label>
               )}
 
-              {formMode === "edit" && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {formMode === "edit" && (
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mobile Number</span>
                     <input
@@ -552,18 +560,18 @@ export default function AdminOrganizerManagement() {
                       className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-white/5"
                     />
                   </label>
-                  <label className="block">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Department</span>
-                    <input
-                      type="text"
-                      name="department"
-                      value={formValues.department}
-                      onChange={handleFormChange}
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-white/5"
-                    />
-                  </label>
-                </div>
-              )}
+                )}
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Department</span>
+                  <input
+                    type="text"
+                    name="department"
+                    value={formValues.department}
+                    onChange={handleFormChange}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-white/10 dark:bg-white/5"
+                  />
+                </label>
+              </div>
 
               {formError && (
                 <p className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/15 dark:text-red-300">

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
+import { getStoredUser } from "../lib/auth";
 
 const initialForm = {
   title: "",
@@ -21,6 +22,8 @@ const initialForm = {
   eventMode: "INDIVIDUAL",
   minTeamSize: "2",
   maxTeamSize: "4",
+  visibilityScope: "COLLEGE",
+  visibilityDepartment: "",
   status: "Draft",
 };
 
@@ -34,6 +37,10 @@ const toDateInput = (value) => {
 export default function OrganizerEditEvent() {
   const navigate = useNavigate();
   const { eventId } = useParams();
+  const user = getStoredUser();
+  const organizerDepartment =
+    user?.professionalProfile?.department || user?.academicProfile?.branch || "";
+  const isOrganizer = String(user?.role || "").toUpperCase() === "ORGANIZER";
 
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
@@ -73,6 +80,11 @@ export default function OrganizerEditEvent() {
         eventMode: event.isTeamEvent ? "TEAM" : "INDIVIDUAL",
         minTeamSize: event.minTeamSize ? String(event.minTeamSize) : "2",
         maxTeamSize: event.maxTeamSize ? String(event.maxTeamSize) : "4",
+        visibilityScope: String(event.visibility?.scope || "COLLEGE").toUpperCase() === "DEPARTMENT"
+          ? "DEPARTMENT"
+          : "COLLEGE",
+        visibilityDepartment:
+          event.visibility?.department || event.organizer?.department || "",
         status: event.status || "Draft",
       });
     } catch (error) {
@@ -93,6 +105,15 @@ export default function OrganizerEditEvent() {
     const { name, value, type, checked } = event.target;
     if (type === "checkbox") {
       setForm((prev) => ({ ...prev, [name]: checked }));
+      return;
+    }
+    if (name === "visibilityScope") {
+      setForm((prev) => ({
+        ...prev,
+        visibilityScope: value,
+        visibilityDepartment:
+          value === "DEPARTMENT" && isOrganizer ? organizerDepartment : prev.visibilityDepartment,
+      }));
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -124,6 +145,12 @@ export default function OrganizerEditEvent() {
       }
     }
 
+    const visibilityDepartment =
+      form.visibilityScope === "DEPARTMENT" && isOrganizer ? organizerDepartment : form.visibilityDepartment;
+    if (form.visibilityScope === "DEPARTMENT" && !visibilityDepartment.trim()) {
+      return "Department is required for department-level events.";
+    }
+
     return null;
   };
 
@@ -149,11 +176,17 @@ export default function OrganizerEditEvent() {
         maxParticipants: Number(form.maxParticipants),
         fee: Number(form.registrationFee || 0),
       },
-      certificate: { isEnabled: true },
       feedback: { enabled: true },
       isTeamEvent,
       minTeamSize: isTeamEvent ? Number(form.minTeamSize || 2) : 1,
       maxTeamSize: isTeamEvent ? Number(form.maxTeamSize || 4) : 1,
+      visibility: {
+        scope: form.visibilityScope === "DEPARTMENT" ? "DEPARTMENT" : "COLLEGE",
+        department:
+          form.visibilityScope === "DEPARTMENT"
+            ? (isOrganizer ? organizerDepartment : form.visibilityDepartment).trim()
+            : "",
+      },
     };
   };
 
@@ -299,7 +332,26 @@ export default function OrganizerEditEvent() {
               <option value="Sports">Sports</option>
               <option value="Workshop">Workshop</option>
             </select>
+            <select
+              name="visibilityScope"
+              value={form.visibilityScope}
+              onChange={handleChange}
+              className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
+            >
+              <option value="COLLEGE">College Level</option>
+              <option value="DEPARTMENT">Department Level</option>
+            </select>
             <input value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
+            {form.visibilityScope === "DEPARTMENT" && (
+              <input
+                name={isOrganizer ? undefined : "visibilityDepartment"}
+                value={isOrganizer ? (organizerDepartment || "Department not set in profile") : form.visibilityDepartment}
+                onChange={isOrganizer ? undefined : handleChange}
+                placeholder="Department"
+                readOnly={isOrganizer}
+                className="lg:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
+              />
+            )}
 
             <input type="date" name="startDate" value={form.startDate} onChange={handleChange} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm" />
             <input type="time" name="startTime" value={form.startTime} onChange={handleChange} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm" />

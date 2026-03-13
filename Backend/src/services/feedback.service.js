@@ -2,7 +2,7 @@ import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import Feedback from "../models/Feedback.model.js";
-import { generateCertificatesForRegistration } from "./certificate.service.js";
+import { generateCertificatesForRegistration, isEventWinnerRankingComplete } from "./certificate.service.js";
 import { sendNotification } from "./notification.service.js";
 
 /* ================================================
@@ -91,11 +91,22 @@ export const submitFeedback = async (eventId, userId, payload) => {
     });
   }
 
-  generateCertificatesForRegistration(registration, event).catch((err) =>
-    console.error("Certificate generation error:", err.message)
-  );
+  const certificateEnabled = Boolean(event?.certificate?.isEnabled);
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  const certificateReady = certificateEnabled && rankingComplete;
 
-  return feedback;
+  if (certificateReady) {
+    generateCertificatesForRegistration(registration, event).catch((err) =>
+      console.error("Certificate generation error:", err.message)
+    );
+  }
+
+  return {
+    feedback,
+    certificateEnabled,
+    rankingComplete,
+    certificateReady
+  };
 };
 
 /* ================================================
@@ -108,12 +119,10 @@ export const getEventFeedback = async (eventId, requester) => {
 
   const isAdmin = requester.role === "MAIN_ADMIN";
   const isOrganizer = event.createdBy.toString() === requester._id.toString();
-  const isAssignedCoordinator =
-    requester.role === "STUDENT_COORDINATOR" &&
-    event.studentCoordinators.some(
-      (coordinator) =>
-        coordinator.coordinatorId?.toString() === requester._id.toString()
-    );
+  const isAssignedCoordinator = event.studentCoordinators.some(
+    (coordinator) =>
+      coordinator.coordinatorId?.toString() === requester._id.toString()
+  );
 
   if (!isAdmin && !isOrganizer && !isAssignedCoordinator) {
     throw new Error("Not authorized to view feedback for this event");

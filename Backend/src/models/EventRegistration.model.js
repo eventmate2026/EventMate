@@ -130,6 +130,14 @@ winner: {
     type: String,
     enum: ["1st", "2nd", "3rd"],
     default: null
+  },
+  assignmentCount: {
+    type: Number,
+    default: 0
+  },
+  unassignedOnce: {
+    type: Boolean,
+    default: false
   }
 },
 

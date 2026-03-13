@@ -133,6 +133,31 @@ const SummaryApi = {
     method: "post",
   },
 
+  get_team_registration_status: {
+    url: "/api/registrations/team/:registrationId/status",
+    method: "get",
+  },
+
+  confirm_team_registration: {
+    url: "/api/registrations/team/:registrationId/confirm",
+    method: "post",
+  },
+
+  resend_team_invites: {
+    url: "/api/registrations/team/:registrationId/resend-invites",
+    method: "post",
+  },
+
+  get_team_invite: {
+    url: "/api/registrations/invite/:token",
+    method: "get",
+  },
+
+  respond_team_invite: {
+    url: "/api/registrations/invite/:token/:action",
+    method: "post",
+  },
+
   assign_coordinator_to_event: {
     url: "/api/events/:eventId/coordinators/assign",
     method: "patch",
@@ -146,6 +171,14 @@ const SummaryApi = {
   get_event_registrations: {
     url: "/api/registrations/:eventId/all",
     method: "get",
+  },
+  tag_registration_winner: {
+    url: "/api/registrations/:registrationId/winner",
+    method: "patch",
+  },
+  untag_registration_winner: {
+    url: "/api/registrations/:registrationId/winner/clear",
+    method: "patch",
   },
 
   /* ================= FEEDBACK ================= */
@@ -190,6 +223,11 @@ const SummaryApi = {
     method: "patch",
   },
 
+  download_demo_certificate: {
+    url: "/api/certificates/:eventId/demo",
+    method: "get",
+  },
+
   download_certificate: {
     url: "/api/certificates/download/:eventId/:emailSlug",
     method: "get",
@@ -207,6 +245,11 @@ const SummaryApi = {
 
   create_event_coordinator: {
     url: "/api/user/create-coordinator",
+    method: "post",
+  },
+
+  promote_event_coordinator: {
+    url: "/api/user/promote-coordinator",
     method: "post",
   },
 
@@ -259,6 +302,26 @@ const SummaryApi = {
   revoke_admin_certificate: {
     url: "/api/admin/certificates/:certificateId/revoke",
     method: "patch",
+  },
+
+  get_security_settings: {
+    url: "/api/admin/security-settings",
+    method: "get",
+  },
+
+  update_security_settings: {
+    url: "/api/admin/security-settings",
+    method: "patch",
+  },
+
+  rotate_security_secret: {
+    url: "/api/admin/security-settings/rotate-secret",
+    method: "post",
+  },
+
+  force_logout_all: {
+    url: "/api/admin/security-settings/force-logout",
+    method: "post",
   },
 
   create_organizer: {

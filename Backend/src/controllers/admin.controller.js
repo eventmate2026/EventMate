@@ -13,6 +13,9 @@ const normalizeVerificationCode = (value) =>
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
 
+const resolveDepartment = (user) =>
+  String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
+
 const buildAdminAuditActor = (req) => ({
   actorId: req.user?._id || null,
   actorName: req.user?.fullName || "Main Admin",
@@ -52,10 +55,29 @@ export const deleteUserController = asyncHandler(async (req, res) => {
 // Get all coordinators only
 export const getCoordinators = async (req, res, next) => {
   try {
-    const coordinators = await User.find(
-      { role: "STUDENT_COORDINATOR" },
-      { password: 0, otp: 0, otpExpiry: 0 }
-    );
+    const includeStudents = ["1", "true", "yes"].includes(String(req.query.includeStudents || "").toLowerCase());
+    const scope = String(req.query.scope || "").trim().toUpperCase();
+    const roles = includeStudents ? ["STUDENT_COORDINATOR", "STUDENT"] : ["STUDENT_COORDINATOR"];
+    const query = { role: { $in: roles } };
+
+    if (req.user.role === "ORGANIZER") {
+      if (scope !== "COLLEGE") {
+        const department = resolveDepartment(req.user);
+        if (!department) {
+          return res.status(400).json({
+            success: false,
+            message: "Organizer department is required"
+          });
+        }
+        const regex = new RegExp(`^${escapeRegex(department)}$`, "i");
+        query.$or = [
+          { "professionalProfile.department": regex },
+          { "academicProfile.branch": regex },
+        ];
+      }
+    }
+
+    const coordinators = await User.find(query, { password: 0, otp: 0, otpExpiry: 0 });
     return res.status(200).json({
       success: true,
       count: coordinators.length,

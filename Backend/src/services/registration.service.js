@@ -2,7 +2,9 @@ import crypto from "crypto";
 import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import MemberVerification from "../models/MemberVerification.model.js";
+import TeamInvitation from "../models/TeamInvitation.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
+import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
@@ -32,15 +34,430 @@ const refreshEventAttendanceTotal = async (eventId) => {
   });
 };
 
+const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
+const normalizeDepartment = (value = "") => String(value || "").trim().toLowerCase();
+const isEventOver = (event) => {
+  const status = String(event?.status || "").trim().toLowerCase();
+  if (status === "completed" || status === "cancelled" || status === "canceled") return true;
+  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  if (Number.isNaN(endTime)) return false;
+  return Date.now() > endTime;
+};
+
+const formatEventDate = (event) => {
+  const dateValue = event?.schedule?.startDate || event?.schedule?.endDate || null;
+  if (!dateValue) return "TBA";
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return "TBA";
+  return parsed.toDateString();
+};
+
+const buildTeamInviteLink = (token, action) => {
+  const baseUrl = String(process.env.FRONTEND_URL || "").trim().replace(/\/$/, "");
+  return `${baseUrl}/team-invite?token=${token}&action=${action}`;
+};
+
+const formatTeamRoleLabel = (role) =>
+  String(role || "").trim().toLowerCase() === "leader" ? "Team Leader" : "Team Member";
+
+const buildTeamParticipants = (registration) => {
+  const participants = [];
+  const leaderEmail = normalizeEmail(registration?.teamLeader?.email);
+  const leaderName = String(registration?.teamLeader?.name || "").trim();
+
+  if (leaderEmail) {
+    participants.push({
+      name: leaderName || "Team Leader",
+      email: leaderEmail,
+      role: "leader"
+    });
+  }
+
+  const teamMembers = Array.isArray(registration?.teamMembers) ? registration.teamMembers : [];
+  teamMembers.forEach((member) => {
+    const email = normalizeEmail(member?.email);
+    if (!email) return;
+    participants.push({
+      name: member?.name || "Member",
+      email,
+      role: "member"
+    });
+  });
+
+  const uniqueParticipants = new Map();
+  for (const participant of participants) {
+    const existing = uniqueParticipants.get(participant.email);
+    if (!existing || (participant.role === "leader" && existing.role !== "leader")) {
+      uniqueParticipants.set(participant.email, participant);
+    }
+  }
+
+  return Array.from(uniqueParticipants.values());
+};
+
+const teamInviteEmailTemplate = ({
+  recipientName,
+  eventName,
+  teamName,
+  leaderName,
+  roleLabel,
+  acceptLink,
+  rejectLink
+}) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #111827;">Hi ${recipientName},</h2>
+    <p>You have been invited to join a team for the event <strong>${eventName}</strong>.</p>
+    <p><strong>Team:</strong> ${teamName || "Team"}<br/>
+       <strong>Team Leader:</strong> ${leaderName || "Team Leader"}<br/>
+       <strong>Your Role:</strong> ${roleLabel || "Team Member"}</p>
+    <p>Please accept or reject the invitation:</p>
+    <div style="margin: 24px 0;">
+      <a href="${acceptLink}" style="
+        display: inline-block;
+        padding: 12px 22px;
+        background-color: #16a34a;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        margin-right: 12px;
+      ">Accept</a>
+      <a href="${rejectLink}" style="
+        display: inline-block;
+        padding: 12px 22px;
+        background-color: #dc2626;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+      ">Reject</a>
+    </div>
+    <p style="color: #6b7280; font-size: 13px;">
+      This invitation was sent to ${recipientName} (${eventName}). If this was a mistake, you can safely ignore this email.
+    </p>
+  </div>
+`;
+
+const teamSignupEmailTemplate = ({
+  recipientName,
+  eventName,
+  teamName,
+  leaderName,
+  roleLabel,
+  signupLink,
+  loginLink
+}) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #111827;">Hi ${recipientName},</h2>
+    <p>You have been listed as a team member for the event <strong>${eventName}</strong>.</p>
+    <p><strong>Team:</strong> ${teamName || "Team"}<br/>
+       <strong>Team Leader:</strong> ${leaderName || "Team Leader"}<br/>
+       <strong>Your Role:</strong> ${roleLabel || "Team Member"}</p>
+    <p>
+      Please sign up (or log in) with this email address to receive your invitation link and respond.
+    </p>
+    <div style="margin: 24px 0;">
+      <a href="${signupLink}" style="
+        display: inline-block;
+        padding: 12px 22px;
+        background-color: #4f46e5;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+      ">Create Account</a>
+      <a href="${loginLink}" style="
+        display: inline-block;
+        padding: 12px 22px;
+        background-color: #0f172a;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        margin-left: 10px;
+      ">Log In</a>
+    </div>
+    <p style="color: #6b7280; font-size: 13px;">
+      After you log in, you will receive the accept or reject invitation email.
+    </p>
+  </div>
+`;
+
+const teamLeaderPendingEmailTemplate = ({
+  recipientName,
+  eventName,
+  teamName,
+  memberCount
+}) => `
+  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+    <h2 style="color: #111827;">Hi ${recipientName},</h2>
+    <p>Your team registration for <strong>${eventName}</strong> has been created.</p>
+    <p><strong>Team:</strong> ${teamName || "Team"}<br/>
+       <strong>Members:</strong> ${memberCount}</p>
+    <p>We are waiting for your team members to accept their invitations.</p>
+    <p style="color: #6b7280; font-size: 13px;">
+      Once all members accept, registration will be confirmed and everyone will receive a confirmation email.
+    </p>
+  </div>
+`;
+
+const sendTeamInvitationEmail = async ({ invite, event, registration }) => {
+  const email = normalizeEmail(invite?.email);
+  if (!email) return;
+  if (String(invite?.role || "").trim().toLowerCase() === "leader") return;
+  const displayName = String(invite?.name || "Participant").trim() || "Participant";
+  const eventName = String(event?.title || "Event").trim() || "Event";
+  const teamName = String(registration?.teamName || "").trim();
+  const leaderName = String(registration?.teamLeader?.name || "").trim();
+  const roleLabel = formatTeamRoleLabel(invite?.role);
+  const acceptLink = buildTeamInviteLink(invite.token, "accept");
+  const rejectLink = buildTeamInviteLink(invite.token, "reject");
+
+  await sendEmail(
+    email,
+    `Team Invitation - ${eventName}`,
+    teamInviteEmailTemplate({
+      recipientName: displayName,
+      eventName,
+      teamName,
+      leaderName,
+      roleLabel,
+      acceptLink,
+      rejectLink
+    })
+  );
+};
+
+const sendTeamLeaderPendingEmail = async ({ registration, event }) => {
+  const email = normalizeEmail(registration?.teamLeader?.email);
+  if (!email) return;
+  const displayName = String(registration?.teamLeader?.name || "Team Leader").trim() || "Team Leader";
+  const eventName = String(event?.title || "Event").trim() || "Event";
+  const teamName = String(registration?.teamName || "").trim();
+  const memberCount = Array.isArray(registration?.teamMembers) ? registration.teamMembers.length : 0;
+
+  await sendEmail(
+    email,
+    `Team Registration Started - ${eventName}`,
+    teamLeaderPendingEmailTemplate({
+      recipientName: displayName,
+      eventName,
+      teamName,
+      memberCount
+    })
+  );
+};
+
+const sendTeamSignupEmail = async ({ invite, event, registration }) => {
+  const email = normalizeEmail(invite?.email);
+  if (!email) return;
+  const baseUrl = String(process.env.FRONTEND_URL || "").trim().replace(/\/$/, "");
+  const signupLink = `${baseUrl}/signup?email=${encodeURIComponent(email)}`;
+  const loginLink = `${baseUrl}/login?email=${encodeURIComponent(email)}`;
+  const displayName = String(invite?.name || "Participant").trim() || "Participant";
+  const eventName = String(event?.title || "Event").trim() || "Event";
+  const teamName = String(registration?.teamName || "").trim();
+  const leaderName = String(registration?.teamLeader?.name || "").trim();
+  const roleLabel = formatTeamRoleLabel(invite?.role);
+
+  await sendEmail(
+    email,
+    `Complete Signup to Join ${eventName}`,
+    teamSignupEmailTemplate({
+      recipientName: displayName,
+      eventName,
+      teamName,
+      leaderName,
+      roleLabel,
+      signupLink,
+      loginLink
+    })
+  );
+};
+
+const createTeamInvitations = async (registration, event, { sendNotifications = true } = {}) => {
+  const participants = buildTeamParticipants(registration);
+  if (!participants.length) return [];
+
+  const participantEmails = participants.map((participant) => participant.email);
+  const existingInvites = await TeamInvitation.find({
+    registration: registration._id,
+    email: { $in: participantEmails }
+  });
+  const inviteByEmail = new Map(
+    existingInvites.map((invite) => [normalizeEmail(invite?.email), invite])
+  );
+
+  const existingUsers = await User.find({ email: { $in: participantEmails } }).select(
+    "_id email lastLoginAt"
+  );
+  const userByEmail = new Map(
+    existingUsers.map((user) => [normalizeEmail(user?.email), user])
+  );
+
+  const registeredByUser = registration?.registeredBy
+    ? await User.findById(registration.registeredBy).select("_id email lastLoginAt")
+    : null;
+  const registeredByEmail = normalizeEmail(registeredByUser?.email);
+
+  const inviteDocs = [];
+  const updatedInvites = [];
+
+  for (const participant of participants) {
+    const existingInvite = inviteByEmail.get(participant.email);
+    const existingUser = userByEmail.get(participant.email);
+    const isLeader = participant.role === "leader";
+    const leaderSignedIn =
+      isLeader || (registeredByEmail && participant.email === registeredByEmail);
+    const hasSignedIn = leaderSignedIn || Boolean(existingUser?.lastLoginAt);
+    const userId = existingUser?._id || (leaderSignedIn ? registeredByUser?._id : null);
+
+    if (existingInvite) {
+      const updates = {};
+      if (isLeader && existingInvite.role !== "leader") {
+        updates.role = "leader";
+      }
+      if (isLeader && existingInvite.status !== "ACCEPTED") {
+        updates.status = "ACCEPTED";
+        updates.respondedAt = existingInvite.respondedAt || new Date();
+        updates.inviteSentAt = null;
+        if (userId) updates.user = userId;
+      } else if (!isLeader && leaderSignedIn && existingInvite.status === "AWAITING_SIGNUP") {
+        updates.status = "PENDING";
+        updates.inviteSentAt = new Date();
+        if (userId) updates.user = userId;
+      }
+
+      if (Object.keys(updates).length) {
+        await TeamInvitation.updateOne({ _id: existingInvite._id }, { $set: updates });
+        updatedInvites.push({ ...existingInvite.toObject(), ...updates });
+      }
+      continue;
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const status = isLeader ? "ACCEPTED" : hasSignedIn ? "PENDING" : "AWAITING_SIGNUP";
+    inviteDocs.push({
+      registration: registration._id,
+      email: participant.email,
+      name: participant.name,
+      role: participant.role,
+      token,
+      status,
+      user: userId,
+      inviteSentAt: status === "PENDING" ? new Date() : null,
+      respondedAt: status === "ACCEPTED" ? new Date() : null
+    });
+  }
+
+  const createdInvites = inviteDocs.length ? await TeamInvitation.insertMany(inviteDocs) : [];
+
+  if (sendNotifications) {
+    for (const invite of [...createdInvites, ...updatedInvites]) {
+      try {
+        if (invite.status === "PENDING") {
+          await sendTeamInvitationEmail({ invite, event, registration });
+        } else if (invite.status === "AWAITING_SIGNUP") {
+          await sendTeamSignupEmail({ invite, event, registration });
+        }
+      } catch (error) {
+        console.error("Team invitation email error:", error.message);
+      }
+    }
+  }
+
+  return createdInvites;
+};
+
 /* ================================================
    INITIATE REGISTRATION
 ================================================ */
 
 export const initiateRegistration = async (eventId, userId, payload) => {
   const { teamName, teamLeader, teamMembers = [] } = payload;
+  const normalizedTeamMembers = Array.isArray(teamMembers) ? teamMembers : [];
 
   const event = await Event.findById(eventId);
   if (!event) throw new Error("Event not found");
+
+  const isTeam = Boolean(event?.isTeamEvent);
+  const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
+  const requester = await User.findById(userId);
+  if (!requester) throw new Error("User not found");
+
+  if (isTeam && String(requester?.role || "").toUpperCase() === "STUDENT_COORDINATOR") {
+    throw new Error("Coordinators cannot participate in team events");
+  }
+  if (visibilityScope === "DEPARTMENT") {
+    const userDepartment = String(
+      requester?.academicProfile?.branch || requester?.professionalProfile?.department || ""
+    ).trim();
+    const eventDepartment = String(event?.visibility?.department || "").trim();
+    const normalizedEventDepartment = normalizeDepartment(eventDepartment);
+    if (
+      !userDepartment ||
+      !eventDepartment ||
+      userDepartment.toLowerCase() !== eventDepartment.toLowerCase()
+    ) {
+      throw new Error("This event is restricted to a specific department");
+    }
+
+    if (isTeam && normalizedEventDepartment) {
+      const leaderDepartment = normalizeDepartment(teamLeader?.branch || teamLeader?.department);
+      if (!leaderDepartment || leaderDepartment !== normalizedEventDepartment) {
+        throw new Error("Team leader must belong to the event department");
+      }
+
+      for (const member of normalizedTeamMembers) {
+        const memberDepartment = normalizeDepartment(member?.branch || member?.department);
+        if (!memberDepartment || memberDepartment !== normalizedEventDepartment) {
+          throw new Error("All team members must belong to the event department");
+        }
+      }
+    }
+  }
+
+  const assignedCoordinators = Array.isArray(event?.studentCoordinators) ? event.studentCoordinators : [];
+  const normalizedUserId = String(userId || "").trim();
+  const isAssignedCoordinator = assignedCoordinators.some(
+    (coordinator) => coordinator?.coordinatorId?.toString() === normalizedUserId
+  );
+  if (isAssignedCoordinator) {
+    throw new Error("Coordinators cannot register for their own event");
+  }
+
+  const coordinatorEmails = new Set(
+    assignedCoordinators.map((coordinator) => normalizeEmail(coordinator?.email)).filter(Boolean)
+  );
+  const leaderEmail = normalizeEmail(teamLeader?.email);
+  const memberEmails = normalizedTeamMembers.map((member) => normalizeEmail(member?.email)).filter(Boolean);
+  const participantEmails = [leaderEmail, ...memberEmails].filter(Boolean);
+  if (leaderEmail && coordinatorEmails.has(leaderEmail)) {
+    throw new Error("Coordinators cannot register for their own event");
+  }
+
+  if (normalizedTeamMembers.length > 0) {
+    const memberIsCoordinator = normalizedTeamMembers.some((member) => {
+      const memberEmail = normalizeEmail(member?.email);
+      return memberEmail && coordinatorEmails.has(memberEmail);
+    });
+    if (memberIsCoordinator) {
+      throw new Error("Coordinators cannot participate in their own event");
+    }
+  }
+
+  if (isTeam && participantEmails.length > 0) {
+    const coordinatorUsers = await User.find({
+      role: "STUDENT_COORDINATOR",
+      email: { $in: participantEmails }
+    }).select("email");
+
+    if (coordinatorUsers.length > 0) {
+      throw new Error("Coordinators cannot participate in team events");
+    }
+  }
 
   if (event.status !== "Published")
     throw new Error("Event is not open for registration");
@@ -71,7 +488,7 @@ export const initiateRegistration = async (eventId, userId, payload) => {
     0
   );
 
-  const incomingCount = 1 + teamMembers.length;
+  const incomingCount = 1 + normalizedTeamMembers.length;
 
   if (totalOccupied + incomingCount > event.registration.maxParticipants)
     throw new Error("Event is full");
@@ -93,7 +510,6 @@ export const initiateRegistration = async (eventId, userId, payload) => {
     throw new Error("You already have an active registration for this event");
 
   const isPaid = event.registration?.fee > 0;
-  const isTeam = event.isTeamEvent;
 
   let initialStatus;
   if (!isTeam) {
@@ -102,11 +518,19 @@ export const initiateRegistration = async (eventId, userId, payload) => {
     initialStatus = "PendingMemberVerification";
   }
 
+  const sanitizedTeamLeader = {
+    ...(teamLeader || {}),
+    emailVerified: isTeam ? true : Boolean(teamLeader?.emailVerified)
+  };
+  const sanitizedTeamMembers = isTeam
+    ? normalizedTeamMembers.map((member) => ({ ...(member || {}), emailVerified: false }))
+    : [];
+
   const registration = await EventRegistration.create({
     event: eventId,
     teamName: isTeam ? teamName : null,
-    teamLeader,
-    teamMembers: isTeam ? teamMembers : [],
+    teamLeader: sanitizedTeamLeader,
+    teamMembers: sanitizedTeamMembers,
     registeredBy: userId,
     status: initialStatus,
     allMembersVerified: !isTeam
@@ -121,8 +545,10 @@ await sendNotification({
   recipientId: userId,
   recipientName: registration.teamLeader.name,
   recipientRole: "STUDENT",
-  title: "Registration Confirmed!",
-  message: `You're registered for ${event.title}`,
+  title: isTeam ? "Team Registration Started" : "Registration Confirmed!",
+  message: isTeam
+    ? `Team registration for ${event.title} is pending member acceptance.`
+    : `You're registered for ${event.title}`,
   type: "REGISTRATION",
   refId: registration._id
 });
@@ -145,8 +571,13 @@ await notifyAssignedCoordinators(event, () => ({
   refId: registration._id
 }));
 
-  if (isTeam && teamMembers.length > 0) {
-    await sendMemberVerificationEmails(registration, teamMembers);
+  if (isTeam) {
+    await createTeamInvitations(registration, event);
+    try {
+      await sendTeamLeaderPendingEmail({ registration, event });
+    } catch (error) {
+      console.error("Team leader pending email error:", error.message);
+    }
   }
 
   return registration;
@@ -160,11 +591,14 @@ export const verifyMember = async (token) => {
   const verification = await MemberVerification.findOne({ token });
 
   if (!verification) throw new Error("Invalid verification link");
-  if (verification.expiresAt < new Date()) throw new Error("Verification link has expired");
-  if (verification.verified) throw new Error("This email has already been verified");
+  const alreadyVerified = Boolean(verification.verified);
+  if (!alreadyVerified && verification.expiresAt < new Date())
+    throw new Error("Verification link has expired");
 
-  verification.verified = true;
-  await verification.save();
+  if (!alreadyVerified) {
+    verification.verified = true;
+    await verification.save();
+  }
 
   const registration = await EventRegistration.findById(verification.registration);
 
@@ -177,13 +611,19 @@ export const verifyMember = async (token) => {
     (m) => m.email === verification.email
   );
 
-  if (!member) throw new Error("Member not found in this registration");
+  if (member) {
+    member.emailVerified = true;
+  } else if (
+    normalizeEmail(registration?.teamLeader?.email) === normalizeEmail(verification.email)
+  ) {
+    registration.teamLeader.emailVerified = true;
+  } else {
+    throw new Error("Member not found in this registration");
+  }
 
-  member.emailVerified = true;
-
-  const allVerified = registration.teamMembers.every(
-    (m) => m.emailVerified === true
-  );
+  const allVerified =
+    Boolean(registration.teamLeader?.emailVerified) &&
+    registration.teamMembers.every((m) => m.emailVerified === true);
 
   if (allVerified) {
     registration.allMembersVerified = true;
@@ -207,28 +647,402 @@ export const verifyMember = async (token) => {
 };
 
 /* ================================================
+   TEAM INVITATION STATUS
+   Team leader views invitation progress
+================================================ */
+
+export const getTeamRegistrationStatus = async (registrationId, requesterId) => {
+  const registration = await EventRegistration.findById(registrationId).populate(
+    "event",
+    "title schedule venue status isTeamEvent"
+  );
+
+  if (!registration) throw new Error("Registration not found");
+  if (registration.registeredBy.toString() !== requesterId.toString())
+    throw new Error("Not authorized to view this registration");
+
+  const event = registration.event;
+  if (!event?.isTeamEvent) throw new Error("This registration is not a team registration");
+
+  const invites = await TeamInvitation.find({ registration: registration._id }).sort({ createdAt: 1 });
+  const inviteByEmail = new Map(
+    invites.map((invite) => [normalizeEmail(invite?.email), invite])
+  );
+
+  const members = buildTeamParticipants(registration).map((member) => {
+    const email = normalizeEmail(member?.email);
+    const invite = inviteByEmail.get(email);
+    const isLeader = member?.role === "leader";
+    const inviteStatus = String(invite?.status || "PENDING").trim();
+    return {
+      name: String(member?.name || "Member").trim() || "Member",
+      email: String(member?.email || "").trim(),
+      role: member?.role || "member",
+      status: isLeader ? "ACCEPTED" : inviteStatus,
+      invitedAt: invite?.inviteSentAt || null,
+      respondedAt: invite?.respondedAt || null
+    };
+  });
+
+  const summary = members.reduce(
+    (acc, member) => {
+      acc.total += 1;
+      if (member.status === "ACCEPTED") acc.accepted += 1;
+      else if (member.status === "REJECTED") acc.rejected += 1;
+      else if (member.status === "AWAITING_SIGNUP") acc.awaitingSignup += 1;
+      else acc.pending += 1;
+      return acc;
+    },
+    { total: 0, accepted: 0, rejected: 0, pending: 0, awaitingSignup: 0 }
+  );
+
+  const allAccepted = summary.total > 0 && summary.accepted === summary.total;
+  const anyRejected = summary.rejected > 0;
+  const canContinue =
+    allAccepted &&
+    !anyRejected &&
+    String(registration.status || "") === "PendingMemberVerification";
+
+  return {
+    registrationId: registration._id,
+    status: registration.status,
+    teamName: registration.teamName,
+    leader: {
+      name: registration?.teamLeader?.name || "",
+      email: registration?.teamLeader?.email || ""
+    },
+    event: {
+      id: event?._id || null,
+      title: event?.title || "Event",
+      date: formatEventDate(event),
+      venue: event?.venue?.location || event?.venue || "TBA"
+    },
+    members,
+    summary,
+    allAccepted,
+    anyRejected,
+    canContinue
+  };
+};
+
+/* ================================================
+   TEAM INVITATION DETAILS (PUBLIC)
+================================================ */
+
+export const getTeamInvitationDetails = async (token) => {
+  const invite = await TeamInvitation.findOne({ token });
+  if (!invite) throw new Error("Invalid invitation link");
+
+  const registration = await EventRegistration.findById(invite.registration);
+  if (!registration) throw new Error("Registration not found");
+
+  const event = await Event.findById(registration.event);
+
+  return {
+    status: invite.status,
+    email: invite.email,
+    name: invite.name,
+    role: invite.role || "member",
+    teamName: registration.teamName,
+    leaderName: registration?.teamLeader?.name || "",
+    event: {
+      title: event?.title || "Event",
+      date: formatEventDate(event),
+      venue: event?.venue?.location || event?.venue || "TBA"
+    }
+  };
+};
+
+/* ================================================
+   TEAM INVITATION RESPONSE (PUBLIC)
+================================================ */
+
+export const respondToTeamInvitation = async (token, action) => {
+  const invite = await TeamInvitation.findOne({ token });
+  if (!invite) throw new Error("Invalid invitation link");
+
+  if (invite.status === "AWAITING_SIGNUP") {
+    throw new Error("Please sign up with this email before responding.");
+  }
+
+  const normalizedAction = String(action || "").trim().toLowerCase();
+  if (normalizedAction !== "accept" && normalizedAction !== "reject") {
+    throw new Error("Invalid invitation action");
+  }
+  const nextStatus = normalizedAction === "accept" ? "ACCEPTED" : "REJECTED";
+
+  if (invite.status === nextStatus) {
+    return {
+      status: invite.status,
+      message: `You have already ${normalizedAction}ed this invitation.`
+    };
+  }
+
+  if (invite.status === "REJECTED" || invite.status === "ACCEPTED") {
+    throw new Error("This invitation has already been responded to.");
+  }
+
+  const registration = await EventRegistration.findById(invite.registration);
+  if (!registration) throw new Error("Registration not found");
+
+  if (registration.status === "Cancelled" || registration.status === "Rejected") {
+    throw new Error("This registration is no longer active");
+  }
+
+  invite.status = nextStatus;
+  invite.respondedAt = new Date();
+  await invite.save();
+
+  const member = registration.teamMembers.find(
+    (m) => normalizeEmail(m?.email) === normalizeEmail(invite.email)
+  );
+  if (member) {
+    member.emailVerified = nextStatus === "ACCEPTED";
+  } else if (
+    normalizeEmail(registration?.teamLeader?.email) === normalizeEmail(invite.email)
+  ) {
+    registration.teamLeader.emailVerified = nextStatus === "ACCEPTED";
+  }
+
+  const invites = await TeamInvitation.find({ registration: registration._id });
+  const allAccepted = invites.length > 0 && invites.every((entry) => entry.status === "ACCEPTED");
+  registration.allMembersVerified = allAccepted;
+  await registration.save();
+
+  try {
+    const event = await Event.findById(registration.event);
+    const actionLabel = nextStatus === "ACCEPTED" ? "accepted" : "rejected";
+    await sendNotification({
+      recipientId: registration.registeredBy,
+      recipientName: registration?.teamLeader?.name || "Team Leader",
+      recipientRole: "STUDENT",
+      title: "Team Invitation Update",
+      message: `${invite.name || invite.email} ${actionLabel} the invitation for ${event?.title || "your event"}.`,
+      type: "REGISTRATION",
+      refId: registration._id
+    });
+  } catch (error) {
+    console.error("Team invitation notification error:", error.message);
+  }
+
+  return {
+    status: invite.status,
+    message:
+      nextStatus === "ACCEPTED"
+        ? "Invitation accepted. Thanks for confirming."
+        : "Invitation rejected. The team leader has been notified."
+  };
+};
+
+/* ================================================
+   CONFIRM TEAM REGISTRATION
+   Team leader confirms after all accepted
+================================================ */
+
+export const confirmTeamRegistration = async (registrationId, requesterId) => {
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  if (registration.registeredBy.toString() !== requesterId.toString())
+    throw new Error("Not authorized to confirm this registration");
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+  if (!event.isTeamEvent) throw new Error("This registration is not a team registration");
+
+  if (registration.status === "Cancelled" || registration.status === "Rejected") {
+    throw new Error("This registration is no longer active");
+  }
+
+  if (registration.status === "Confirmed") {
+    return {
+      status: registration.status,
+      message: "Registration is already confirmed."
+    };
+  }
+
+  if (registration.status === "PendingPayment") {
+    return {
+      status: registration.status,
+      message: "Team accepted. Payment is pending."
+    };
+  }
+
+  const invites = await TeamInvitation.find({ registration: registration._id });
+  if (invites.length === 0) throw new Error("Team invitations are still pending");
+
+  for (const invite of invites) {
+    if (invite.role !== "leader") continue;
+    if (invite.status === "ACCEPTED") continue;
+    invite.status = "ACCEPTED";
+    invite.respondedAt = invite.respondedAt || new Date();
+    invite.inviteSentAt = null;
+    await invite.save();
+  }
+
+  const anyRejected = invites.some((invite) => invite.status === "REJECTED");
+  if (anyRejected) throw new Error("A team member rejected the invitation");
+
+  const allAccepted = invites.every((invite) => invite.status === "ACCEPTED");
+  if (!allAccepted) throw new Error("Waiting for all team members to accept");
+
+  registration.allMembersVerified = true;
+  const isPaid = event?.registration?.fee > 0;
+  registration.status = isPaid ? "PendingPayment" : "Confirmed";
+  await registration.save();
+
+  if (!isPaid) {
+    await generateQRsForRegistration(registration, event);
+  }
+
+  return {
+    status: registration.status,
+    message: isPaid
+      ? "Team accepted. Proceed to payment to complete registration."
+      : "Team accepted. Registration confirmed and QR codes have been sent."
+  };
+};
+
+/* ================================================
+   RESEND TEAM INVITES
+================================================ */
+
+export const resendTeamInvites = async (registrationId, requesterId) => {
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  if (registration.registeredBy.toString() !== requesterId.toString())
+    throw new Error("Not authorized to resend invites for this registration");
+
+  if (registration.status === "Cancelled" || registration.status === "Rejected") {
+    throw new Error("This registration is no longer active");
+  }
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+  if (!event.isTeamEvent) throw new Error("This registration is not a team registration");
+
+  await createTeamInvitations(registration, event, { sendNotifications: false });
+  const invites = await TeamInvitation.find({ registration: registration._id });
+
+  let sent = 0;
+
+  for (const invite of invites) {
+    if (invite.status === "ACCEPTED" || invite.status === "REJECTED") continue;
+
+    try {
+      if (invite.status === "PENDING") {
+        await sendTeamInvitationEmail({ invite, event, registration });
+      } else if (invite.status === "AWAITING_SIGNUP") {
+        await sendTeamSignupEmail({ invite, event, registration });
+      }
+      invite.inviteSentAt = new Date();
+      await invite.save();
+      sent += 1;
+    } catch (error) {
+      console.error("Resend team invite error:", error.message);
+    }
+  }
+
+  return {
+    sent,
+    message:
+      sent > 0
+        ? `Invitations resent to ${sent} member${sent === 1 ? "" : "s"}.`
+        : "No pending invitations to resend."
+  };
+};
+
+/* ================================================
+   SEND PENDING TEAM INVITES AFTER SIGN-IN
+================================================ */
+
+export const sendPendingTeamInvitesForUser = async (user) => {
+  const email = normalizeEmail(user?.email);
+  if (!email || !user?._id) return { sent: 0 };
+
+  const invites = await TeamInvitation.find({
+    email,
+    status: "AWAITING_SIGNUP"
+  });
+
+  if (!invites.length) return { sent: 0 };
+
+  let sentCount = 0;
+
+  for (const invite of invites) {
+    try {
+      const registration = await EventRegistration.findById(invite.registration);
+      if (!registration) continue;
+      if (registration.status === "Cancelled" || registration.status === "Rejected") continue;
+
+      const event = await Event.findById(registration.event);
+      if (!event) continue;
+
+      if (invite.role === "leader") {
+        invite.status = "ACCEPTED";
+        invite.respondedAt = invite.respondedAt || new Date();
+        invite.inviteSentAt = null;
+        invite.user = user._id;
+        await invite.save();
+        continue;
+      }
+
+      invite.status = "PENDING";
+      invite.user = user._id;
+      invite.inviteSentAt = new Date();
+      await invite.save();
+
+      await sendTeamInvitationEmail({ invite, event, registration });
+      sentCount += 1;
+    } catch (error) {
+      console.error("Pending team invite dispatch error:", error.message);
+    }
+  }
+
+  return { sent: sentCount };
+};
+
+/* ================================================
    GET MY REGISTRATIONS
    Student sees their own registrations + QR
 ================================================ */
 
 export const getMyRegistrations = async (userId) => {
-  const registrations = await EventRegistration.find({
-    registeredBy: userId
-  })
+  const user = await User.findById(userId).select("email");
+  const userEmail = normalizeEmail(user?.email);
+
+  const registrationQuery = userEmail
+    ? {
+        $or: [
+          { registeredBy: userId },
+          { "teamLeader.email": userEmail },
+          { "teamMembers.email": userEmail }
+        ]
+      }
+    : { registeredBy: userId };
+
+  const registrations = await EventRegistration.find(registrationQuery)
     .populate("event", "title category schedule venue status posterUrl")
     .sort({ createdAt: -1 });
 
-  // Attach QR for each registration
   const result = await Promise.all(
     registrations.map(async (reg) => {
-      const qr = await ParticipantQR.findOne({
-        registration: reg._id,
-        email: reg.teamLeader.email
-      }).select("qrImageUrl role attendanceMarked");
+      const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
+      const isTeamLeader =
+        reg?.registeredBy?.toString() === userId.toString() ||
+        (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
+      const qr = lookupEmail
+        ? await ParticipantQR.findOne({
+            registration: reg._id,
+            email: lookupEmail
+          }).select("qrImageUrl role attendanceMarked")
+        : null;
 
       return {
         ...reg.toObject(),
-        qr: qr || null
+        qr: qr || null,
+        isTeamLeader
       };
     })
   );
@@ -251,14 +1065,15 @@ export const getEventRegistrations = async (eventId, requester) => {
   const isOrganizer =
     event.organizer?.organizerId?.toString() === requesterId ||
     event.createdBy?.toString() === requesterId;
-  const isAssignedCoordinator =
-    requester?.role === "STUDENT_COORDINATOR" &&
-    event.studentCoordinators.some(
-      (coordinator) =>
-        coordinator.coordinatorId?.toString() === requesterId
-    );
+  const isAssignedCoordinator = event.studentCoordinators.some(
+    (coordinator) =>
+      coordinator.coordinatorId?.toString() === requesterId
+  );
+  const canAccessAsCoordinator =
+    isAssignedCoordinator &&
+    !(requester?.role === "STUDENT" && isEventOver(event));
 
-  if (!isAdmin && !isOrganizer && !isAssignedCoordinator)
+  if (!isAdmin && !isOrganizer && !canAccessAsCoordinator)
     throw new Error("Not authorized to view these registrations");
 
   const registrations = await EventRegistration.find({
@@ -286,26 +1101,34 @@ export const getEventRegistrations = async (eventId, requester) => {
    HELPER — Send verification emails
 ================================================ */
 
-const sendMemberVerificationEmails = async (registration, teamMembers) => {
-  for (const member of teamMembers) {
+const sendMemberVerificationEmails = async (registration, participants) => {
+  const seen = new Set();
+
+  for (const participant of participants) {
+    const email = normalizeEmail(participant?.email);
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+
     const token = crypto.randomBytes(32).toString("hex");
 
     await MemberVerification.create({
       registration: registration._id,
-      email: member.email,
+      email,
       token,
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
     });
 
     const verifyLink = `${process.env.FRONTEND_URL}/verify-registration?token=${token}`;
+    const displayName = String(participant?.name || "Participant").trim() || "Participant";
+    const roleLabel = participant?.role === "leader" ? "team leader" : "team member";
 
     await sendEmail(
-      member.email,
-      "Verify Your Event Registration — EventMate",
+      email,
+      "Verify Your Event Registration - EventMate",
       `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
-          <h2 style="color: #4f46e5;">Hi ${member.name},</h2>
-          <p>You've been added as a team member for an event on EventMate.</p>
+          <h2 style="color: #4f46e5;">Hi ${displayName},</h2>
+          <p>You're listed as the ${roleLabel} for a team event on EventMate.</p>
           <p>Please verify your participation by clicking the button below:</p>
           <div style="text-align: center; margin: 32px 0;">
             <a href="${verifyLink}" style="
@@ -525,6 +1348,16 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
   if (registration.status !== "Confirmed")
     throw new Error("Only confirmed registrations can be tagged as winners");
 
+  const leaderEmail = normalizeEmail(registration?.teamLeader?.email);
+  const leaderQr = await ParticipantQR.findOne({
+    registration: registration._id,
+    email: leaderEmail,
+    attendanceMarked: true
+  });
+
+  if (!leaderQr)
+    throw new Error("Attendance must be marked before tagging winners");
+
   // Check if this position already taken
   const positionTaken = await EventRegistration.findOne({
     event: event._id,
@@ -537,6 +1370,17 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
   // Check if this registration already has a position
   if (registration.winner.isWinner)
     throw new Error(`This team/participant is already tagged as ${registration.winner.position} place`);
+
+  const assignmentCount = Number(registration?.winner?.assignmentCount || 0);
+  const unassignedOnce = Boolean(registration?.winner?.unassignedOnce);
+
+  if (assignmentCount === 0) {
+    registration.winner.assignmentCount = 1;
+  } else if (assignmentCount === 1 && unassignedOnce) {
+    registration.winner.assignmentCount = 2;
+  } else {
+    throw new Error("Winner selection can only be changed once");
+  }
 
   // Tag winner
   registration.winner.isWinner = true;
@@ -552,3 +1396,62 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
     eventName: event.title
   };
 };
+
+export const untagWinner = async (registrationId, taggedBy) => {
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+
+  if (event.status === "Cancelled")
+    throw new Error("Cannot update winners for a cancelled event");
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const eventStart = new Date(event.schedule.startDate);
+  eventStart.setHours(0, 0, 0, 0);
+
+  if (today < eventStart)
+    throw new Error("Cannot update winners before event starts");
+
+  const isAdmin = taggedBy.role === "MAIN_ADMIN";
+  const isOrganizer =
+    event.createdBy.toString() === taggedBy._id.toString();
+
+  if (!isAdmin && !isOrganizer)
+    throw new Error("Not authorized to update winners for this event");
+
+  if (registration.status !== "Confirmed")
+    throw new Error("Only confirmed registrations can be updated");
+
+  if (!registration.winner.isWinner)
+    throw new Error("No winner assigned to remove");
+
+  const assignmentCount = Number(registration?.winner?.assignmentCount || 0);
+  const unassignedOnce = Boolean(registration?.winner?.unassignedOnce);
+
+  if (unassignedOnce)
+    throw new Error("Winner can be removed only once");
+
+  if (assignmentCount >= 2)
+    throw new Error("Winner selection is locked");
+
+  registration.winner.isWinner = false;
+  registration.winner.position = null;
+  registration.winner.unassignedOnce = true;
+  if (assignmentCount === 0) {
+    registration.winner.assignmentCount = 1;
+  }
+
+  await registration.save();
+
+  return {
+    name: event.isTeamEvent
+      ? registration.teamName
+      : registration.teamLeader.name,
+    isTeam: event.isTeamEvent,
+    eventName: event.title
+  };
+};
+

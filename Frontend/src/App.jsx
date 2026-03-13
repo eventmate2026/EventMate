@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import VerifyEmail from "./pages/VerifyEmail";
 import VerifyRegistration from "./pages/VerifyRegistration";
+import TeamInvite from "./pages/TeamInvite";
 import ForgotPassword from "./pages/ForgotPassword";
 import Profile from "./pages/Profile";
 import ProfileCustomization from "./pages/ProfileCustomization";
@@ -63,6 +64,12 @@ const AdminCertificatesAuditLogs = lazy(() =>
 const AdminSecurityReports = lazy(() =>
   import("./pages/AdminSecurityReports").catch(() => ({
     default: () => <div>Security and reports loading...</div>,
+  }))
+);
+
+const AdminProfile = lazy(() =>
+  import("./pages/AdminProfile").catch(() => ({
+    default: () => <div>Admin profile loading...</div>,
   }))
 );
 
@@ -207,6 +214,12 @@ const StudentMyEvents = lazy(() =>
 const StudentEventQRCode = lazy(() =>
   import("./pages/StudentEventQRCode").catch(() => ({
     default: () => <div>QR pass loading...</div>,
+  }))
+);
+
+const StudentTeamRegistration = lazy(() =>
+  import("./pages/StudentTeamRegistration").catch(() => ({
+    default: () => <div>Team registration loading...</div>,
   }))
 );
 
@@ -461,7 +474,6 @@ function DashboardLayout() {
 
   return (
     <div className="eventmate-app-shell eventmate-app-shell-dashboard relative isolate flex min-h-screen flex-col overflow-x-hidden">
-      <ScrollProgressBeam />
       <AmbientBackdrop variant="dashboard" />
       {!hideTopNav && (
         <Navbar
@@ -490,6 +502,7 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/verify-registration" element={<VerifyRegistration />} />
+          <Route path="/team-invite" element={<TeamInvite />} />
           <Route
             path="/attendance/verify"
             element={
@@ -586,6 +599,17 @@ export default function App() {
               <ProtectedRoute requiredRole="MAIN_ADMIN">
                 <Suspense fallback={<div className="p-8 text-center">Loading Security & Reports...</div>}>
                   <AdminSecurityReports />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin-dashboard/profile"
+            element={
+              <ProtectedRoute requiredRole="MAIN_ADMIN">
+                <Suspense fallback={<div className="p-8 text-center">Loading Admin Profile...</div>}>
+                  <AdminProfile />
                 </Suspense>
               </ProtectedRoute>
             }
@@ -724,7 +748,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Dashboard...</div>}>
                   <CoordinatorDashboard />
                 </Suspense>
@@ -735,7 +759,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/contact-admin"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Contact Admin...</div>}>
                   <CoordinatorContactAdmin />
                 </Suspense>
@@ -746,7 +770,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/registrations"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Registrations...</div>}>
                   <CoordinatorRegistrations />
                 </Suspense>
@@ -757,7 +781,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/event/:eventId/registrations"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Registrations...</div>}>
                   <CoordinatorRegistrations />
                 </Suspense>
@@ -768,7 +792,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/event/:eventId/details"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Event Details...</div>}>
                   <CoordinatorEventDetails />
                 </Suspense>
@@ -779,7 +803,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/event/:eventId/scan"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Attendance Scanner...</div>}>
                   <CoordinatorAttendanceScanner />
                 </Suspense>
@@ -790,7 +814,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/event/:eventId/scan-qr"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Attendance Scanner...</div>}>
                   <CoordinatorAttendanceScanner />
                 </Suspense>
@@ -801,7 +825,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/event/:eventId/feedback"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Feedback...</div>}>
                   <CoordinatorEventFeedback />
                 </Suspense>
@@ -812,7 +836,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/notifications"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Suspense fallback={<div className="p-8 text-center">Loading Notifications...</div>}>
                   <CoordinatorNotifications />
                 </Suspense>
@@ -823,7 +847,7 @@ export default function App() {
           <Route
             path="/coordinator-dashboard/profile"
             element={
-              <ProtectedRoute requiredRole="STUDENT_COORDINATOR">
+              <ProtectedRoute requiredRole={["STUDENT_COORDINATOR", "STUDENT"]}>
                 <Profile />
               </ProtectedRoute>
             }
@@ -884,6 +908,14 @@ export default function App() {
               element={
                 <Suspense fallback={<div className="p-8 text-center">Loading QR Pass...</div>}>
                   <StudentEventQRCode />
+                </Suspense>
+              }
+            />
+            <Route
+              path="team-registration/:registrationId"
+              element={
+                <Suspense fallback={<div className="p-8 text-center">Loading Team Registration...</div>}>
+                  <StudentTeamRegistration />
                 </Suspense>
               }
             />

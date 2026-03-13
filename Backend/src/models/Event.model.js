@@ -43,7 +43,8 @@ const EventSchema = new mongoose.Schema(
           default: null
         },
         name: String,
-        email: String
+        email: String,
+        department: String
       }
     ],
 
@@ -120,7 +121,10 @@ const EventSchema = new mongoose.Schema(
     /* ================= CERTIFICATE ================= */
 
     certificate: {
-      isEnabled: Boolean,
+      isEnabled: {
+        type: Boolean,
+        default: false
+      },
       templateId: {
         type: mongoose.Schema.Types.ObjectId
       },
@@ -247,6 +251,21 @@ const EventSchema = new mongoose.Schema(
       averageRating: Number
     },
 
+    /* ================= VISIBILITY ================= */
+
+    visibility: {
+      scope: {
+        type: String,
+        enum: ["COLLEGE", "DEPARTMENT"],
+        default: "COLLEGE"
+      },
+      department: {
+        type: String,
+        trim: true,
+        default: ""
+      }
+    },
+
     /* ================= EVENT STATUS ================= */
 
     status: {
@@ -300,6 +319,18 @@ EventSchema.pre("save", function () {
   // Registration sanity check
   if (this.registration.lastDate > this.schedule.startDate) {
     throw new Error("Registration lastDate cannot be after event startDate");
+  }
+
+  // Visibility sanity check
+  if (!this.visibility) {
+    this.visibility = { scope: "COLLEGE", department: "" };
+  }
+  const visibilityScope = String(this.visibility?.scope || "COLLEGE").toUpperCase();
+  if (visibilityScope === "COLLEGE") {
+    this.visibility.department = "";
+  }
+  if (visibilityScope === "DEPARTMENT" && !String(this.visibility?.department || "").trim()) {
+    throw new Error("Department is required for department-level events");
   }
 
 });

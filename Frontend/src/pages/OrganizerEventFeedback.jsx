@@ -25,6 +25,7 @@ const parseFeedbackRows = (payload) => {
     id: normalizeId(entry?._id || entry?.id) || `feedback-${index}`,
     reviewer: String(entry?.participantName || "Participant").trim() || "Participant",
     reviewerEmail: String(entry?.participantEmail || "").trim(),
+    reviewerDepartment: String(entry?.participantDepartment || entry?.department || "").trim(),
     rating: Number(entry?.rating || 0),
     comment: String(entry?.comment || "").trim() || "No written feedback provided.",
     submittedAt: entry?.createdAt || entry?.updatedAt || null,
@@ -205,6 +206,9 @@ export default function OrganizerEventFeedback() {
                         <div>
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">{row.reviewer}</p>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-300 break-all">{row.reviewerEmail || "Email unavailable"}</p>
+                          {row.reviewerDepartment ? (
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{row.reviewerDepartment}</p>
+                          ) : null}
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{formatDate(row.submittedAt)}</p>
                         </div>
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">

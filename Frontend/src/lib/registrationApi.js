@@ -43,6 +43,7 @@ const normalizeRegistration = (item) => {
     status: String(item?.status || "").trim(),
     totalParticipants: Number(item?.totalParticipants || 0) || 0,
     createdAt: item?.createdAt || null,
+    isTeamLeader: Boolean(item?.isTeamLeader),
     qr: qrImageUrl
       ? {
           qrImageUrl,

@@ -6,6 +6,7 @@ import {
   buildCertificateEmailSlug,
   generateCertificatesForEvent,
   generateCertificatesForSelection,
+  generateDemoCertificateBuffer,
   normalizeCertificateCustomization
 } from "../services/certificate.service.js";
 
@@ -36,6 +37,12 @@ const writeCertificateAuditLog = async (payload) => {
   } catch (error) {
     console.error("Failed to write certificate audit log:", error.message);
   }
+};
+
+const sanitizeFileName = (value, fallback) => {
+  const normalized = String(value || "").trim();
+  const safe = normalized.replace(/[^a-z0-9-_]+/gi, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
+  return safe || fallback;
 };
 
 /* ================================================
@@ -130,7 +137,7 @@ export const generateEventCertificates = async (req, res, next) => {
 export const generateSelectedCertificates = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.eventId).select(
-      "_id createdBy status title schedule venue certificate"
+      "_id createdBy status title schedule venue certificate isTeamEvent"
     );
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
@@ -379,6 +386,51 @@ export const downloadCertificate = async (req, res, next) => {
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="certificate_${certificate.participantName.replace(/\s/g, "_")}.pdf"`,
+      "Content-Length": pdfBuffer.length
+    });
+
+    return res.send(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ================================================
+   DOWNLOAD DEMO CERTIFICATE (ORGANIZER/ADMIN)
+================================================ */
+export const downloadDemoCertificate = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.eventId).select(
+      "_id createdBy title schedule venue certificate"
+    );
+
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const isAdmin = req.user.role === "MAIN_ADMIN";
+    const isOwner = event.createdBy.toString() === req.user._id.toString();
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to download demo certificate for this event"
+      });
+    }
+
+    if (!event?.certificate?.isEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: "Save certificate template before downloading a demo certificate."
+      });
+    }
+
+    const participantName = req.user.fullName || req.user.name || "Organizer";
+    const pdfBuffer = await generateDemoCertificateBuffer(event, participantName);
+    const safeTitle = sanitizeFileName(event.title, "event");
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename=\"demo_certificate_${safeTitle}.pdf\"`,
       "Content-Length": pdfBuffer.length
     });
 

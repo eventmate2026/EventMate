@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Link2, Loader2, Plus, Users } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Link2, Loader2, Plus, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { extractCreatedUser, extractEventList } from "../lib/backendAdapters";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const formDefaults = {
   fullName: "",
@@ -31,6 +33,7 @@ const upsertCoordinator = (list, payload) => {
   const coordinatorId = normalizeId(payload?.coordinatorId || payload?._id || payload?.id);
   const email = normalizeEmail(payload?.email);
   const fullName = String(payload?.fullName || payload?.name || "Coordinator").trim() || "Coordinator";
+  const department = resolveUserDepartment(payload);
   const key = coordinatorId || email;
   if (!key) return list;
 
@@ -41,6 +44,7 @@ const upsertCoordinator = (list, payload) => {
     coordinatorId,
     fullName,
     email: email || "N/A",
+    department,
   };
 
   if (index >= 0) {
@@ -61,11 +65,13 @@ const buildCoordinatorCatalog = (events, createdCoordinators) => {
   createdCoordinators.forEach((coordinator) => {
     const key = normalizeId(coordinator?.coordinatorId) || normalizeEmail(coordinator?.email);
     if (!key) return;
+    const department = resolveUserDepartment(coordinator);
     map.set(key, {
       key,
       coordinatorId: normalizeId(coordinator?.coordinatorId),
       fullName: String(coordinator?.fullName || "Coordinator").trim() || "Coordinator",
       email: normalizeEmail(coordinator?.email) || "N/A",
+      department,
     });
   });
 
@@ -74,11 +80,13 @@ const buildCoordinatorCatalog = (events, createdCoordinators) => {
     coordinators.forEach((item) => {
       const key = normalizeId(item?.coordinatorId) || normalizeEmail(item?.email);
       if (!key) return;
+      const department = resolveUserDepartment(item);
       map.set(key, {
         key,
         coordinatorId: normalizeId(item?.coordinatorId),
         fullName: String(item?.name || "Coordinator").trim() || "Coordinator",
         email: normalizeEmail(item?.email) || "N/A",
+        department,
       });
     });
   });
@@ -87,6 +95,7 @@ const buildCoordinatorCatalog = (events, createdCoordinators) => {
 };
 
 export default function OrganizerCoordinatorManagement() {
+  const navigate = useNavigate();
   const user = getStoredUser();
 
   const [form, setForm] = useState(formDefaults);
@@ -101,6 +110,8 @@ export default function OrganizerCoordinatorManagement() {
 
   const [listWarning, setListWarning] = useState(null);
   const [message, setMessage] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   const coordinatorCatalog = useMemo(
     () => buildCoordinatorCatalog(myEvents, createdCoordinators),
@@ -144,6 +155,24 @@ export default function OrganizerCoordinatorManagement() {
   }, [user?._id]);
 
   useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const pushToast = (payload) => {
+    setToast(payload);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4500);
+  };
+
+  useEffect(() => {
     const firstEventId = normalizeId(myEvents[0]?._id);
     if (!firstEventId) return;
 
@@ -181,6 +210,7 @@ export default function OrganizerCoordinatorManagement() {
             coordinatorId: createdCoordinatorId,
             fullName: created?.fullName || fullName,
             email: created?.email || email,
+            department: resolveUserDepartment(created),
           })
         );
       }
@@ -205,6 +235,17 @@ export default function OrganizerCoordinatorManagement() {
         type: "success",
         text: `${response.data?.message || "Coordinator created successfully."}${assignmentMessage}`,
       });
+      pushToast({
+        type: "success",
+        text: "Verification OTP sent to the coordinator email.",
+      });
+
+      const nextEmail = created?.email || email;
+      if (nextEmail) {
+        setTimeout(() => {
+          navigate("/verify-email", { state: { email: nextEmail } });
+        }, 400);
+      }
 
       setForm((prev) => ({
         ...formDefaults,
@@ -262,17 +303,25 @@ export default function OrganizerCoordinatorManagement() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
+        {toast && (
+          <div className="fixed top-6 right-6 z-50">
+            <div
+              className={`rounded-xl px-4 py-3 shadow-lg text-sm ${
+                toast.type === "success"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-red-600 text-white"
+              }`}
+            >
+              {toast.text}
+            </div>
+          </div>
+        )}
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Coordinator Management</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
             Create coordinator accounts and assign them to your events using current backend routes.
           </p>
         </section>
-
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200 inline-flex items-start gap-2 w-full">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          Backend does not expose organizer-wide coordinator account listing. This page shows coordinators attached to your events plus coordinators created in this session.
-        </div>
 
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Coordinator</h2>
@@ -351,7 +400,7 @@ export default function OrganizerCoordinatorManagement() {
               <option value="">Select coordinator</option>
               {assignableCoordinators.map((item) => (
                 <option key={item.key} value={item.coordinatorId}>
-                  {item.fullName} ({item.email})
+                  {item.fullName} ({item.email}){item.department ? ` • ${item.department}` : ""}
                 </option>
               ))}
             </select>
@@ -421,6 +470,9 @@ export default function OrganizerCoordinatorManagement() {
                           >
                             <p className="text-sm font-semibold text-slate-900 dark:text-white">{item?.name || "Coordinator"}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-300">{item?.email || "Email not available"}</p>
+                            {item?.department ? (
+                              <p className="text-xs text-slate-500 dark:text-slate-300">{item.department}</p>
+                            ) : null}
                           </div>
                         ))}
                       </div>

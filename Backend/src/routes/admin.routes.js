@@ -8,6 +8,12 @@ import { getAllUsersController, updateUserController, deleteUserController,
   getCertificatesRegistry,
   getCertificateAuditLogs,
   revokeCertificate } from "../controllers/admin.controller.js";
+import {
+  forceLogoutAllController,
+  getSecuritySettingsController,
+  rotateSecuritySecretController,
+  updateSecuritySettingsController
+} from "../controllers/securitySettings.controller.js";
 
 const router = express.Router();
 
@@ -52,6 +58,30 @@ router.patch(
   "/certificates/:certificateId/revoke",
   roleMiddleware("MAIN_ADMIN"),
   revokeCertificate
+);
+
+router.get(
+  "/security-settings",
+  roleMiddleware("MAIN_ADMIN"),
+  getSecuritySettingsController
+);
+
+router.patch(
+  "/security-settings",
+  roleMiddleware("MAIN_ADMIN"),
+  updateSecuritySettingsController
+);
+
+router.post(
+  "/security-settings/rotate-secret",
+  roleMiddleware("MAIN_ADMIN"),
+  rotateSecuritySecretController
+);
+
+router.post(
+  "/security-settings/force-logout",
+  roleMiddleware("MAIN_ADMIN"),
+  forceLogoutAllController
 );
 
 export default router;

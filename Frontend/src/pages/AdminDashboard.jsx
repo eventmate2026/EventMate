@@ -12,6 +12,7 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -151,12 +152,14 @@ export default function AdminDashboard() {
   const recentActivity = useMemo(() => {
     const feed = [];
     users.forEach((user) => {
+      const department = resolveUserDepartment(user);
       if (user.createdAt) {
         feed.push({
           id: `joined-${user._id}`,
           type: "joined",
           name: user.fullName,
           avatar: user.avatar || null,
+          department,
           detail: `${ROLE_LABELS[user.role] || user.role} account created`,
           time: user.createdAt,
         });
@@ -167,6 +170,7 @@ export default function AdminDashboard() {
           type: "login",
           name: user.fullName,
           avatar: user.avatar || null,
+          department,
           detail: "Successful login activity recorded",
           time: user.lastLoginAt,
         });
@@ -182,6 +186,7 @@ export default function AdminDashboard() {
     const rows = users.map((user) => ({
       Name: user.fullName,
       Email: user.email,
+      Department: resolveUserDepartment(user) || "N/A",
       Role: ROLE_LABELS[user.role] || user.role,
       Active: user.isActive ? "Yes" : "No",
       Verified: user.emailVerified ? "Yes" : "No",
@@ -346,7 +351,12 @@ export default function AdminDashboard() {
                             coreClassName="h-full w-full border border-slate-200 dark:border-white/10 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 text-xs font-semibold flex items-center justify-center"
                             fallback={<span>{getInitials(item.name || "U")}</span>}
                           />
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
+                            {item.department ? (
+                              <p className="text-xs text-slate-500 dark:text-slate-300 truncate">{item.department}</p>
+                            ) : null}
+                          </div>
                         </div>
                         <span className={`inline-flex items-center gap-1 text-xs font-medium ${item.type === "login" ? "text-emerald-600 dark:text-emerald-300" : "text-indigo-600 dark:text-indigo-300"}`}>
                           {item.type === "login" ? <UserCheck size={13} /> : <UserX size={13} />}

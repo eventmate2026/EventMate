@@ -10,7 +10,8 @@ import {
   downloadCertificate,
   verifyCertificate,
   updateEventCertificateCustomization,
-  uploadEventCertificateBackground
+  uploadEventCertificateBackground,
+  downloadDemoCertificate
 } from "../controllers/certificate.controller.js";
 
 const router = express.Router();
@@ -44,6 +45,14 @@ router.patch(
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   upload.single("background"),
   uploadEventCertificateBackground
+);
+
+// Organizer/Admin downloads a demo certificate
+router.get(
+  "/:eventId/demo",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  downloadDemoCertificate
 );
 
 // Organizer/Admin manually triggers certificate generation

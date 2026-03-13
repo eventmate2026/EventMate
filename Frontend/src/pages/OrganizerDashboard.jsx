@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   CalendarDays,
-  CircleCheck,
   Clock3,
   FileCheck2,
   Loader2,
@@ -16,13 +15,13 @@ import {
   Sparkles,
   Star,
   Users2,
-  XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { getStoredUser } from "../lib/auth";
+import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
+import { computeProfileProgress } from "../lib/profileProgress";
 
 const STATUS_STYLES = {
   Draft: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -179,7 +178,7 @@ const deriveEventStage = (event) => {
 
 export default function OrganizerDashboard() {
   const navigate = useNavigate();
-  const user = getStoredUser();
+  const [user, setUser] = useState(() => getStoredUser());
 
   const [events, setEvents] = useState([]);
   const [registrationStats, setRegistrationStats] = useState({});
@@ -254,6 +253,12 @@ export default function OrganizerDashboard() {
   useEffect(() => {
     fetchMyEvents();
   }, [user?._id]);
+
+  useEffect(() => {
+    return subscribeAuthUpdates(() => {
+      setUser(getStoredUser());
+    });
+  }, []);
 
   const handlePublishEvent = async (eventId) => {
     if (!eventId) return;
@@ -344,19 +349,8 @@ export default function OrganizerDashboard() {
     };
   }, [eventRows]);
 
-  const profileProgress = useMemo(() => {
-    const checks = [
-      Boolean(user?.fullName || user?.name),
-      Boolean(user?.email),
-      Boolean(user?.phone || user?.phoneNumber),
-      Boolean(user?.department || user?.organization || user?.college),
-      Boolean(user?.avatar),
-    ];
-    const done = checks.filter(Boolean).length;
-    const total = checks.length;
-    const percent = Math.round((done / total) * 100);
-    return { done, total, left: total - done, percent };
-  }, [user]);
+  const profileProgress = useMemo(() => computeProfileProgress(user), [user]);
+  const showProfileCard = profileProgress.left > 0;
 
   const activity = useMemo(() => {
     const rows = [];
@@ -825,53 +819,33 @@ export default function OrganizerDashboard() {
                 </div>
               </section>
 
-              <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Workflow Snapshot</h3>
-                <div className="mt-4 space-y-2">
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <Sparkles size={14} className="text-amber-500" />
-                    {metrics.workflow.draft} draft
+              {showProfileCard && (
+                <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-5 text-white shadow-xl shadow-indigo-500/20">
+                  <h3 className="text-lg font-semibold">Complete your profile</h3>
+                  <p className="mt-1 text-sm text-white/85">
+                    Better profile data helps admins and coordinators collaborate quickly.
                   </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <CalendarDays size={14} className="text-blue-500" />
-                    {metrics.workflow.published} published
-                  </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <CircleCheck size={14} className="text-emerald-500" />
-                    {metrics.workflow.completed} completed
-                  </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <XCircle size={14} className="text-rose-500" />
-                    {metrics.workflow.cancelled} cancelled
-                  </p>
-                </div>
-              </section>
-
-              <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-5 text-white shadow-xl shadow-indigo-500/20">
-                <h3 className="text-lg font-semibold">Complete your profile</h3>
-                <p className="mt-1 text-sm text-white/85">
-                  Better profile data helps admins and coordinators collaborate quickly.
-                </p>
-                <div className="mt-4">
-                  <div className="h-2 rounded-full bg-white/25">
-                    <div
-                      className="h-full rounded-full bg-white transition-all duration-300"
-                      style={{ width: `${profileProgress.percent}%` }}
-                    />
+                  <div className="mt-4">
+                    <div className="h-2 rounded-full bg-white/25">
+                      <div
+                        className="h-full rounded-full bg-white transition-all duration-300"
+                        style={{ width: `${profileProgress.percent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-white/90">
+                      <span>{profileProgress.percent}% completed</span>
+                      <span>{profileProgress.left} steps left</span>
+                    </div>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-white/90">
-                    <span>{profileProgress.percent}% completed</span>
-                    <span>{profileProgress.left} steps left</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/profile")}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-white"
-                >
-                  Continue Setup
-                </button>
-              </section>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/profile")}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-white"
+                  >
+                    Continue Setup
+                  </button>
+                </section>
+              )}
 
               <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Shortcuts</p>

@@ -8,6 +8,14 @@ import generateRefreshToken from "../utils/generateRefreshToken.js";
 import sendEmail from "../config/sendEmail.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 import { validateRegister } from "../validators/auth.validator.js";
+import { getSecuritySettings } from "../services/securitySettings.service.js";
+import { sendPendingTeamInvitesForUser } from "../services/registration.service.js";
+
+const clampNumber = (value, min, max, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+};
 
 // ---------------- REGISTER ----------------
 export const registerUserController = asyncHandler(async (req, res) => {
@@ -59,17 +67,81 @@ export const loginController = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email }).select("+password +refreshToken");
   if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
+
+  const settings = await getSecuritySettings();
+
+  if (settings?.maintenanceMode && user.role !== "MAIN_ADMIN") {
+    return res.status(503).json({
+      success: false,
+      message: "System is under maintenance. Please try again later.",
+    });
+  }
+
+  if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((user.lockoutUntil.getTime() - Date.now()) / 1000)
+    );
+    res.set("Retry-After", String(retryAfterSeconds));
+    return res.status(429).json({
+      success: false,
+      message: "Account locked. Please try again later.",
+      retryAfterSeconds,
+      lockedUntil: user.lockoutUntil,
+    });
+  }
+
   if (!user.emailVerified) return res.status(403).json({ success: false, message: "Verify email first" });
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
+  if (!isMatch) {
+    const maxFailed = clampNumber(settings?.maxFailedLoginAttempts, 3, 20, 5);
+    const lockoutMinutes = clampNumber(settings?.lockoutDurationMinutes, 5, 240, 30);
 
-  const accessToken = generateAccessToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+    const nextFailed = Math.max(0, Number(user.failedLoginAttempts || 0) + 1);
+    user.failedLoginAttempts = nextFailed;
+
+    let lockoutUntil = null;
+    if (nextFailed >= maxFailed) {
+      lockoutUntil = new Date(Date.now() + lockoutMinutes * 60 * 1000);
+      user.lockoutUntil = lockoutUntil;
+      user.failedLoginAttempts = 0;
+    }
+
+    await user.save();
+
+    if (lockoutUntil) {
+      const retryAfterSeconds = Math.max(1, Math.ceil(lockoutMinutes * 60));
+      res.set("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({
+        success: false,
+        message: "Account locked due to too many failed attempts.",
+        retryAfterSeconds,
+        lockedUntil: lockoutUntil,
+      });
+    }
+
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
+  }
+
+  if (user.failedLoginAttempts || user.lockoutUntil) {
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
+  }
+
+  const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
+  const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
+
+  const accessToken = generateAccessToken(user._id, `${accessMinutes}m`);
+  const refreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
 
   user.refreshToken = refreshToken;
   user.lastLoginAt = new Date();
   await user.save();
+
+  sendPendingTeamInvitesForUser(user).catch((error) => {
+    console.error("Pending team invite check failed:", error.message);
+  });
 
   res.json({ success: true, accessToken, refreshToken, role: user.role });
 });
@@ -102,9 +174,13 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
       return res.status(403).json({ success: false, message: "Invalid refresh token" });
     }
 
+    const settings = await getSecuritySettings();
+    const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
+    const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
+
     // Generate new tokens
-    const newAccessToken = generateAccessToken(user._id);
-    const newRefreshToken = generateRefreshToken(user._id);
+    const newAccessToken = generateAccessToken(user._id, `${accessMinutes}m`);
+    const newRefreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
 
     user.refreshToken = newRefreshToken;
     await user.save();

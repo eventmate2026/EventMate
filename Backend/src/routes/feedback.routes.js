@@ -19,7 +19,7 @@ router.post(
 router.get(
   "/:eventId",
   authMiddleware,
-  roleMiddleware("MAIN_ADMIN", "ORGANIZER", "STUDENT_COORDINATOR"),
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"),
   getEventFeedback
 );
 

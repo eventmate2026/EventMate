@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BellRing,
@@ -9,8 +9,8 @@ import {
   RefreshCcw,
   Save
 } from "lucide-react";
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import api from "../lib/api";
+import SummaryApi from "../api/SummaryApi";
 
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   maxFailedLoginAttempts: 5,
@@ -62,10 +62,32 @@ const Switch = ({ checked, onChange, disabled = false, label }) => (
 
 export default function AdminSecurityReports() {
   const [settings, setSettings] = useState(DEFAULT_SECURITY_SETTINGS);
+  const [initialSettings, setInitialSettings] = useState(DEFAULT_SECURITY_SETTINGS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [rotatingSecret, setRotatingSecret] = useState(false);
   const [forcingLogout, setForcingLogout] = useState(false);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await api({ ...SummaryApi.get_security_settings, cacheTTL: 60000 });
+        const data = response.data?.data || DEFAULT_SECURITY_SETTINGS;
+        setSettings(data);
+        setInitialSettings(data);
+      } catch (err) {
+        setError(err.response?.data?.message || "Unable to load security settings.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSettings();
+  }, []);
 
   const securityScore = useMemo(() => {
     let score = 100;
@@ -83,34 +105,63 @@ export default function AdminSecurityReports() {
   const handleRotateSecret = async () => {
     setRotatingSecret(true);
     setNotice("");
-    await wait(900);
-    setSettings((prev) => ({
-      ...prev,
-      lastRotatedAt: new Date().toISOString()
-    }));
-    setNotice("JWT secret rotated. Current sessions now require fresh login.");
-    setRotatingSecret(false);
+    try {
+      const response = await api({ ...SummaryApi.rotate_security_secret });
+      const data = response.data?.data;
+      if (data) {
+        setSettings(data);
+        setInitialSettings(data);
+      }
+      setNotice(response.data?.message || "JWT secret rotated. Current sessions now require fresh login.");
+    } catch (err) {
+      setNotice(err.response?.data?.message || "Unable to rotate secret right now.");
+    } finally {
+      setRotatingSecret(false);
+    }
   };
 
   const handleForceLogoutAll = async () => {
     setForcingLogout(true);
     setNotice("");
-    await wait(900);
-    setNotice("Forced logout applied to all active sessions.");
-    setForcingLogout(false);
+    try {
+      const response = await api({ ...SummaryApi.force_logout_all });
+      const data = response.data?.data;
+      if (data) {
+        setSettings(data);
+        setInitialSettings(data);
+      }
+      setNotice(response.data?.message || "Forced logout applied to all active sessions.");
+    } catch (err) {
+      setNotice(err.response?.data?.message || "Unable to force logout right now.");
+    } finally {
+      setForcingLogout(false);
+    }
   };
 
   const handleDiscardChanges = () => {
-    setSettings(DEFAULT_SECURITY_SETTINGS);
+    setSettings(initialSettings);
     setNotice("Unsaved changes discarded.");
   };
 
   const handleSaveConfiguration = async () => {
     setSaving(true);
     setNotice("");
-    await wait(1000);
-    setNotice("System security configuration saved.");
-    setSaving(false);
+    try {
+      const response = await api({
+        ...SummaryApi.update_security_settings,
+        data: settings
+      });
+      const data = response.data?.data;
+      if (data) {
+        setSettings(data);
+        setInitialSettings(data);
+      }
+      setNotice(response.data?.message || "System security configuration saved.");
+    } catch (err) {
+      setNotice(err.response?.data?.message || "Unable to save configuration.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -124,6 +175,19 @@ export default function AdminSecurityReports() {
             Configure global security protocols, token lifecycles, and admin incident actions.
           </p>
         </header>
+
+        {loading && (
+          <article className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-3 text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
+            <Loader2 size={14} className="animate-spin" />
+            Loading security settings...
+          </article>
+        )}
+
+        {error && !loading ? (
+          <article className="eventmate-panel rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+            {error}
+          </article>
+        ) : null}
 
         {notice ? (
           <article className="eventmate-panel rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">

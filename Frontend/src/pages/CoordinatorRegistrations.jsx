@@ -20,6 +20,15 @@ import { getStoredUser } from "../lib/auth";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeTeamName = (value) => String(value || "").trim();
+const compareStrings = (left, right) => String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+const rankParticipantRole = (value) => {
+  const role = String(value || "").toLowerCase();
+  if (role === "leader") return 0;
+  if (role === "member") return 1;
+  if (role === "participant") return 2;
+  return 3;
+};
 
 const parseRegistrationRows = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -48,6 +57,7 @@ const toParticipantRows = (registration) => {
     return structuredParticipants.map((participant, index) => {
       const participantEmail = String(participant?.email || "").trim();
       const qr = qrByEmail.get(normalizeEmail(participantEmail)) || null;
+      const hasQr = Boolean(qr?.qrImageUrl);
 
       return {
         id: normalizeId(participant?._id || participant?.id || `${registrationId}-${participantEmail || index}`),
@@ -55,9 +65,12 @@ const toParticipantRows = (registration) => {
         participantName: String(participant?.name || "Participant").trim() || "Participant",
         participantEmail,
         participantRole: String(qr?.role || (index === 0 ? "leader" : "member")).trim(),
+        department: String(participant?.branch || participant?.department || "").trim(),
+        year: String(participant?.year || "").trim(),
         teamName,
         registrationStatus,
         registeredAt,
+        hasQr,
         attendanceMarked: Boolean(qr?.attendanceMarked),
         attendanceMarkedAt: qr?.attendanceMarkedAt || null,
       };
@@ -71,9 +84,12 @@ const toParticipantRows = (registration) => {
       participantName: String(participant?.name || "Participant").trim() || "Participant",
       participantEmail: String(participant?.email || "").trim(),
       participantRole: String(participant?.role || "participant").trim(),
+      department: "",
+      year: "",
       teamName,
       registrationStatus,
       registeredAt,
+      hasQr: Boolean(participant?.qrImageUrl),
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
     }));
@@ -86,9 +102,12 @@ const toParticipantRows = (registration) => {
       participantName: "Participant",
       participantEmail: "",
       participantRole: "participant",
+      department: "",
+      year: "",
       teamName,
       registrationStatus,
       registeredAt,
+      hasQr: false,
       attendanceMarked: false,
       attendanceMarkedAt: null,
     },
@@ -96,7 +115,10 @@ const toParticipantRows = (registration) => {
 };
 
 const parseParticipantRows = (payload) =>
-  parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
+  parseRegistrationRows(payload)
+    .filter((registration) => String(registration?.status || "").trim() === "Confirmed")
+    .flatMap((registration) => toParticipantRows(registration))
+    .filter((row) => row.hasQr);
 
 const parseDate = (value) => {
   const date = new Date(value || 0);
@@ -180,6 +202,27 @@ const REGISTRATION_STATUS_STYLES = {
 
 const getStatusClass = (status) =>
   REGISTRATION_STATUS_STYLES[String(status || "")] || "bg-slate-200 text-slate-700";
+const sortRegistrationRows = (left, right) => {
+  const leftTeam = normalizeTeamName(left?.teamName);
+  const rightTeam = normalizeTeamName(right?.teamName);
+  const leftHasTeam = Boolean(leftTeam);
+  const rightHasTeam = Boolean(rightTeam);
+
+  if (leftHasTeam !== rightHasTeam) return leftHasTeam ? -1 : 1;
+
+  if (leftHasTeam && rightHasTeam) {
+    const teamCompare = compareStrings(leftTeam, rightTeam);
+    if (teamCompare !== 0) return teamCompare;
+  }
+
+  const roleCompare = rankParticipantRole(left?.participantRole) - rankParticipantRole(right?.participantRole);
+  if (roleCompare !== 0) return roleCompare;
+
+  const nameCompare = compareStrings(left?.participantName, right?.participantName);
+  if (nameCompare !== 0) return nameCompare;
+
+  return compareStrings(left?.participantEmail, right?.participantEmail);
+};
 
 export default function CoordinatorRegistrations() {
   const navigate = useNavigate();
@@ -275,42 +318,46 @@ export default function CoordinatorRegistrations() {
   const scannerEnabled = selectedEvent && selectedStatus !== "cancelled";
   const attendanceWindowOpen = isAttendanceWindowOpen(selectedEvent);
 
-  const filteredRegistrationRows = useMemo(() => {
+  const visibleRegistrationRows = useMemo(() => {
     const normalizedQuery = String(registrationQuery || "").trim().toLowerCase();
-    if (!normalizedQuery) return registrationRows;
+    const baseRows = registrationRows;
+    const rows = normalizedQuery
+      ? baseRows.filter((row) => {
+          const haystack = [
+            row.participantName,
+            row.participantEmail,
+            row.teamName,
+            row.registrationStatus,
+            row.participantRole,
+            row.department,
+          ]
+            .map((value) => String(value || "").toLowerCase())
+            .join(" ");
+          return haystack.includes(normalizedQuery);
+        })
+      : baseRows;
 
-    return registrationRows.filter((row) => {
-      const haystack = [
-        row.participantName,
-        row.participantEmail,
-        row.teamName,
-        row.registrationStatus,
-        row.participantRole,
-      ]
-        .map((value) => String(value || "").toLowerCase())
-        .join(" ");
-      return haystack.includes(normalizedQuery);
-    });
+    return rows.slice().sort(sortRegistrationRows);
   }, [registrationQuery, registrationRows]);
 
   const registrationStats = useMemo(() => {
     const totalParticipants = registrationRows.length;
-    const checkedIn = registrationRows.filter((row) => row.attendanceMarked).length;
-    const remaining = Math.max(0, totalParticipants - checkedIn);
-    const confirmed = registrationRows.filter((row) => row.registrationStatus === "Confirmed").length;
-    const groups = new Set(registrationRows.map((row) => row.registrationId).filter(Boolean)).size;
+    const attended = registrationRows.filter((row) => row.attendanceMarked).length;
+    const pending = registrationRows.filter((row) => row.registrationStatus !== "Confirmed").length;
+    const notAttended = registrationRows.filter(
+      (row) => row.registrationStatus === "Confirmed" && !row.attendanceMarked
+    ).length;
 
     return {
       totalParticipants,
-      checkedIn,
-      remaining,
-      confirmed,
-      groups,
+      attended,
+      pending,
+      notAttended,
     };
   }, [registrationRows]);
 
   return (
-    <section className="eventmate-page min-h-screen bg-[#eceff4]/90 px-4 py-8 sm:px-6">
+    <section className="eventmate-page min-h-screen bg-slate-100/80 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-6xl">
         <button
           type="button"
@@ -461,8 +508,8 @@ export default function CoordinatorRegistrations() {
             <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Registrations</h3>
-                  <p className="text-xs text-slate-500">Participants registered for the selected event.</p>
+                  <h3 className="text-lg font-bold text-slate-900">Registered Students</h3>
+                  <p className="text-xs text-slate-500">Live list of registrations for this event.</p>
                 </div>
                 <button
                   type="button"
@@ -475,26 +522,22 @@ export default function CoordinatorRegistrations() {
                 </button>
               </div>
 
-              <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Total Participants</p>
+                  <p className="text-[11px] text-slate-500">Total Registrations</p>
                   <p className="mt-0.5 text-sm font-semibold text-slate-900">{registrationStats.totalParticipants}</p>
                 </article>
                 <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Checked In</p>
-                  <p className="mt-0.5 text-sm font-semibold text-emerald-700">{registrationStats.checkedIn}</p>
+                  <p className="text-[11px] text-slate-500">Attended</p>
+                  <p className="mt-0.5 text-sm font-semibold text-emerald-700">{registrationStats.attended}</p>
                 </article>
                 <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Remaining</p>
-                  <p className="mt-0.5 text-sm font-semibold text-indigo-700">{registrationStats.remaining}</p>
+                  <p className="text-[11px] text-slate-500">Pending</p>
+                  <p className="mt-0.5 text-sm font-semibold text-amber-700">{registrationStats.pending}</p>
                 </article>
                 <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Confirmed</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{registrationStats.confirmed}</p>
-                </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Groups</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{registrationStats.groups}</p>
+                  <p className="text-[11px] text-slate-500">Not Attended</p>
+                  <p className="mt-0.5 text-sm font-semibold text-rose-700">{registrationStats.notAttended}</p>
                 </article>
               </section>
 
@@ -503,7 +546,7 @@ export default function CoordinatorRegistrations() {
                 <input
                   value={registrationQuery}
                   onChange={(event) => setRegistrationQuery(event.target.value)}
-                  placeholder="Search by name, email, team, status..."
+                  placeholder="Search by name, email, or team..."
                   className="w-full rounded-md border border-slate-200 bg-white px-9 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400"
                 />
               </label>
@@ -519,7 +562,7 @@ export default function CoordinatorRegistrations() {
                 </p>
               ) : registrationRows.length === 0 ? (
                 <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                  No registrations found for this event yet.
+                  No confirmed registrations with QR sent for this event yet.
                 </p>
               ) : (
                 <>
@@ -527,41 +570,42 @@ export default function CoordinatorRegistrations() {
                     <table className="min-w-full text-sm">
                       <thead className="bg-slate-100/80">
                         <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2.5 font-semibold">Participant</th>
-                          <th className="px-3 py-2.5 font-semibold">Contact</th>
+                          <th className="px-3 py-2.5 font-semibold">Student Name</th>
+                          <th className="px-3 py-2.5 font-semibold">Branch &amp; Year</th>
                           <th className="px-3 py-2.5 font-semibold">Team</th>
-                          <th className="px-3 py-2.5 font-semibold">Registration</th>
-                          <th className="px-3 py-2.5 font-semibold">Attendance</th>
-                          <th className="px-3 py-2.5 font-semibold">Registered</th>
+                          <th className="px-3 py-2.5 font-semibold">Reg. Date</th>
+                          <th className="px-3 py-2.5 font-semibold">Attendance Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 bg-white">
-                        {filteredRegistrationRows.length === 0 ? (
+                        {visibleRegistrationRows.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">
+                            <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
                               No participants match the current search.
                             </td>
                           </tr>
                         ) : (
-                          filteredRegistrationRows.map((row) => (
+                          visibleRegistrationRows.map((row) => (
                             <tr key={`${row.registrationId}-${row.id}`} className="align-top">
                               <td className="px-3 py-3">
                                 <div className="flex items-start gap-2.5">
                                   <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
                                   <div>
                                     <p className="font-semibold text-slate-900">{row.participantName}</p>
-                                    <p className="mt-0.5 text-xs text-slate-500">Role: {row.participantRole || "participant"}</p>
+                                    <p className="mt-0.5 text-xs text-slate-500">{row.participantEmail || "-"}</p>
+                                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}>
+                                      {row.registrationStatus}
+                                    </span>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-3 py-3">
-                                <p className="text-slate-800">{row.participantEmail || "-"}</p>
+                                <p className="text-slate-800">{row.department || "-"}</p>
+                                <p className="mt-0.5 text-xs text-slate-500">{row.year || "-"}</p>
                               </td>
                               <td className="px-3 py-3 text-slate-700">{row.teamName || "Individual"}</td>
                               <td className="px-3 py-3">
-                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}>
-                                  {row.registrationStatus}
-                                </span>
+                                <span className="text-xs text-slate-600">{formatDateTime(row.registeredAt)}</span>
                               </td>
                               <td className="px-3 py-3">
                                 {row.attendanceMarked ? (
@@ -579,7 +623,6 @@ export default function CoordinatorRegistrations() {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-3 py-3 text-xs text-slate-600">{formatDateTime(row.registeredAt)}</td>
                             </tr>
                           ))
                         )}
@@ -588,7 +631,7 @@ export default function CoordinatorRegistrations() {
                   </div>
 
                   <p className="mt-3 text-xs text-slate-500">
-                    Showing {filteredRegistrationRows.length} of {registrationRows.length} participants.
+                    Showing {visibleRegistrationRows.length} of {registrationRows.length} participants.
                   </p>
                 </>
               )}

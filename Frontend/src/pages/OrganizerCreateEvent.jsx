@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractUsersList } from "../lib/backendAdapters";
+import { getStoredUser } from "../lib/auth";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const initialForm = {
   title: "",
@@ -23,6 +25,8 @@ const initialForm = {
   maxTeamSize: "4",
   poster: null,
   resourceFile: null,
+  visibilityScope: "COLLEGE",
+  visibilityDepartment: "",
 };
 
 const fieldClass =
@@ -33,14 +37,24 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 export default function OrganizerCreateEvent() {
   const navigate = useNavigate();
+  const user = getStoredUser();
+  const defaultDepartment =
+    user?.professionalProfile?.department || user?.academicProfile?.branch || "";
+  const isOrganizer = String(user?.role || "").toUpperCase() === "ORGANIZER";
 
-  const [form, setForm] = useState(initialForm);
+  const buildInitialForm = () => ({
+    ...initialForm,
+    visibilityDepartment: defaultDepartment,
+  });
+
+  const [form, setForm] = useState(buildInitialForm);
   const [message, setMessage] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [coordinatorOptions, setCoordinatorOptions] = useState([]);
-  const [selectedCoordinatorId, setSelectedCoordinatorId] = useState("");
+  const [coordinatorPick, setCoordinatorPick] = useState("");
+  const [selectedCoordinatorIds, setSelectedCoordinatorIds] = useState([]);
   const [loadingCoordinatorOptions, setLoadingCoordinatorOptions] = useState(false);
   const [coordinatorOptionsError, setCoordinatorOptionsError] = useState("");
   const [judges, setJudges] = useState([]);
@@ -62,23 +76,38 @@ export default function OrganizerCreateEvent() {
       setLoadingCoordinatorOptions(true);
       setCoordinatorOptionsError("");
       try {
+        const includeStudents = true;
         const response = await api({
           ...SummaryApi.get_event_coordinators,
           cacheTTL: 60000,
+          params: { includeStudents: true, scope: form.visibilityScope },
         });
 
         const rows = extractUsersList(response.data);
         const options = rows
-          .filter((item) => String(item?.role || "").toUpperCase() === "STUDENT_COORDINATOR")
-          .map((item) => ({
-            id: normalizeId(item?._id || item?.id),
-            fullName: String(item?.fullName || "Coordinator").trim() || "Coordinator",
-            email: normalizeEmail(item?.email),
-          }))
-          .filter((item) => item.id)
-          .sort((a, b) => a.fullName.localeCompare(b.fullName));
+          .map((item) => {
+            const role = String(item?.role || "").toUpperCase();
+            if (!role) return null;
+            if (!includeStudents && role !== "STUDENT_COORDINATOR") return null;
+            return {
+              id: normalizeId(item?._id || item?.id),
+              fullName: String(item?.fullName || "Coordinator").trim() || "Coordinator",
+              email: normalizeEmail(item?.email),
+              role,
+              roleLabel: role === "STUDENT" ? "Student" : "Coordinator",
+              department: resolveUserDepartment(item),
+            };
+          })
+          .filter((item) => item && item.id)
+          .sort((a, b) => {
+            const rankA = a.role === "STUDENT" ? 1 : 0;
+            const rankB = b.role === "STUDENT" ? 1 : 0;
+            if (rankA !== rankB) return rankA - rankB;
+            return a.fullName.localeCompare(b.fullName);
+          });
 
         setCoordinatorOptions(options);
+        setSelectedCoordinatorIds((prev) => prev.filter((id) => options.some((item) => item.id === id)));
       } catch (error) {
         setCoordinatorOptions([]);
         setCoordinatorOptionsError(
@@ -90,7 +119,7 @@ export default function OrganizerCreateEvent() {
     };
 
     loadCoordinatorOptions();
-  }, []);
+  }, [form.visibilityScope]);
 
   const handleChange = (event) => {
     const { name, value, type, checked, files } = event.target;
@@ -100,6 +129,15 @@ export default function OrganizerCreateEvent() {
     }
     if (type === "file") {
       setForm((prev) => ({ ...prev, [name]: files?.[0] || null }));
+      return;
+    }
+    if (name === "visibilityScope") {
+      setForm((prev) => ({
+        ...prev,
+        visibilityScope: value,
+        visibilityDepartment:
+          value === "DEPARTMENT" && isOrganizer ? defaultDepartment : prev.visibilityDepartment,
+      }));
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -117,6 +155,20 @@ export default function OrganizerCreateEvent() {
 
   const handleListRemove = (setter, index) => {
     setter((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addCoordinator = () => {
+    const coordinatorId = normalizeId(coordinatorPick);
+    if (!coordinatorId) return;
+    setSelectedCoordinatorIds((prev) => {
+      if (prev.includes(coordinatorId)) return prev;
+      return [...prev, coordinatorId];
+    });
+    setCoordinatorPick("");
+  };
+
+  const removeCoordinator = (coordinatorId) => {
+    setSelectedCoordinatorIds((prev) => prev.filter((id) => id !== coordinatorId));
   };
 
   const validateForm = () => {
@@ -147,6 +199,12 @@ export default function OrganizerCreateEvent() {
       if (minTeam < 1 || maxTeam <= 1 || maxTeam < minTeam) {
         return "Team size values are invalid.";
       }
+    }
+
+    const visibilityDepartment =
+      form.visibilityScope === "DEPARTMENT" && isOrganizer ? defaultDepartment : form.visibilityDepartment;
+    if (form.visibilityScope === "DEPARTMENT" && !visibilityDepartment.trim()) {
+      return "Department is required for department-level events.";
     }
 
     return null;
@@ -187,8 +245,17 @@ export default function OrganizerCreateEvent() {
       })
     );
 
-    payload.append("certificate", JSON.stringify({ isEnabled: true }));
+    payload.append("certificate", JSON.stringify({ isEnabled: false }));
     payload.append("feedback", JSON.stringify({ enabled: true }));
+    const visibilityDepartment =
+      form.visibilityScope === "DEPARTMENT" && isOrganizer ? defaultDepartment : form.visibilityDepartment;
+    payload.append(
+      "visibility",
+      JSON.stringify({
+        scope: form.visibilityScope === "DEPARTMENT" ? "DEPARTMENT" : "COLLEGE",
+        department: form.visibilityScope === "DEPARTMENT" ? visibilityDepartment.trim() : "",
+      })
+    );
 
     const isTeamEvent = form.eventMode === "TEAM";
     payload.append("isTeamEvent", String(isTeamEvent));
@@ -229,21 +296,41 @@ export default function OrganizerCreateEvent() {
       }
 
       let assignmentNote = "";
-      const coordinatorId = normalizeId(selectedCoordinatorId);
-      const selectedCoordinator = coordinatorOptions.find((item) => item.id === coordinatorId);
+      const uniqueCoordinatorIds = Array.from(
+        new Set(selectedCoordinatorIds.map(normalizeId).filter(Boolean))
+      );
 
-      if (coordinatorId && createdEventId) {
-        try {
-          await api({
-            ...SummaryApi.assign_coordinator_to_event,
-            url: SummaryApi.assign_coordinator_to_event.url.replace(":eventId", createdEventId),
-            data: { coordinatorId },
-          });
-          assignmentNote = ` Coordinator assigned: ${selectedCoordinator?.fullName || "Selected coordinator"}.`;
-        } catch (assignError) {
-          assignmentNote = ` Coordinator assignment failed: ${
-            assignError.response?.data?.message || "Please assign from Coordinator Management."
-          }`;
+      if (uniqueCoordinatorIds.length && createdEventId) {
+        const results = await Promise.allSettled(
+          uniqueCoordinatorIds.map((coordinatorId) =>
+            (async () => {
+              return api({
+                ...SummaryApi.assign_coordinator_to_event,
+                url: SummaryApi.assign_coordinator_to_event.url.replace(":eventId", createdEventId),
+                data: { coordinatorId },
+              });
+            })()
+          )
+        );
+
+        const successNames = [];
+        const failedNames = [];
+        results.forEach((result, index) => {
+          const coordinatorId = uniqueCoordinatorIds[index];
+          const selectedCoordinator = coordinatorOptions.find((item) => item.id === coordinatorId);
+          const label = selectedCoordinator?.fullName || "Coordinator";
+          if (result.status === "fulfilled") {
+            successNames.push(label);
+          } else {
+            failedNames.push(label);
+          }
+        });
+
+        if (successNames.length) {
+          assignmentNote += ` Coordinators assigned: ${successNames.join(", ")}.`;
+        }
+        if (failedNames.length) {
+          assignmentNote += ` Failed to assign: ${failedNames.join(", ")}.`;
         }
       }
 
@@ -254,9 +341,10 @@ export default function OrganizerCreateEvent() {
           : `${createResponse.data?.message || "Event created as draft."}${assignmentNote}`,
       });
 
-      setForm(initialForm);
+      setForm(buildInitialForm());
       setPreviewUrl("");
-      setSelectedCoordinatorId("");
+      setCoordinatorPick("");
+      setSelectedCoordinatorIds([]);
       setJudges([]);
       setMentors([]);
     } catch (error) {
@@ -360,7 +448,7 @@ export default function OrganizerCreateEvent() {
                     className={`mt-1 ${fieldClass}`}
                   />
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Category</span>
                     <select
@@ -377,6 +465,18 @@ export default function OrganizerCreateEvent() {
                     </select>
                   </label>
                   <label className="block">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Event Level</span>
+                    <select
+                      name="visibilityScope"
+                      value={form.visibilityScope}
+                      onChange={handleChange}
+                      className={`mt-1 ${fieldClass}`}
+                    >
+                      <option value="COLLEGE">College Level</option>
+                      <option value="DEPARTMENT">Department Level</option>
+                    </select>
+                  </label>
+                  <label className="block">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Max Participants</span>
                     <input
                       type="number"
@@ -389,6 +489,26 @@ export default function OrganizerCreateEvent() {
                     />
                   </label>
                 </div>
+                {form.visibilityScope === "DEPARTMENT" && (
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Department</span>
+                    {isOrganizer ? (
+                      <input
+                        value={defaultDepartment || "Department not set in profile"}
+                        readOnly
+                        className={`mt-1 ${fieldClass} bg-slate-100 dark:bg-white/10`}
+                      />
+                    ) : (
+                      <input
+                        name="visibilityDepartment"
+                        value={form.visibilityDepartment}
+                        onChange={handleChange}
+                        placeholder="e.g. Computer Engineering"
+                        className={`mt-1 ${fieldClass}`}
+                      />
+                    )}
+                  </label>
+                )}
               </div>
             </section>
 
@@ -526,7 +646,7 @@ export default function OrganizerCreateEvent() {
 
             <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Assign Coordinator (Optional)</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Assign Coordinators (Optional)</p>
                 <button
                   type="button"
                   onClick={() => navigate("/organizer-dashboard/coordinator-management")}
@@ -538,21 +658,34 @@ export default function OrganizerCreateEvent() {
               <div className="mt-3 space-y-2">
                 <label className="block">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    Select coordinator for this event
+                    Select coordinators for this event
                   </span>
-                  <select
-                    value={selectedCoordinatorId}
-                    onChange={(event) => setSelectedCoordinatorId(event.target.value)}
-                    className={`mt-1 ${fieldClass}`}
-                    disabled={loadingCoordinatorOptions}
-                  >
-                    <option value="">No coordinator selected</option>
-                    {coordinatorOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.fullName} ({item.email || "no-email"})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <select
+                      value={coordinatorPick}
+                      onChange={(event) => setCoordinatorPick(event.target.value)}
+                      className={`${fieldClass} sm:flex-1`}
+                      disabled={loadingCoordinatorOptions}
+                    >
+                      <option value="">Choose a coordinator</option>
+                      {coordinatorOptions
+                        .filter((item) => !selectedCoordinatorIds.includes(item.id))
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.fullName} ({item.email || "no-email"}) • {item.roleLabel}
+                            {item.department ? ` • ${item.department}` : ""}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addCoordinator}
+                      disabled={!coordinatorPick}
+                      className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-70"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </label>
 
                 {loadingCoordinatorOptions && (
@@ -570,12 +703,43 @@ export default function OrganizerCreateEvent() {
 
                 {!loadingCoordinatorOptions && !coordinatorOptionsError && coordinatorOptions.length === 0 && (
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    No coordinator accounts found. Create one from Coordinator Management.
+                    {form.visibilityScope === "DEPARTMENT"
+                      ? "No coordinators or students found in your department."
+                      : "No coordinators or students found right now."}
+                  </p>
+                )}
+
+                {selectedCoordinatorIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCoordinatorIds.map((id) => {
+                      const selected = coordinatorOptions.find((item) => item.id === id);
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/15 dark:text-indigo-200"
+                        >
+                          {selected?.fullName || "Coordinator"}
+                          {selected?.roleLabel ? ` • ${selected.roleLabel}` : ""}
+                          {selected?.department ? ` • ${selected.department}` : ""}
+                          <button
+                            type="button"
+                            onClick={() => removeCoordinator(id)}
+                            className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] text-indigo-700 hover:bg-white"
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    No coordinators selected yet.
                   </p>
                 )}
 
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Selected coordinator will be linked right after event creation.
+                  Selected coordinators will be linked right after event creation.
                 </p>
               </div>
             </section>

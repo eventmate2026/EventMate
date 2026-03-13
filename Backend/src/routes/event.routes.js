@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 import upload from "../middleware/multer.middleware.js";
 import {
@@ -34,7 +35,7 @@ router.get(
 router.get(
   "/assigned-to-me",
   authMiddleware,
-  roleMiddleware("STUDENT_COORDINATOR"),
+  roleMiddleware("STUDENT_COORDINATOR", "STUDENT"),
   getMyAssignedEvents
 );
 
@@ -45,7 +46,7 @@ router.patch(
   publishEvent
 );
 
-router.get("/", getPublishedEvents);
+router.get("/", optionalAuthMiddleware, getPublishedEvents);
 
 router.patch(
   "/:id/cancel",

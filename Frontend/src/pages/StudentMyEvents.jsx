@@ -35,6 +35,7 @@ const formatTimeRange = (start, end) => {
 const normalizeStatus = (value) => {
   const normalized = String(value || "").trim();
   if (!normalized) return "Pending";
+  if (normalized === "PendingMemberVerification") return "Pending Team Acceptance";
   return normalized.replace(/([a-z])([A-Z])/g, "$1 $2");
 };
 

@@ -1,49 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Download,
-  FilePlus2,
-  History,
-  Loader2,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowLeft, CalendarDays, Download, Loader2, ShieldCheck } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
 
-const normalizeId = (value) => String(value || "").trim();
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-const buildSelectionKey = (registrationId, email) =>
-  `${normalizeId(registrationId)}::${normalizeEmail(email)}`;
-
 const formatDate = (value) => {
   const parsed = new Date(value || 0);
   if (Number.isNaN(parsed.getTime())) return "Date TBD";
   return parsed.toLocaleDateString([], { month: "short", day: "2-digit", year: "numeric" });
-};
-
-const formatDateTime = (value) => {
-  const parsed = new Date(value || 0);
-  if (Number.isNaN(parsed.getTime())) return "Recently";
-  return parsed.toLocaleString([], { month: "short", day: "2-digit", year: "numeric" });
-};
-
-const parseRegistrationRows = (payload) => {
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.registrations)) return payload.registrations;
-  if (Array.isArray(payload?.data?.registrations)) return payload.data.registrations;
-  return [];
-};
-
-const parseCertificateRows = (payload) => {
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.certificates)) return payload.certificates;
-  if (Array.isArray(payload?.data?.certificates)) return payload.data.certificates;
-  return [];
 };
 
 const PREVIEW_RATIO = 841 / 595;
@@ -241,12 +206,6 @@ const getPreviewTransformByAnchor = (anchor) => {
 
 const roundToTenth = (value) => Math.round(Number(value || 0) * 10) / 10;
 
-const countEligibleAttendance = (registrationRows) =>
-  registrationRows.reduce((sum, registration) => {
-    const participants = Array.isArray(registration?.participants) ? registration.participants : [];
-    return sum + participants.filter((participant) => Boolean(participant?.attendanceMarked)).length;
-  }, 0);
-
 const getEventDateLabel = (eventData) => {
   const start = formatDate(eventData?.schedule?.startDate);
   const end = formatDate(eventData?.schedule?.endDate);
@@ -261,16 +220,10 @@ export default function OrganizerCertificateManagement() {
   const dragCanvasRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [eventData, setEventData] = useState(null);
-  const [registrationRows, setRegistrationRows] = useState([]);
-  const [certificateRows, setCertificateRows] = useState([]);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [generating, setGenerating] = useState(false);
-  const [issuingSelected, setIssuingSelected] = useState(false);
-  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
-  const [issueSelections, setIssueSelections] = useState({});
+  const [downloadingDemo, setDownloadingDemo] = useState(false);
   const [customization, setCustomization] = useState(() =>
     normalizeCertificateCustomization(DEFAULT_CERTIFICATE_CUSTOMIZATION)
   );
@@ -282,65 +235,40 @@ export default function OrganizerCertificateManagement() {
   const [uploadingBackground, setUploadingBackground] = useState(false);
   const [draggingLayoutKey, setDraggingLayoutKey] = useState(null);
 
-  const load = useCallback(
-    async ({ silent = false } = {}) => {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      setError(null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const [detailResponse, registrationResponse, certificatesResponse] = await Promise.all([
-          api({
-            ...SummaryApi.get_public_event_details,
-            url: SummaryApi.get_public_event_details.url.replace(":eventId", encodeURIComponent(eventId || "")),
-          }),
-          api({
-            ...SummaryApi.get_event_registrations,
-            url: SummaryApi.get_event_registrations.url.replace(":eventId", encodeURIComponent(eventId || "")),
-          }),
-          api({
-            ...SummaryApi.get_event_certificates,
-            url: SummaryApi.get_event_certificates.url.replace(":eventId", encodeURIComponent(eventId || "")),
-            cacheTTL: 45000,
-          }),
-        ]);
+    try {
+      const detailResponse = await api({
+        ...SummaryApi.get_public_event_details,
+        url: SummaryApi.get_public_event_details.url.replace(":eventId", encodeURIComponent(eventId || "")),
+      });
 
-        const event = extractEventItem(detailResponse.data);
-        if (!event) {
-          setError("Event not found.");
-          setEventData(null);
-          setRegistrationRows([]);
-          setCertificateRows([]);
-          const fallbackCustomization = normalizeCertificateCustomization(DEFAULT_CERTIFICATE_CUSTOMIZATION);
-          setCustomization(fallbackCustomization);
-          setDraftCustomization(fallbackCustomization);
-          return;
-        }
-
-        const nextCustomization = normalizeCertificateCustomization(event?.certificate?.customization);
-        setEventData(event);
-        setRegistrationRows(parseRegistrationRows(registrationResponse.data));
-        setCertificateRows(parseCertificateRows(certificatesResponse.data));
-        setCustomization(nextCustomization);
-        setDraftCustomization(nextCustomization);
-      } catch (fetchError) {
-        setError(fetchError.response?.data?.message || "Unable to load certificate management workspace.");
+      const event = extractEventItem(detailResponse.data);
+      if (!event) {
+        setError("Event not found.");
         setEventData(null);
-        setRegistrationRows([]);
-        setCertificateRows([]);
         const fallbackCustomization = normalizeCertificateCustomization(DEFAULT_CERTIFICATE_CUSTOMIZATION);
         setCustomization(fallbackCustomization);
         setDraftCustomization(fallbackCustomization);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+        return;
       }
-    },
-    [eventId]
-  );
+
+      const nextCustomization = normalizeCertificateCustomization(event?.certificate?.customization);
+      setEventData(event);
+      setCustomization(nextCustomization);
+      setDraftCustomization(nextCustomization);
+    } catch (fetchError) {
+      setError(fetchError.response?.data?.message || "Unable to load certificate management workspace.");
+      setEventData(null);
+      const fallbackCustomization = normalizeCertificateCustomization(DEFAULT_CERTIFICATE_CUSTOMIZATION);
+      setCustomization(fallbackCustomization);
+      setDraftCustomization(fallbackCustomization);
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId]);
 
   useEffect(() => {
     load();
@@ -352,259 +280,50 @@ export default function OrganizerCertificateManagement() {
     }
   }, [isCustomizeDialogOpen]);
 
-  const stats = useMemo(() => {
-    const totalRegistered = registrationRows.reduce((sum, row) => {
-      const count = Number(row?.totalParticipants);
-      if (Number.isFinite(count) && count > 0) return sum + count;
-
-      const participants = Array.isArray(row?.participants) ? row.participants.length : 0;
-      if (participants > 0) return sum + participants;
-
-      return sum + 1;
-    }, 0);
-
-    const eligibleAttended = countEligibleAttendance(registrationRows);
-    const issuedCount = certificateRows.length;
-
-    return {
-      totalRegistered,
-      eligibleAttended,
-      issuedCount,
-    };
-  }, [registrationRows, certificateRows]);
-
-  const attendedParticipants = useMemo(() => {
-    const rows = [];
-    const seen = new Set();
-
-    registrationRows.forEach((registration) => {
-      const registrationId = normalizeId(registration?._id);
-      const participants = Array.isArray(registration?.participants) ? registration.participants : [];
-      const isWinner = Boolean(registration?.winner?.isWinner);
-      const winnerPosition = String(registration?.winner?.position || "").trim();
-
-      participants.forEach((participant) => {
-        if (!participant?.attendanceMarked) return;
-        const email = normalizeEmail(participant?.email);
-        if (!email || !registrationId) return;
-        const key = buildSelectionKey(registrationId, email);
-        if (seen.has(key)) return;
-        seen.add(key);
-
-        rows.push({
-          key,
-          registrationId,
-          participantName: String(participant?.name || participant?.fullName || "Participant").trim() || "Participant",
-          participantEmail: email,
-          teamName: String(registration?.teamName || "").trim(),
-          defaultType: isWinner ? "winner" : "participation",
-          defaultPosition: isWinner ? winnerPosition : ""
-        });
-      });
-    });
-
-    return rows.sort((a, b) => a.participantName.localeCompare(b.participantName));
-  }, [registrationRows]);
-
-  useEffect(() => {
-    setIssueSelections((prev) => {
-      const next = {};
-      attendedParticipants.forEach((participant) => {
-        const existing = prev?.[participant.key] || {};
-        next[participant.key] = {
-          selected: Boolean(existing.selected),
-          certificateType: existing.certificateType || participant.defaultType,
-          position: existing.position || participant.defaultPosition
-        };
-      });
-      return next;
-    });
-  }, [attendedParticipants]);
-
-  const selectedCount = useMemo(
-    () => Object.values(issueSelections).filter((entry) => Boolean(entry?.selected)).length,
-    [issueSelections]
-  );
-
-  const recentIssued = useMemo(() => {
-    return [...certificateRows]
-      .sort((a, b) => new Date(b?.issuedAt || 0).getTime() - new Date(a?.issuedAt || 0).getTime())
-      .slice(0, 5)
-      .map((row, index) => ({
-        id: normalizeId(row?._id || `${row?.participantEmail}-${index}`),
-        participantName: String(row?.participantName || "Participant").trim() || "Participant",
-        participantEmail: normalizeEmail(row?.participantEmail),
-        issuedAt: row?.issuedAt || null,
-      }));
-  }, [certificateRows]);
-
-  const encodedEventId = encodeURIComponent(normalizeId(eventData?._id || eventId || ""));
   const previewCustomization = useMemo(
     () => normalizeCertificateCustomization(isCustomizeDialogOpen ? draftCustomization : customization),
     [customization, draftCustomization, isCustomizeDialogOpen]
   );
 
-  const handleGenerateClick = async () => {
-    setGenerating(true);
-    setNotice(null);
-    try {
-      const response = await api({
-        ...SummaryApi.generate_event_certificates,
-        url: SummaryApi.generate_event_certificates.url.replace(
-          ":eventId",
-          encodeURIComponent(eventId || "")
-        ),
-      });
-      await load({ silent: true });
-      const metrics = response?.data?.data;
-      if (metrics) {
-        const firstFailureReason = Array.isArray(metrics?.failures)
-          ? String(metrics.failures[0]?.reason || "").trim()
-          : "";
-        const failureSuffix =
-          Number(metrics.failedRegistrations || 0) > 0 && firstFailureReason
-            ? ` First error: ${firstFailureReason}`
-            : "";
-        setNotice(
-          `Generation completed. Registrations: ${metrics.totalRegistrations}, Issued: ${metrics.generatedCertificates}, Failed: ${metrics.failedRegistrations}.${failureSuffix}`
-        );
-      } else {
-        setNotice("Certificate generation completed and records refreshed.");
-      }
-    } catch (generateError) {
-      setNotice(generateError.response?.data?.message || "Unable to generate certificates.");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleToggleSelection = (key) => (eventValue) => {
-    const checked = Boolean(eventValue?.target?.checked);
-    setIssueSelections((prev) => ({
-      ...prev,
-      [key]: {
-        ...(prev?.[key] || {}),
-        selected: checked
-      }
-    }));
-  };
-
-  const handleTemplateChange = (key) => (eventValue) => {
-    const value = String(eventValue?.target?.value || "").trim();
-    setIssueSelections((prev) => ({
-      ...prev,
-      [key]: {
-        ...(prev?.[key] || {}),
-        certificateType: value,
-        position: value === "winner" ? prev?.[key]?.position || "" : ""
-      }
-    }));
-  };
-
-  const handlePositionChange = (key) => (eventValue) => {
-    const value = String(eventValue?.target?.value || "").trim();
-    setIssueSelections((prev) => ({
-      ...prev,
-      [key]: {
-        ...(prev?.[key] || {}),
-        position: value
-      }
-    }));
-  };
-
-  const handleSelectAll = () => {
-    setIssueSelections((prev) => {
-      const next = { ...(prev || {}) };
-      attendedParticipants.forEach((participant) => {
-        next[participant.key] = {
-          selected: true,
-          certificateType: next[participant.key]?.certificateType || participant.defaultType,
-          position: next[participant.key]?.position || participant.defaultPosition
-        };
-      });
-      return next;
-    });
-  };
-
-  const handleClearSelection = () => {
-    setIssueSelections((prev) => {
-      const next = { ...(prev || {}) };
-      Object.keys(next).forEach((key) => {
-        next[key] = { ...(next[key] || {}), selected: false };
-      });
-      return next;
-    });
-  };
-
-  const handleIssueSelected = async () => {
-    const selections = attendedParticipants
-      .filter((participant) => Boolean(issueSelections?.[participant.key]?.selected))
-      .map((participant) => {
-        const config = issueSelections?.[participant.key] || {};
-        const certificateType = String(config.certificateType || "participation").trim();
-        return {
-          registrationId: participant.registrationId,
-          participantEmail: participant.participantEmail,
-          certificateType,
-          position: certificateType === "winner" ? String(config.position || "").trim() : null
-        };
-      });
-
-    if (selections.length === 0) {
-      setNotice("Select at least one attended student to issue certificates.");
+  const handleDownloadDemo = async () => {
+    if (!eventData?._id) return;
+    if (!eventData?.certificate?.isEnabled) {
+      setNotice("Save the certificate template before downloading a demo certificate.");
       return;
     }
 
-    const missingPosition = selections.find(
-      (selection) => selection.certificateType === "winner" && !selection.position
-    );
-    if (missingPosition) {
-      setNotice("Winner templates require a 1st/2nd/3rd position.");
-      return;
-    }
-
-    setIssuingSelected(true);
     setNotice(null);
+    setDownloadingDemo(true);
     try {
       const response = await api({
-        ...SummaryApi.issue_selected_certificates,
-        url: SummaryApi.issue_selected_certificates.url.replace(
+        ...SummaryApi.download_demo_certificate,
+        url: SummaryApi.download_demo_certificate.url.replace(
           ":eventId",
-          encodeURIComponent(eventId || "")
+          encodeURIComponent(eventData._id)
         ),
-        data: { selections }
+        responseType: "blob",
+        skipCache: true,
       });
 
-      await load({ silent: true });
-      const metrics = response?.data?.data;
-      if (metrics) {
-        const firstFailureReason = Array.isArray(metrics?.failures)
-          ? String(metrics.failures[0]?.reason || "").trim()
-          : "";
-        const failureSuffix =
-          Number(metrics.failed || 0) > 0 && firstFailureReason
-            ? ` First error: ${firstFailureReason}`
-            : "";
-        setNotice(
-          `Selected issuance completed. Requested: ${metrics.totalRequested}, Issued: ${metrics.issued}, Skipped: ${metrics.skipped}, Failed: ${metrics.failed}.${failureSuffix}`
-        );
-      } else {
-        setNotice("Selected certificate issuance completed.");
-      }
-    } catch (issueError) {
-      setNotice(issueError.response?.data?.message || "Unable to issue selected certificates.");
-    } finally {
-      setIssuingSelected(false);
-    }
-  };
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const fileNameBase = String(eventData?.title || "event")
+        .trim()
+        .replace(/[^a-z0-9-_]+/gi, "_");
+      const downloadName = `demo_certificate_${fileNameBase || "event"}.pdf`;
 
-  const handleDownload = (participantEmail) => {
-    const normalizedEmail = normalizeEmail(participantEmail);
-    const emailSlug = normalizedEmail.replace(/[@.]/g, "_");
-    const url = SummaryApi.download_certificate.url
-      .replace(":eventId", encodedEventId)
-      .replace(":emailSlug", encodeURIComponent(emailSlug));
-    window.open(url, "_blank", "noopener,noreferrer");
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = downloadName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (demoError) {
+      setNotice(demoError.response?.data?.message || "Unable to download demo certificate.");
+    } finally {
+      setDownloadingDemo(false);
+    }
   };
 
   const handleDraftCustomizationChange = (field, value) => {
@@ -792,26 +511,26 @@ export default function OrganizerCertificateManagement() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Certificate Management</h1>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-              Design templates and issue certificates for attendees.
+              Design and save certificate templates, then download a demo certificate for preview.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setNotice("Certificate history is shown in the 'Recently Issued' panel.")}
+              onClick={handleOpenCustomizationDialog}
               className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10"
             >
-              <History size={13} />
-              History Log
+              Edit Template
             </button>
             <button
               type="button"
-              onClick={() => setNotice("Template creation is saved as a UI stub in this build.")}
-              className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+              onClick={handleDownloadDemo}
+              disabled={downloadingDemo}
+              className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
             >
-              <FilePlus2 size={13} />
-              New Template
+              {downloadingDemo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              Demo Certificate
             </button>
           </div>
         </div>
@@ -1013,205 +732,17 @@ export default function OrganizerCertificateManagement() {
                         onClick={handleOpenCustomizationDialog}
                         className="text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                       >
-                        Customize Fields
+                        Edit & Save Template
                       </button>
                     </div>
                   </div>
                 </article>
 
-                <article className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
-                    <ShieldCheck size={14} className="text-indigo-500" />
-                    Certificate Issuance Status
-                  </p>
-
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <article className="rounded-xl border border-indigo-200 bg-indigo-50/70 dark:border-indigo-400/30 dark:bg-indigo-500/15 p-4">
-                      <p className="text-xs text-indigo-600 dark:text-indigo-200">Total Registered</p>
-                      <p className="mt-1 text-3xl font-bold text-indigo-700 dark:text-indigo-200">{stats.totalRegistered}</p>
-                    </article>
-                    <article className="rounded-xl border border-emerald-200 bg-emerald-50/70 dark:border-emerald-400/30 dark:bg-emerald-500/15 p-4">
-                      <p className="text-xs text-emerald-700 dark:text-emerald-200">Eligible (Attended)</p>
-                      <p className="mt-1 text-3xl font-bold text-emerald-700 dark:text-emerald-200">{stats.eligibleAttended}</p>
-                    </article>
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                    <p className="inline-flex items-start gap-1.5">
-                      <CheckCircle2 size={13} className="text-indigo-500 mt-0.5 shrink-0" />
-                      Auto Email: Certificates are emailed to students by backend workflow.
-                    </p>
-                    <p className="inline-flex items-start gap-1.5">
-                      <CheckCircle2 size={13} className="text-indigo-500 mt-0.5 shrink-0" />
-                      Student Portal: Students can download issued certificates from dashboard.
-                    </p>
-                  </div>
-
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsSelectionOpen((prev) => !prev)}
-                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                    >
-                      {isSelectionOpen ? "Hide Attendees" : "Select Attendees"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleGenerateClick}
-                      disabled={generating}
-                      className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                    >
-                      {generating ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                      {generating ? "Generating..." : "Generate Certificates"}
-                    </button>
-                  </div>
-
-                  {isSelectionOpen && (
-                    <div className="mt-4 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Attended Students</p>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-300">
-                          <button
-                            type="button"
-                            onClick={handleSelectAll}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-white dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                          >
-                            Select all
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleClearSelection}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-white dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                          >
-                            Clear
-                          </button>
-                          <span>{selectedCount} selected</span>
-                        </div>
-                      </div>
-
-                      {attendedParticipants.length === 0 ? (
-                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
-                          No attended students found yet.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-                            {attendedParticipants.map((participant) => {
-                              const config = issueSelections?.[participant.key] || {};
-                              const certificateType = String(config.certificateType || participant.defaultType);
-                              const position = String(config.position || participant.defaultPosition);
-                              return (
-                                <div
-                                  key={participant.key}
-                                  className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 dark:border-white/10 dark:bg-slate-900/70"
-                                >
-                                  <label className="flex items-start gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={Boolean(config.selected)}
-                                      onChange={handleToggleSelection(participant.key)}
-                                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <span className="min-w-0">
-                                      <span className="block text-xs font-semibold text-slate-900 dark:text-white">
-                                        {participant.participantName}
-                                      </span>
-                                      <span className="block text-[11px] text-slate-500 dark:text-slate-300">
-                                        {participant.participantEmail}
-                                        {participant.teamName ? ` • ${participant.teamName}` : ""}
-                                      </span>
-                                    </span>
-                                  </label>
-
-                                  <div className="ml-auto flex flex-wrap items-center gap-2">
-                                    <select
-                                      value={certificateType}
-                                      onChange={handleTemplateChange(participant.key)}
-                                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-                                    >
-                                      <option value="participation">Participation</option>
-                                      <option value="winner">Winner</option>
-                                    </select>
-                                    {certificateType === "winner" ? (
-                                      <select
-                                        value={position}
-                                        onChange={handlePositionChange(participant.key)}
-                                        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200"
-                                      >
-                                        <option value="">Position</option>
-                                        <option value="1st">1st</option>
-                                        <option value="2nd">2nd</option>
-                                        <option value="3rd">3rd</option>
-                                      </select>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400">Position N/A</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          <div className="mt-3 flex items-center justify-end">
-                            <button
-                              type="button"
-                              onClick={handleIssueSelected}
-                              disabled={issuingSelected || selectedCount === 0}
-                              className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                            >
-                              {issuingSelected ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                              {issuingSelected ? "Issuing..." : "Issue Selected"}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </article>
+                
               </div>
 
               <aside className="space-y-4">
-                <article className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">Recently Issued</p>
-                    <button
-                      type="button"
-                      onClick={() => load({ silent: true })}
-                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 inline-flex items-center gap-1"
-                    >
-                      {refreshing ? <Loader2 size={12} className="animate-spin" /> : <Clock3 size={12} />}
-                      View All
-                    </button>
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    {recentIssued.length === 0 ? (
-                      <p className="text-xs text-slate-500 dark:text-slate-300">No certificates issued yet for this event.</p>
-                    ) : (
-                      recentIssued.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 dark:border-white/10 px-2.5 py-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">{item.participantName}</p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-300 truncate">{formatDateTime(item.issuedAt)}</p>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                              Sent
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDownload(item.participantEmail)}
-                              className="inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-white/10 p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
-                              title="Download"
-                            >
-                              <Download size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </article>
+                
 
                 <article className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                   <p className="text-xs text-slate-500 dark:text-slate-300 inline-flex items-center gap-1.5">

@@ -21,7 +21,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
-import { fetchRegisteredEventIds, invalidateMyRegistrationsCache } from "../lib/registrationApi";
+import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -52,7 +52,7 @@ const validateProfile = (profile, label) => {
   if (!String(profile.mobileNumber || "").trim()) return `${label} mobile number is required.`;
   if (!/^[6-9]\d{9}$/.test(String(profile.mobileNumber || "").trim())) return `${label} mobile number must be 10 digits.`;
   if (!String(profile.collegeName || "").trim()) return `${label} college name is required.`;
-  if (!String(profile.branch || "").trim()) return `${label} branch is required.`;
+  if (!String(profile.branch || "").trim()) return `${label} department is required.`;
   if (!String(profile.year || "").trim()) return `${label} year is required.`;
   return null;
 };
@@ -67,6 +67,7 @@ const profileToParticipant = (profile) => ({
 });
 
 const normalizeId = (value) => String(value || "").trim();
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 const getEventId = (event) =>
   normalizeId(event?._id || event?.id || event?.eventId);
@@ -125,8 +126,12 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [pendingRegistrationId, setPendingRegistrationId] = useState("");
+  const [pendingTeamRegistrationId, setPendingTeamRegistrationId] = useState("");
   const [registrationWarning, setRegistrationWarning] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
 
@@ -144,9 +149,13 @@ export default function StudentEventDetails({ mode = "details" }) {
       setLoading(true);
       setError(null);
       setMessage(null);
+      setModal(null);
+      setPendingRegistrationId("");
+      setPendingTeamRegistrationId("");
       setRegistrationWarning(null);
+      setTeamRegistrationInfo(null);
       try {
-        const registrationInfoPromise = fetchRegisteredEventIds();
+        const registrationInfoPromise = fetchMyRegistrations();
         let responseEvent = null;
         let primaryError = null;
 
@@ -185,11 +194,15 @@ export default function StudentEventDetails({ mode = "details" }) {
         setActiveDetailTab("about");
 
         const registrationInfo = await registrationInfoPromise;
-        const registeredIds = registrationInfo.ids;
+        const registrationRows = Array.isArray(registrationInfo?.rows) ? registrationInfo.rows : [];
+        const registeredIds = new Set(registrationRows.map((row) => row.eventId).filter(Boolean));
         setRegistrationWarning(registrationInfo.warning);
-        setIsRegistered(
-          registeredIds.has(getEventId(responseEvent))
+        const eventKey = getEventId(responseEvent);
+        setIsRegistered(registeredIds.has(eventKey));
+        const matchedRegistration = registrationRows.find(
+          (row) => normalizeId(row.eventId) === normalizeId(eventKey)
         );
+        setTeamRegistrationInfo(matchedRegistration || null);
 
         const participationMode = mappedEvent?.participationMode || "INDIVIDUAL";
         const defaultType = participationMode === "TEAM" ? "TEAM" : "INDIVIDUAL";
@@ -212,6 +225,21 @@ export default function StudentEventDetails({ mode = "details" }) {
     fetchEventDetails();
   }, [eventId]);
 
+  const handleModalClose = () => {
+    setModal(null);
+    if (pendingTeamRegistrationId) {
+      const nextId = pendingTeamRegistrationId;
+      setPendingTeamRegistrationId("");
+      navigate(`/student-dashboard/team-registration/${encodeURIComponent(nextId)}`);
+      return;
+    }
+    if (pendingRegistrationId) {
+      const nextId = pendingRegistrationId;
+      setPendingRegistrationId("");
+      navigate(`/student-dashboard/my-events/qr/${encodeURIComponent(nextId)}`);
+    }
+  };
+
   const allowedRegistrationTypes = useMemo(() => {
     const participationMode = event?.participationMode || "INDIVIDUAL";
     if (participationMode === "TEAM") return ["TEAM"];
@@ -229,12 +257,43 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   const isTeamRegistration = registrationType === "TEAM";
   const maxAdditionalMembers = Math.max(Number(event?.maxTeamMembers || 4) - 1, 1);
+  const coordinatorList = Array.isArray(event?.coordinators) ? event.coordinators : [];
+  const isCoordinatorAccount = String(user?.role || "").toUpperCase() === "STUDENT_COORDINATOR";
+  const normalizedUserId = normalizeId(user?._id || user?.id);
+  const normalizedUserEmail = normalizeEmail(user?.email);
+  const isAssignedCoordinator = coordinatorList.some((coordinator) => {
+    const coordinatorId = normalizeId(coordinator?.id || coordinator?.coordinatorId);
+    const coordinatorEmail = normalizeEmail(coordinator?.email);
+    return (
+      (normalizedUserId && coordinatorId && coordinatorId === normalizedUserId) ||
+      (normalizedUserEmail && coordinatorEmail && coordinatorEmail === normalizedUserEmail)
+    );
+  });
+  const isCoordinatorBlocked = isAssignedCoordinator || (isCoordinatorAccount && isTeamRegistration);
   const registerCtaLabel = isRegistered
     ? "Registered"
-    : event?.registrationOpen
-      ? "Register"
-      : "Registration Closed";
-  const coordinatorList = Array.isArray(event?.coordinators) ? event.coordinators : [];
+    : isAssignedCoordinator
+      ? "Coordinator Assigned"
+      : isCoordinatorAccount && isTeamRegistration
+        ? "Coordinator Account"
+      : event?.registrationOpen
+        ? "Register"
+        : "Registration Closed";
+  const canRegister = Boolean(event?.registrationOpen) && !isRegistered && !isCoordinatorBlocked;
+  const showSidebarRegisterButton = Boolean(event?.registrationOpen || isRegistered || isCoordinatorBlocked);
+  const organizerLabel = [event?.organizerName, event?.organizerDepartment].filter(Boolean).join(" • ") || event?.organizerName || "Organizer";
+  const coordinatorEmailSet = useMemo(() => {
+    const emails = coordinatorList.map((coordinator) => normalizeEmail(coordinator?.email)).filter(Boolean);
+    return new Set(emails);
+  }, [coordinatorList]);
+  const eventVisibilityScope = String(event?.visibilityScope || "COLLEGE").toUpperCase();
+  const eventVisibilityDepartment = String(event?.visibilityDepartment || "").trim();
+  const isDepartmentEvent = eventVisibilityScope === "DEPARTMENT" && Boolean(eventVisibilityDepartment);
+  const canViewTeamInvites = Boolean(
+    teamRegistrationInfo?.isTeamLeader &&
+      teamRegistrationInfo?.status === "PendingMemberVerification" &&
+      teamRegistrationInfo?.id
+  );
 
   const updateLeaderField = (field, value) => {
     setLeaderProfile((prev) => ({ ...prev, [field]: value }));
@@ -262,6 +321,18 @@ export default function StudentEventDetails({ mode = "details" }) {
     if (leaderError) return leaderError;
 
     if (isTeamRegistration) {
+      if (coordinatorEmailSet.size > 0) {
+        const leaderEmail = normalizeEmail(leaderProfile.email);
+        if (leaderEmail && coordinatorEmailSet.has(leaderEmail)) {
+          return "Assigned coordinators cannot be added as team leaders.";
+        }
+      }
+      if (isDepartmentEvent) {
+        const leaderDepartment = String(leaderProfile.branch || "").trim();
+        if (!leaderDepartment || leaderDepartment.toLowerCase() !== eventVisibilityDepartment.toLowerCase()) {
+          return `Team leader must belong to the ${eventVisibilityDepartment} department.`;
+        }
+      }
       if (!String(teamName || "").trim()) return "Team name is required.";
       if (teamMembers.length === 0) return "Add at least one team member.";
       if (teamMembers.length > maxAdditionalMembers) {
@@ -269,8 +340,20 @@ export default function StudentEventDetails({ mode = "details" }) {
       }
 
       for (let index = 0; index < teamMembers.length; index += 1) {
+        if (coordinatorEmailSet.size > 0) {
+          const memberEmail = normalizeEmail(teamMembers[index]?.email);
+          if (memberEmail && coordinatorEmailSet.has(memberEmail)) {
+            return `Team member ${index + 1} cannot be an assigned coordinator for this event.`;
+          }
+        }
         const memberError = validateProfile(teamMembers[index], `Team member ${index + 1}`);
         if (memberError) return memberError;
+        if (isDepartmentEvent) {
+          const memberDepartment = String(teamMembers[index]?.branch || "").trim();
+          if (!memberDepartment || memberDepartment.toLowerCase() !== eventVisibilityDepartment.toLowerCase()) {
+            return `Team member ${index + 1} must belong to the ${eventVisibilityDepartment} department.`;
+          }
+        }
       }
     }
 
@@ -281,10 +364,24 @@ export default function StudentEventDetails({ mode = "details" }) {
   };
 
   const handleRegister = async () => {
-    if (!event || isRegistered || isRegistering || !event.registrationOpen) return;
+    if (!event || isRegistered || isRegistering) return;
+    if (isCoordinatorBlocked) {
+      const payload = {
+        type: "error",
+        text: isAssignedCoordinator
+          ? "You are assigned as a coordinator for this event. Coordinators cannot register."
+          : "Coordinator accounts cannot register for team events.",
+      };
+      setMessage(payload);
+      setModal(payload);
+      return;
+    }
+    if (!event.registrationOpen) return;
     const validationError = validateRegistration();
     if (validationError) {
-      setMessage({ type: "error", text: validationError });
+      const payload = { type: "error", text: validationError };
+      setMessage(payload);
+      setModal(payload);
       return;
     }
 
@@ -307,12 +404,16 @@ export default function StudentEventDetails({ mode = "details" }) {
 
       const registrationStatus = String(response.data?.data?.status || "").trim();
       const qrReadyNow = registrationStatus === "Confirmed";
-      setMessage({
+      const popupPayload = {
         type: "success",
         text: qrReadyNow
           ? "Registered successfully. Your QR pass is now available in My Events."
-          : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
-      });
+          : isTeamRegistration
+            ? "Team registration created. Invitations go to members with accounts; others will get an invite after signup and login. Track accept/reject status and continue once everyone accepts."
+            : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
+      };
+      setMessage(popupPayload);
+      setModal(popupPayload);
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
       setEvent((prev) =>
@@ -320,8 +421,22 @@ export default function StudentEventDetails({ mode = "details" }) {
           ? { ...prev, participantCount: Number(prev.participantCount || 0) + headCount }
           : prev
       );
+
+      const registrationId = response.data?.data?._id || response.data?.data?.id;
+      if (registrationId) {
+        if (isTeamRegistration) {
+          setPendingTeamRegistrationId(String(registrationId));
+        } else {
+          setPendingRegistrationId(String(registrationId));
+        }
+      }
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Unable to register for this event." });
+      const payload = {
+        type: "error",
+        text: err.response?.data?.message || "Unable to register for this event.",
+      };
+      setMessage(payload);
+      setModal(payload);
     } finally {
       setIsRegistering(false);
     }
@@ -349,6 +464,32 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   return (
     <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
+      {modal && isRegistrationMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-gray-900">
+            <div
+              className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
+                modal.type === "success" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+              }`}
+            >
+              {modal.type === "success" ? <CheckCircle2 size={26} /> : <AlertCircle size={26} />}
+            </div>
+            <h2 className="mt-3 text-lg font-semibold text-slate-900 dark:text-white">
+              {modal.type === "success" ? "Thank You!" : "Unable to Register"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{modal.text}</p>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                modal.type === "success" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -431,7 +572,13 @@ export default function StudentEventDetails({ mode = "details" }) {
                   </p>
                 )}
 
-                {isRegistered ? (
+                {isCoordinatorBlocked ? (
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 p-4 text-sm text-amber-700 dark:text-amber-300">
+                    {isAssignedCoordinator
+                      ? "You are assigned as a coordinator for this event. Coordinators cannot register."
+                      : "Coordinator accounts cannot register for team events."}
+                  </div>
+                ) : isRegistered ? (
                   <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
                     You are already registered for this event.
                   </div>
@@ -475,7 +622,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                       <input type="email" placeholder="Email Address *" value={leaderProfile.email} onChange={(eventValue) => updateLeaderField("email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input placeholder="Branch *" value={leaderProfile.branch} onChange={(eventValue) => updateLeaderField("branch", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input placeholder="Department *" value={leaderProfile.branch} onChange={(eventValue) => updateLeaderField("branch", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                     </div>
 
@@ -502,7 +649,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                                 <input placeholder="Email Address *" value={member.email} onChange={(eventValue) => updateMemberField(index, "email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
-                                <input placeholder="Branch *" value={member.branch} onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input placeholder="Department *" value={member.branch} onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                               </div>
                             </div>
@@ -539,14 +686,16 @@ export default function StudentEventDetails({ mode = "details" }) {
                       </p>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={handleRegister}
-                      disabled={isRegistering || !event.registrationOpen}
-                      className="mt-5 w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
-                    >
-                      {isRegistering ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Submitting...</span> : isTeamRegistration ? "Register Team" : "Register"}
-                    </button>
+                    {event.registrationOpen && (
+                      <button
+                        type="button"
+                        onClick={handleRegister}
+                        disabled={isRegistering || !canRegister}
+                        className="mt-5 w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
+                      >
+                        {isRegistering ? <span className="inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" />Submitting...</span> : isTeamRegistration ? "Register Team" : "Register"}
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -595,7 +744,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                         <Building2 size={13} />
                         Organized By
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{event.organizerName}</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{organizerLabel}</p>
                     </div>
                   </div>
                 </section>
@@ -683,6 +832,9 @@ export default function StudentEventDetails({ mode = "details" }) {
                               <Building2 size={14} className="text-indigo-600 dark:text-indigo-300" />
                               {event.organizerName}
                             </p>
+                            {event.organizerDepartment ? (
+                              <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{event.organizerDepartment}</p>
+                            ) : null}
                             <p className="mt-2 text-xs text-gray-600 dark:text-gray-300 inline-flex items-center gap-2 break-all">
                               <Mail size={13} className="text-indigo-600 dark:text-indigo-300 shrink-0" />
                               {event.contact?.email || "Not available"}
@@ -703,6 +855,11 @@ export default function StudentEventDetails({ mode = "details" }) {
                                       <UserRound size={13} className="text-indigo-600 dark:text-indigo-300" />
                                       {coordinator.name || "Coordinator"}
                                     </p>
+                                    {coordinator.department ? (
+                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                                        {coordinator.department}
+                                      </p>
+                                    ) : null}
                                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 inline-flex items-center gap-2 break-all">
                                       <Mail size={12} className="text-indigo-600 dark:text-indigo-300 shrink-0" />
                                       {coordinator.email || "Email not available"}
@@ -763,14 +920,16 @@ export default function StudentEventDetails({ mode = "details" }) {
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">Entry Fee</p>
                       <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{event.isFree ? "Free" : `Rs ${event.price}`}</p>
 
-                      <button
-                        type="button"
-                        onClick={() => navigate(registerPath)}
-                        disabled={isRegistered || !event.registrationOpen}
-                        className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
-                      >
-                        {registerCtaLabel}
-                      </button>
+                      {showSidebarRegisterButton && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(registerPath)}
+                          disabled={isRegistered || isCoordinatorBlocked || !event.registrationOpen}
+                          className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
+                        >
+                          {registerCtaLabel}
+                        </button>
+                      )}
 
                       <p className="mt-3 text-[11px] text-gray-500 dark:text-gray-400">
                         By registering, you agree to event rules.
@@ -791,6 +950,9 @@ export default function StudentEventDetails({ mode = "details" }) {
                           {event.coordinators.map((coordinator, index) => (
                             <div key={`sidebar-coordinator-${index}`} className="rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
                               <p className="text-sm font-semibold text-gray-900 dark:text-white">{coordinator.name || "Coordinator"}</p>
+                              {coordinator.department ? (
+                                <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300">{coordinator.department}</p>
+                              ) : null}
                               <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-300 break-all">{coordinator.email || "Email not available"}</p>
                             </div>
                           ))}
@@ -803,6 +965,30 @@ export default function StudentEventDetails({ mode = "details" }) {
                 {isRegistered ? (
                   <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
                     You are already registered for this event.
+                  </div>
+                ) : null}
+
+                {canViewTeamInvites ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/student-dashboard/team-registration/${encodeURIComponent(
+                          teamRegistrationInfo.id
+                        )}`
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+                  >
+                    View Team Invitations
+                  </button>
+                ) : null}
+
+                {isCoordinatorBlocked ? (
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/15 p-4 text-sm text-amber-700 dark:text-amber-300">
+                    {isAssignedCoordinator
+                      ? "You are assigned as a coordinator for this event. Registration is disabled."
+                      : "Coordinator accounts cannot register for team events."}
                   </div>
                 ) : null}
 
@@ -831,3 +1017,8 @@ export default function StudentEventDetails({ mode = "details" }) {
     </div>
   );
 }
+
+
+
+
+

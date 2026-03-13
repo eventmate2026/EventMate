@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Loader2, MapPin, MessageSquarePlus, Star } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarDays,
+  CheckCircle2,
+  Loader2,
+  MapPin,
+  MessageSquarePlus,
+  Star,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
@@ -66,6 +75,7 @@ export default function StudentFeedbackPending() {
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [modal, setModal] = useState(null);
   const [expandedEventId, setExpandedEventId] = useState("");
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
@@ -99,6 +109,10 @@ export default function StudentFeedbackPending() {
 
     loadRows();
   }, [submittedEventIds]);
+
+  const handleModalClose = () => {
+    setModal(null);
+  };
 
   const feedbackRows = useMemo(
     () =>
@@ -154,15 +168,19 @@ export default function StudentFeedbackPending() {
     const draft = drafts[eventId] || { rating: "", comment: "" };
     const rating = Number(draft.rating);
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-      setNotice({ type: "error", text: "Please select a rating between 1 and 5." });
+      const payload = { type: "error", text: "Please select a rating between 1 and 5." };
+      setNotice(payload);
+      setModal(payload);
       return;
     }
 
     if (!row?.canSubmit) {
-      setNotice({
+      const payload = {
         type: "error",
         text: "Feedback requires confirmed registration and marked attendance.",
-      });
+      };
+      setNotice(payload);
+      setModal(payload);
       return;
     }
 
@@ -177,21 +195,27 @@ export default function StudentFeedbackPending() {
           comment: String(draft.comment || "").trim() || undefined,
         },
       });
-      setNotice({
+      const payload = {
         type: "success",
         text: response.data?.message || "Feedback submitted successfully.",
-      });
+      };
+      setNotice(payload);
+      setModal(payload);
       markEventAsSubmitted(eventId);
     } catch (submitError) {
       const backendMessage = submitError?.response?.data?.message || "Unable to submit feedback.";
       if (/already submitted/i.test(backendMessage)) {
-        setNotice({
+        const payload = {
           type: "success",
           text: "Feedback for this event was already submitted. Removed from pending queue.",
-        });
+        };
+        setNotice(payload);
+        setModal(payload);
         markEventAsSubmitted(eventId);
       } else {
-        setNotice({ type: "error", text: backendMessage });
+        const payload = { type: "error", text: backendMessage };
+        setNotice(payload);
+        setModal(payload);
       }
     } finally {
       setSubmittingEventId("");
@@ -206,6 +230,34 @@ export default function StudentFeedbackPending() {
 
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-gray-900"
+          >
+            <div
+              className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
+                modal.type === "success" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+              }`}
+            >
+              {modal.type === "success" ? <CheckCircle2 size={26} /> : <AlertCircle size={26} />}
+            </div>
+            <h2 className="mt-3 text-lg font-semibold text-slate-900 dark:text-white">
+              {modal.type === "success" ? "Thank You!" : "Unable to Submit"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{modal.text}</p>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                modal.type === "success" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 space-y-6">
         <button
           type="button"

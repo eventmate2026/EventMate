@@ -4,12 +4,14 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const EMPTY_FORM = {
   fullName: "",
   email: "",
   password: "",
   mobileNumber: "",
+  department: "",
 };
 
 const getInitials = (name) =>
@@ -59,10 +61,12 @@ export default function AdminCoordinatorManagement() {
     if (!term) return coordinators;
 
     return coordinators.filter((coordinator) => {
+      const department = resolveUserDepartment(coordinator).toLowerCase();
       return (
         coordinator.fullName?.toLowerCase().includes(term) ||
         coordinator.email?.toLowerCase().includes(term) ||
-        String(coordinator.mobileNumber || "").toLowerCase().includes(term)
+        String(coordinator.mobileNumber || "").toLowerCase().includes(term) ||
+        (department && department.includes(term))
       );
     });
   }, [coordinators, searchTerm]);
@@ -100,6 +104,7 @@ export default function AdminCoordinatorManagement() {
       email: coordinator.email || "",
       password: "",
       mobileNumber: coordinator.mobileNumber || "",
+      department: resolveUserDepartment(coordinator) || "",
     });
     setFormError(null);
     setIsFormOpen(true);
@@ -123,6 +128,7 @@ export default function AdminCoordinatorManagement() {
 
     const fullName = formValues.fullName.trim();
     const email = formValues.email.trim().toLowerCase();
+    const department = formValues.department.trim();
 
     if (fullName.length < 3) {
       setFormError("Full name must be at least 3 characters.");
@@ -148,6 +154,7 @@ export default function AdminCoordinatorManagement() {
             fullName,
             email,
             password: formValues.password,
+            ...(department ? { professionalProfile: { department } } : {}),
           },
         });
 
@@ -165,6 +172,9 @@ export default function AdminCoordinatorManagement() {
             fullName,
             email,
             mobileNumber: formValues.mobileNumber.trim() || undefined,
+            professionalProfile: {
+              department: department || undefined,
+            },
           },
         });
 
@@ -303,6 +313,7 @@ export default function AdminCoordinatorManagement() {
                 <tbody className="divide-y divide-slate-100 dark:divide-white/10">
                   {filteredCoordinators.map((coordinator) => {
                     const isPending = pendingId === coordinator._id;
+                    const department = resolveUserDepartment(coordinator);
                     return (
                       <tr key={coordinator._id}>
                         <td className="py-3 pr-3">
@@ -317,6 +328,9 @@ export default function AdminCoordinatorManagement() {
                             <div>
                               <p className="font-semibold text-slate-900 dark:text-white">{coordinator.fullName}</p>
                               <p className="text-xs text-slate-500 dark:text-slate-400">{coordinator.email}</p>
+                              {department && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{department}</p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -393,12 +407,18 @@ export default function AdminCoordinatorManagement() {
                 </label>
               )}
 
-              {formMode === "edit" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {formMode === "edit" && (
+                  <label className="block">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mobile Number</span>
+                    <input type="text" name="mobileNumber" value={formValues.mobileNumber} onChange={handleFormChange} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 px-3 text-sm" />
+                  </label>
+                )}
                 <label className="block">
-                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mobile Number</span>
-                  <input type="text" name="mobileNumber" value={formValues.mobileNumber} onChange={handleFormChange} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 px-3 text-sm" />
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Department</span>
+                  <input type="text" name="department" value={formValues.department} onChange={handleFormChange} className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 py-2.5 px-3 text-sm" />
                 </label>
-              )}
+              </div>
 
               {formError && (
                 <p className="text-sm rounded-lg px-3 py-2 bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300 flex items-start gap-2">

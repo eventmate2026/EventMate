@@ -114,3 +114,98 @@ export const tagWinner = async (req, res, next) => {
     next(error);
   }
 };
+
+// Team leader - view team invitation status
+export const getTeamRegistrationStatus = async (req, res, next) => {
+  try {
+    const result = await registrationService.getTeamRegistrationStatus(
+      req.params.registrationId,
+      req.user._id
+    );
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Team leader - confirm team registration
+export const confirmTeamRegistration = async (req, res, next) => {
+  try {
+    const result = await registrationService.confirmTeamRegistration(
+      req.params.registrationId,
+      req.user._id
+    );
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Public - get team invitation details
+export const getTeamInvitationDetails = async (req, res, next) => {
+  try {
+    const result = await registrationService.getTeamInvitationDetails(req.params.token);
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Public - accept/reject team invitation
+export const respondToTeamInvitation = async (req, res, next) => {
+  try {
+    const action = req.params.action;
+    const result = await registrationService.respondToTeamInvitation(req.params.token, action);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Team leader - resend team invitations
+export const resendTeamInvites = async (req, res, next) => {
+  try {
+    const result = await registrationService.resendTeamInvites(
+      req.params.registrationId,
+      req.user._id
+    );
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Remove winner tag (one-time undo)
+export const untagWinner = async (req, res, next) => {
+  try {
+    const result = await registrationService.untagWinner(
+      req.params.registrationId,
+      req.user
+    );
+    return res.status(200).json({
+      success: true,
+      message: `Winner selection removed for ${result.name}`,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};

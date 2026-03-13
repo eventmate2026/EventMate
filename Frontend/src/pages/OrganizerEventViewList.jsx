@@ -25,12 +25,19 @@ const parseRegistrationRows = (payload) => {
   return [];
 };
 
+const isSuccessfulRegistration = (registration) =>
+  String(registration?.status || "").trim().toLowerCase() === "confirmed";
+
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "Pending").trim() || "Pending";
   const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim() || "NotRequired";
   const teamName = String(registration?.teamName || "").trim();
   const registeredAt = registration?.createdAt || null;
+  const winnerPosition = String(registration?.winner?.position || "").trim();
+  const isWinner = Boolean(registration?.winner?.isWinner);
+  const winnerAssignmentCount = Number(registration?.winner?.assignmentCount || 0);
+  const winnerUnassignedOnce = Boolean(registration?.winner?.unassignedOnce);
 
   const qrParticipants = Array.isArray(registration?.participants) ? registration.participants : [];
   const qrByEmail = new Map(
@@ -62,6 +69,11 @@ const toParticipantRows = (registration) => {
         registeredAt,
         attendanceMarked: Boolean(qr?.attendanceMarked),
         attendanceMarkedAt: qr?.attendanceMarkedAt || null,
+        isLeader: index === 0,
+        winnerPosition,
+        isWinner,
+        winnerAssignmentCount,
+        winnerUnassignedOnce,
       };
     });
   }
@@ -83,6 +95,11 @@ const toParticipantRows = (registration) => {
       registeredAt,
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
+      isLeader: index === 0,
+      winnerPosition,
+      isWinner,
+      winnerAssignmentCount,
+      winnerUnassignedOnce,
     }));
   }
 
@@ -103,11 +120,19 @@ const toParticipantRows = (registration) => {
       registeredAt,
       attendanceMarked: false,
       attendanceMarkedAt: null,
+      isLeader: true,
+      winnerPosition,
+      isWinner,
+      winnerAssignmentCount,
+      winnerUnassignedOnce,
     },
   ];
 };
 
-const parseParticipantRows = (payload) => parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
+const parseParticipantRows = (payload) =>
+  parseRegistrationRows(payload)
+    .filter((registration) => isSuccessfulRegistration(registration))
+    .flatMap((registration) => toParticipantRows(registration));
 
 const formatDate = (value) => {
   if (!value) return "Date TBD";
@@ -157,6 +182,9 @@ export default function OrganizerEventViewList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [winnerNotice, setWinnerNotice] = useState(null);
+  const [pendingWinnerUpdates, setPendingWinnerUpdates] = useState({});
+  const [savingWinnerChanges, setSavingWinnerChanges] = useState(false);
 
   const [query, setQuery] = useState("");
   const [registrationFilter, setRegistrationFilter] = useState("All");
@@ -262,6 +290,168 @@ export default function OrganizerEventViewList() {
     };
   }, [participantRows]);
 
+  const positionTakenBy = useMemo(() => {
+    const map = new Map();
+    participantRows.forEach((row) => {
+      if (!row.isLeader) return;
+      if (!row.isWinner || !row.winnerPosition) return;
+      const registrationKey = normalizeId(row.registrationId);
+      const pending = pendingWinnerUpdates[registrationKey];
+      if (pending?.action === "clear") return;
+      map.set(row.winnerPosition, registrationKey);
+    });
+
+    Object.entries(pendingWinnerUpdates).forEach(([registrationKey, update]) => {
+      if (update?.action === "assign" && update.position) {
+        map.set(update.position, registrationKey);
+      }
+    });
+
+    return map;
+  }, [participantRows, pendingWinnerUpdates]);
+
+  const canAssignWinners = useMemo(() => {
+    if (!eventData) return false;
+    const status = String(eventData?.status || "").trim().toLowerCase();
+    if (status === "cancelled") return false;
+    const startDate = new Date(eventData?.schedule?.startDate || 0);
+    if (Number.isNaN(startDate.getTime())) return false;
+    return Date.now() >= startDate.getTime();
+  }, [eventData]);
+
+  const pendingWinnerCount = useMemo(
+    () => Object.keys(pendingWinnerUpdates).length,
+    [pendingWinnerUpdates]
+  );
+
+  const handleQueueWinnerAssign = (registrationId, position) => {
+    const normalizedId = normalizeId(registrationId);
+    const normalizedPosition = String(position || "").trim();
+    if (!normalizedId) return;
+
+    if (!normalizedPosition) {
+      setPendingWinnerUpdates((prev) => {
+        const next = { ...prev };
+        delete next[normalizedId];
+        return next;
+      });
+      return;
+    }
+
+    const takenBy = positionTakenBy.get(normalizedPosition);
+    if (takenBy && takenBy !== normalizedId) {
+      setWinnerNotice({
+        type: "error",
+        text: `${normalizedPosition} place is already selected.`,
+      });
+      return;
+    }
+
+    setPendingWinnerUpdates((prev) => ({
+      ...prev,
+      [normalizedId]: { action: "assign", position: normalizedPosition },
+    }));
+  };
+
+  const handleQueueWinnerClear = (registrationId) => {
+    const normalizedId = normalizeId(registrationId);
+    if (!normalizedId) return;
+
+    setPendingWinnerUpdates((prev) => ({
+      ...prev,
+      [normalizedId]: { action: "clear" },
+    }));
+  };
+
+  const handleUndoWinnerChange = (registrationId) => {
+    const normalizedId = normalizeId(registrationId);
+    if (!normalizedId) return;
+    setPendingWinnerUpdates((prev) => {
+      const next = { ...prev };
+      delete next[normalizedId];
+      return next;
+    });
+  };
+
+  const handleSaveWinnerChanges = async () => {
+    const pendingEntries = Object.entries(pendingWinnerUpdates);
+    if (pendingEntries.length === 0) return;
+
+    setWinnerNotice(null);
+    setSavingWinnerChanges(true);
+
+    const clearEntries = pendingEntries.filter(([, update]) => update?.action === "clear");
+    const assignEntries = pendingEntries.filter(([, update]) => update?.action === "assign");
+
+    let hadError = false;
+    let errorMessage = "";
+    let hasSuccess = false;
+
+    try {
+      for (const [registrationId] of clearEntries) {
+        try {
+          await api({
+            ...SummaryApi.untag_registration_winner,
+            url: SummaryApi.untag_registration_winner.url.replace(
+              ":registrationId",
+              encodeURIComponent(registrationId)
+            ),
+          });
+          hasSuccess = true;
+          setPendingWinnerUpdates((prev) => {
+            const next = { ...prev };
+            delete next[registrationId];
+            return next;
+          });
+        } catch (clearError) {
+          hadError = true;
+          errorMessage = clearError.response?.data?.message || "Unable to clear winner selection.";
+          break;
+        }
+      }
+
+      if (!hadError) {
+        for (const [registrationId, update] of assignEntries) {
+          try {
+            await api({
+              ...SummaryApi.tag_registration_winner,
+              url: SummaryApi.tag_registration_winner.url.replace(
+                ":registrationId",
+                encodeURIComponent(registrationId)
+              ),
+              data: { position: update.position },
+            });
+            hasSuccess = true;
+            setPendingWinnerUpdates((prev) => {
+              const next = { ...prev };
+              delete next[registrationId];
+              return next;
+            });
+          } catch (assignError) {
+            hadError = true;
+            errorMessage = assignError.response?.data?.message || "Unable to assign winner.";
+            break;
+          }
+        }
+      }
+
+      if (hasSuccess) {
+        await load({ silent: true });
+      }
+
+      if (hadError) {
+        setWinnerNotice({ type: "error", text: errorMessage });
+      } else {
+        setWinnerNotice({
+          type: "success",
+          text: "Winner changes saved successfully.",
+        });
+      }
+    } finally {
+      setSavingWinnerChanges(false);
+    }
+  };
+
   const encodedEventId = encodeURIComponent(normalizeId(eventData?._id) || eventId || "");
 
   return (
@@ -349,6 +539,24 @@ export default function OrganizerEventViewList() {
             </section>
 
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
+              {winnerNotice && (
+                <p
+                  className={`mb-4 rounded-lg px-3 py-2 text-sm ${
+                    winnerNotice.type === "success"
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
+                      : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
+                  }`}
+                >
+                  {winnerNotice.text}
+                </p>
+              )}
+
+              {!canAssignWinners && (
+                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
+                  Winner selection opens on the event start date.
+                </p>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_180px_170px] gap-3">
                 <label className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -383,6 +591,28 @@ export default function OrganizerEventViewList() {
                 </select>
               </div>
 
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-slate-500 dark:text-slate-300">
+                  Select winners, then save changes to apply.
+                </p>
+                <div className="flex items-center gap-2">
+                  {pendingWinnerCount > 0 && (
+                    <span className="text-xs font-semibold text-amber-600 dark:text-amber-300">
+                      {pendingWinnerCount} pending
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveWinnerChanges}
+                    disabled={!canAssignWinners || pendingWinnerCount === 0 || savingWinnerChanges}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    {savingWinnerChanges ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {savingWinnerChanges ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+
               <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-100/80 dark:bg-white/5">
@@ -391,6 +621,7 @@ export default function OrganizerEventViewList() {
                       <th className="px-3 py-2.5 font-semibold">Contact</th>
                       <th className="px-3 py-2.5 font-semibold">Academic</th>
                       <th className="px-3 py-2.5 font-semibold">Team</th>
+                      <th className="px-3 py-2.5 font-semibold">Rank</th>
                       <th className="px-3 py-2.5 font-semibold">Registration</th>
                       <th className="px-3 py-2.5 font-semibold">Attendance</th>
                       <th className="px-3 py-2.5 font-semibold">Registered</th>
@@ -399,19 +630,47 @@ export default function OrganizerEventViewList() {
                   <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40">
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">
                           No participants found for the current filters.
                         </td>
                       </tr>
                     ) : (
-                      filteredRows.map((row) => (
-                        <tr key={`${row.registrationId}-${row.id}`} className="align-top">
+                      filteredRows.map((row) => {
+                        const winnerKey = normalizeId(row.registrationId);
+                        const pendingUpdate = pendingWinnerUpdates[winnerKey];
+                        const pendingAction = pendingUpdate?.action || "";
+                        const pendingPosition = pendingUpdate?.position || "";
+                        const isPendingClear = pendingAction === "clear";
+                        const assignmentCount = Number(row.winnerAssignmentCount || 0);
+                        const winnerLocked = assignmentCount >= 2;
+                        const canEditWinner =
+                          row.isLeader &&
+                          row.registrationStatus === "Confirmed" &&
+                          canAssignWinners &&
+                          !savingWinnerChanges;
+                        const canClearWinner =
+                          canEditWinner &&
+                          row.isWinner &&
+                          !row.winnerUnassignedOnce &&
+                          assignmentCount < 2 &&
+                          !isPendingClear;
+                        const canSelectWinner =
+                          canEditWinner &&
+                          row.attendanceMarked &&
+                          !row.isWinner &&
+                          !winnerLocked;
+
+                        return (
+                          <tr key={`${row.registrationId}-${row.id}`} className="align-top">
                           <td className="px-3 py-3">
                             <div className="flex items-start gap-2.5">
                               <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
                               <div>
                                 <p className="font-semibold text-slate-900 dark:text-white">{row.participantName}</p>
                                 <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-300">Role: {row.participantRole || "participant"}</p>
+                                {row.branch ? (
+                                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-300">{row.branch}</p>
+                                ) : null}
                               </div>
                             </div>
                           </td>
@@ -426,6 +685,59 @@ export default function OrganizerEventViewList() {
                             </p>
                           </td>
                           <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{row.teamName || "Individual"}</td>
+                          <td className="px-3 py-3">
+                            {row.isWinner && row.winnerPosition ? (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                                  {row.winnerPosition} Place
+                                </span>
+                                {isPendingClear ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-amber-600 dark:text-amber-300">Pending removal</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUndoWinnerChange(row.registrationId)}
+                                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300"
+                                    >
+                                      Undo
+                                    </button>
+                                  </div>
+                                ) : canClearWinner ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQueueWinnerClear(row.registrationId)}
+                                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-300"
+                                  >
+                                    Deselect
+                                  </button>
+                                ) : winnerLocked ? (
+                                  <span className="text-[11px] text-slate-400 dark:text-slate-500">Locked</span>
+                                ) : null}
+                              </div>
+                            ) : row.isLeader ? (
+                              !row.attendanceMarked ? (
+                                <span className="text-xs text-slate-400 dark:text-slate-500">Attendance pending</span>
+                              ) : winnerLocked ? (
+                                <span className="text-xs text-slate-400 dark:text-slate-500">Locked</span>
+                              ) : (
+                                <select
+                                  value={pendingPosition}
+                                  onChange={(event) => handleQueueWinnerAssign(row.registrationId, event.target.value)}
+                                  disabled={!canSelectWinner}
+                                  className="w-full rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1.5 text-xs text-slate-700 dark:text-slate-100 disabled:opacity-60"
+                                >
+                                  <option value="">Select</option>
+                                  {["1st", "2nd", "3rd"].map((position) => (
+                                    <option key={position} value={position} disabled={positionTakenBy.get(position) && positionTakenBy.get(position) !== winnerKey}>
+                                      {position}
+                                    </option>
+                                  ))}
+                                </select>
+                              )
+                            ) : (
+                              <span className="text-xs text-slate-400 dark:text-slate-500">Team member</span>
+                            )}
+                          </td>
                           <td className="px-3 py-3">
                             <div className="flex flex-col gap-1.5">
                               <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus, REGISTRATION_STATUS_STYLES)}`}>
@@ -454,7 +766,8 @@ export default function OrganizerEventViewList() {
                           </td>
                           <td className="px-3 py-3 text-xs text-slate-600 dark:text-slate-300">{formatDateTime(row.registeredAt)}</td>
                         </tr>
-                      ))
+                      );
+                    })
                     )}
                   </tbody>
                 </table>

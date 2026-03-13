@@ -8,6 +8,7 @@ import CertificateAuditLog from "../models/CertificateAuditLog.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
+import Feedback from "../models/Feedback.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { sendNotification } from "./notification.service.js";
 
@@ -255,6 +256,59 @@ const normalizeWinnerPosition = (value) => {
 };
 
 const normalizeParticipantEmail = (value) => String(value || "").trim().toLowerCase();
+const WINNER_POSITIONS = ["1st", "2nd", "3rd"];
+
+const buildTeamParticipantsFromRegistration = (registration) => {
+  const members = [
+    registration?.teamLeader,
+    ...(Array.isArray(registration?.teamMembers) ? registration.teamMembers : [])
+  ].filter(Boolean);
+
+  const unique = new Map();
+  for (const member of members) {
+    const email = normalizeParticipantEmail(member?.email);
+    if (!email) continue;
+    const name = String(member?.name || member?.fullName || "Participant").trim() || "Participant";
+    if (!unique.has(email)) {
+      unique.set(email, { name, email });
+    }
+  }
+
+  return Array.from(unique.values());
+};
+
+const hasTeamLeaderFeedback = async (eventId, registrationId) => {
+  if (!eventId || !registrationId) return false;
+  const existing = await Feedback.exists({
+    event: eventId,
+    registration: registrationId
+  });
+  return Boolean(existing);
+};
+
+export const isEventWinnerRankingComplete = async (eventId) => {
+  if (!eventId) return false;
+
+  const confirmedCount = await EventRegistration.countDocuments({
+    event: eventId,
+    status: "Confirmed"
+  });
+
+  if (confirmedCount === 0) return false;
+
+  const requiredCount = Math.min(WINNER_POSITIONS.length, confirmedCount);
+
+  const winners = await EventRegistration.find({
+    event: eventId,
+    "winner.position": { $in: WINNER_POSITIONS }
+  }).select("winner.position");
+
+  const assigned = new Set(
+    winners.map((row) => row?.winner?.position).filter(Boolean)
+  );
+
+  return assigned.size >= requiredCount;
+};
 
 // Logo path stored in backend root
 const LOGO_PATH = path.join(__dirname, "../../logo.png");
@@ -545,6 +599,30 @@ const generateCertificatePDF = async (data) => {
   });
 };
 
+export const generateDemoCertificateBuffer = async (event, participantName) => {
+  if (!event) {
+    throw new Error("Event not found");
+  }
+
+  const displayName = String(participantName || "Organizer").trim() || "Organizer";
+  const eventDate = event.schedule?.startDate
+    ? new Date(event.schedule.startDate).toDateString()
+    : "TBA";
+  const venue = event.venue?.location || event.venue?.mode || "TBA";
+  const customization = normalizeCertificateCustomization(event?.certificate?.customization);
+
+  return generateCertificatePDF({
+    participantName: displayName,
+    eventName: event.title || "Event",
+    eventDate,
+    venue,
+    certificateType: "participation",
+    position: null,
+    customization,
+    verificationCode: null
+  });
+};
+
 /* ================================================
    UPLOAD PDF BUFFER TO CLOUDINARY
 ================================================ */
@@ -792,6 +870,21 @@ const issueCertificateForParticipant = async ({
 
 export const generateCertificatesForRegistration = async (registration, event) => {
   try {
+    if (!event?.certificate?.isEnabled) {
+      return 0;
+    }
+    const rankingComplete = await isEventWinnerRankingComplete(event?._id);
+    if (!rankingComplete) {
+      return 0;
+    }
+
+    if (event?.isTeamEvent) {
+      const feedbackExists = await hasTeamLeaderFeedback(event._id, registration._id);
+      if (!feedbackExists) {
+        return 0;
+      }
+    }
+
     let issuedCount = 0;
     const isWinner = registration.winner?.isWinner || false;
     const position = registration.winner?.position || null;
@@ -813,15 +906,19 @@ export const generateCertificatesForRegistration = async (registration, event) =
         }];
       }
     } else {
-      const allQRs = await ParticipantQR.find({
-        registration: registration._id,
-        attendanceMarked: true
-      });
+      if (isWinner) {
+        participants = buildTeamParticipantsFromRegistration(registration);
+      } else {
+        const allQRs = await ParticipantQR.find({
+          registration: registration._id,
+          attendanceMarked: true
+        });
 
-      participants = allQRs.map((qr) => ({
-        name: qr.name,
-        email: qr.email
-      }));
+        participants = allQRs.map((qr) => ({
+          name: qr.name,
+          email: qr.email
+        }));
+      }
     }
 
     if (participants.length === 0) {
@@ -856,6 +953,15 @@ export const generateCertificatesForEvent = async (eventId) => {
   const event = await Event.findById(eventId);
   if (!event) throw new Error("Event not found");
 
+  if (!event?.certificate?.isEnabled) {
+    throw new Error("Certificate template is not saved for this event");
+  }
+
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  if (!rankingComplete) {
+    throw new Error("Winner ranks must be assigned before issuing certificates");
+  }
+
   if (event.status !== "Completed") {
     throw new Error("Certificates can only be generated after event is completed");
   }
@@ -871,6 +977,19 @@ export const generateCertificatesForEvent = async (eventId) => {
 
   for (const registration of registrations) {
     try {
+      if (event.isTeamEvent) {
+        const feedbackExists = await hasTeamLeaderFeedback(event._id, registration._id);
+        if (!feedbackExists) {
+          failedRegistrations += 1;
+          failures.push({
+            registrationId: registration?._id || null,
+            participantEmail: registration?.teamLeader?.email || null,
+            reason: "Team leader feedback is required before issuing group certificates."
+          });
+          continue;
+        }
+      }
+
       const generatedNow = await generateCertificatesForRegistration(registration, event);
       generatedCertificates += Number(generatedNow || 0);
     } catch (error) {
@@ -893,6 +1012,15 @@ export const generateCertificatesForEvent = async (eventId) => {
 
 export const generateCertificatesForSelection = async (event, selections = []) => {
   if (!event) throw new Error("Event not found");
+
+  if (!event?.certificate?.isEnabled) {
+    throw new Error("Certificate template is not saved for this event");
+  }
+
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  if (!rankingComplete) {
+    throw new Error("Winner ranks must be assigned before issuing certificates");
+  }
 
   if (event.status !== "Completed") {
     throw new Error("Certificates can only be generated after event is completed");
@@ -950,6 +1078,14 @@ export const generateCertificatesForSelection = async (event, selections = []) =
     if (registration.status !== "Confirmed") {
       recordFailure(selection, "Only confirmed registrations can receive certificates.");
       continue;
+    }
+
+    if (event.isTeamEvent) {
+      const feedbackExists = await hasTeamLeaderFeedback(event._id, registration._id);
+      if (!feedbackExists) {
+        recordFailure(selection, "Team leader feedback is required before issuing group certificates.");
+        continue;
+      }
     }
 
     const participantQr = await ParticipantQR.findOne({

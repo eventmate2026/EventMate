@@ -28,12 +28,12 @@ export default function AttendanceVerify() {
       }
 
       if (!user || !accessToken) {
-        setMessage("Please log in as organizer or coordinator to verify attendance.");
+        setMessage("Please log in as organizer or assigned coordinator to verify attendance.");
         return;
       }
 
-      if (!["ORGANIZER", "STUDENT_COORDINATOR"].includes(user.role)) {
-        setMessage("Only organizers and coordinators can verify attendance.");
+      if (!["ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"].includes(user.role)) {
+        setMessage("Only organizers or assigned coordinators can verify attendance.");
         return;
       }
 

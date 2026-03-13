@@ -57,12 +57,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   };
 
   const roleProfilePath = {
-    MAIN_ADMIN: "/profile",
+    MAIN_ADMIN: "/admin-dashboard/profile",
     ORGANIZER: "/organizer-dashboard/profile",
     STUDENT_COORDINATOR: "/coordinator-dashboard/profile",
     STUDENT: "/profile",
   };
   const currentProfilePath = roleProfilePath[user?.role] || "/profile";
+  const handleProfileClick = () => {
+    setIsUserMenuOpen(false);
+    navigate(currentProfilePath);
+  };
 
   const studentRouteMap = {
     home: "/student-dashboard",
@@ -608,7 +612,12 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 >
                   {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
-                <div className="relative h-9 w-9">
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
+                  aria-label="Open profile"
+                  className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
                   <span className="absolute inset-0 rounded-full bg-indigo-400/20 blur-md animate-admin-avatar" />
                   <AvatarWithFrame
                     src={avatarUrl}
@@ -617,7 +626,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
                     fallback={<span>{avatarInitials || "AD"}</span>}
                   />
-                </div>
+                </button>
                 <button
                   type="button"
                   onClick={() => onLogout?.()}
@@ -719,33 +728,45 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 </button>
 
                 {/* User Profile Dropdown */}
-                <div className="relative ml-3">
-                  <div>
-                    <button
-                      type="button"
-                      className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300 transition duration-150 ease-in-out"
-                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    >
-                      <span className="sr-only">Open user menu</span>
-                      <AvatarWithFrame
-                        src={avatarUrl}
-                        alt="Profile"
-                        className="h-8 w-8"
-                        coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold text-sm"
-                        fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
-                      />
-                </button>
-              </div>
+                <div className="relative ml-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleProfileClick}
+                    className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300 transition duration-150 ease-in-out"
+                    aria-label="Open profile"
+                  >
+                    <AvatarWithFrame
+                      src={avatarUrl}
+                      alt="Profile"
+                      className="h-8 w-8"
+                      coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold text-sm"
+                      fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Toggle user menu"
+                    className="rounded-full border border-slate-200 dark:border-white/10 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  >
+                    <ChevronDown size={16} />
+                  </button>
 
-              {/* Dropdown Menu */}
+                  {/* Dropdown Menu */}
                   {isUserMenuOpen && (
-                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 dark:ring-white/10 focus:outline-none z-50">
+                    <div className="origin-top-right absolute right-0 mt-12 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 dark:ring-white/10 focus:outline-none z-50">
                       <div className="px-4 py-2 border-b border-gray-100 dark:border-white/10">
                         <p className="text-sm text-gray-900 dark:text-gray-100 font-bold">{displayName}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || 'student@college.com'}</p>
                       </div>
-                      
-                      <Link to={currentProfilePath} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">Your Profile</Link>
+
+                      <Link
+                        to={currentProfilePath}
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5"
+                      >
+                        Your Profile
+                      </Link>
                       <button
                         onClick={() => { onLogout?.(); setIsUserMenuOpen(false); }}
                         className="w-full text-left block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"

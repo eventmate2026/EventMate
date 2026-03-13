@@ -9,19 +9,25 @@ const UserSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: ["MAIN_ADMIN", "ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"],
-      default: "STUDENT",
-      immutable: true
+      default: "STUDENT"
     },
 
     mobileNumber: { type: String, match: /^[6-9]\d{9}$/, sparse: true },
     collegeName: { type: String, trim: true, maxlength: 150 },
     avatar: { type: String, default: null },
+    educationLevel: {
+      type: String,
+      enum: ["10th", "12th", "Diploma", "Engineering", ""],
+      default: ""
+    },
 
     academicProfile: { branch: String, year: { type: String, enum: ["1st","2nd","3rd","4th"] } },
     professionalProfile: { department: String, occupation: String },
 
     emailVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockoutUntil: { type: Date, default: null },
     refreshToken: { type: String, select: false },
     otp: { type: String, select: false },
     otpExpiry: { type: Date, select: false },

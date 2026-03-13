@@ -5,7 +5,8 @@ import roleMiddleware from "../middleware/role.middleware.js";
 
 import { getProfileController, updateProfileController, uploadAvatarController, forgotPasswordController, resetPasswordController,
   createOrganizer,
-  createCoordinator
+  createCoordinator,
+  promoteCoordinator
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
@@ -30,6 +31,12 @@ router.post(
   "/create-coordinator",
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   createCoordinator
+);
+
+router.post(
+  "/promote-coordinator",
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  promoteCoordinator
 );
 
 export default router;

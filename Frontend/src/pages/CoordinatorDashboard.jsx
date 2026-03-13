@@ -13,13 +13,13 @@ import {
   Sparkles,
   Star,
   Users2,
-  XCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
-import { getStoredUser } from "../lib/auth";
+import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
+import { computeProfileProgress } from "../lib/profileProgress";
 
 const FALLBACK_POSTERS = [
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=900&q=80",
@@ -150,7 +150,7 @@ const sortByRecent = (items) =>
 
 export default function CoordinatorDashboard() {
   const navigate = useNavigate();
-  const user = getStoredUser();
+  const [user, setUser] = useState(() => getStoredUser());
 
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -206,6 +206,12 @@ export default function CoordinatorDashboard() {
   useEffect(() => {
     loadEvents();
   }, [user?._id, user?.email]);
+
+  useEffect(() => {
+    return subscribeAuthUpdates(() => {
+      setUser(getStoredUser());
+    });
+  }, []);
 
   const metrics = useMemo(() => {
     const workflow = {
@@ -275,22 +281,8 @@ export default function CoordinatorDashboard() {
     return rows.slice(0, 6);
   }, [events]);
 
-  const profileProgress = useMemo(() => {
-    const fields = [
-      user?.fullName,
-      user?.email,
-      user?.mobileNumber,
-      user?.academicProfile?.branch,
-      user?.academicProfile?.year,
-      user?.professionalProfile?.department,
-      user?.avatar,
-    ];
-    const total = fields.length;
-    const completed = fields.filter((field) => String(field || "").trim()).length;
-    const percentage = Math.max(20, Math.min(100, Math.round((completed / total) * 100)));
-    const stepsLeft = Math.max(0, total - completed);
-    return { percentage, stepsLeft };
-  }, [user]);
+  const profileProgress = useMemo(() => computeProfileProgress(user), [user]);
+  const showProfileCard = profileProgress.left > 0;
 
   const filterCounts = useMemo(
     () => ({
@@ -389,13 +381,6 @@ export default function CoordinatorDashboard() {
               >
                 {refreshing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCcw size={15} />}
                 Refresh
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/coordinator-dashboard/registrations")}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                Event Workspace
               </button>
               <button
                 type="button"
@@ -652,65 +637,37 @@ export default function CoordinatorDashboard() {
                 </div>
               </section>
 
-              <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Workflow Snapshot</h3>
-                <div className="mt-4 space-y-2">
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <Sparkles size={14} className="text-emerald-500" />
-                    {metrics.workflow.live} live
+              {showProfileCard && (
+                <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-5 text-white shadow-xl shadow-indigo-500/20">
+                  <h3 className="text-lg font-semibold">Complete your profile</h3>
+                  <p className="mt-1 text-sm text-white/85">
+                    Keep profile data complete so organizers can coordinate with you faster.
                   </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <CalendarDays size={14} className="text-sky-500" />
-                    {metrics.workflow.upcoming} upcoming
-                  </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <CircleCheck size={14} className="text-indigo-500" />
-                    {metrics.workflow.completed} completed
-                  </p>
-                  <p className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                    <XCircle size={14} className="text-rose-500" />
-                    {metrics.workflow.cancelled} cancelled
-                  </p>
-                </div>
-              </section>
-
-              <section className="rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-5 text-white shadow-xl shadow-indigo-500/20">
-                <h3 className="text-lg font-semibold">Complete your profile</h3>
-                <p className="mt-1 text-sm text-white/85">
-                  Keep profile data complete so organizers can coordinate with you faster.
-                </p>
-                <div className="mt-4">
-                  <div className="h-2 rounded-full bg-white/25">
-                    <div
-                      className="h-full rounded-full bg-white transition-all duration-300"
-                      style={{ width: `${profileProgress.percentage}%` }}
-                    />
+                  <div className="mt-4">
+                    <div className="h-2 rounded-full bg-white/25">
+                      <div
+                        className="h-full rounded-full bg-white transition-all duration-300"
+                        style={{ width: `${profileProgress.percent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-white/90">
+                      <span>{profileProgress.percent}% completed</span>
+                      <span>{profileProgress.left} steps left</span>
+                    </div>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-white/90">
-                    <span>{profileProgress.percentage}% completed</span>
-                    <span>{profileProgress.stepsLeft} steps left</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/coordinator-dashboard/profile")}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-white"
-                >
-                  Continue Setup
-                </button>
-              </section>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/coordinator-dashboard/profile")}
+                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-white"
+                  >
+                    Continue Setup
+                  </button>
+                </section>
+              )}
 
               <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Quick Shortcuts</p>
                 <div className="mt-3 grid gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/coordinator-dashboard/registrations")}
-                    className="inline-flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                  >
-                    Open Event Workspace
-                    <Users2 size={14} />
-                  </button>
                   <button
                     type="button"
                     onClick={() => navigate("/coordinator-dashboard/notifications")}

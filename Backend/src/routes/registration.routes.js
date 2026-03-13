@@ -4,11 +4,17 @@ import roleMiddleware from "../middleware/role.middleware.js";
 import {
   initiateRegistration,
   verifyMember,
+  getTeamRegistrationStatus,
+  confirmTeamRegistration,
+  getTeamInvitationDetails,
+  respondToTeamInvitation,
+  resendTeamInvites,
   getMyRegistrations,
   getEventRegistrations,
   markAttendanceManual,
   markAttendance,
-  tagWinner
+  tagWinner,
+  untagWinner
 } from "../controllers/registration.controller.js";
 
 const router = express.Router();
@@ -19,6 +25,19 @@ router.post("/:eventId/draft", authMiddleware, initiateRegistration);
 // Member verifies email via token — public
 router.get("/verify/:token", verifyMember);
 
+// Team invitation details (public)
+router.get("/invite/:token", getTeamInvitationDetails);
+router.post("/invite/:token/:action", respondToTeamInvitation);
+
+// Team leader - view team invitation status
+router.get("/team/:registrationId/status", authMiddleware, getTeamRegistrationStatus);
+
+// Team leader - confirm team registration after all accepted
+router.post("/team/:registrationId/confirm", authMiddleware, confirmTeamRegistration);
+
+// Team leader - resend team invitations
+router.post("/team/:registrationId/resend-invites", authMiddleware, resendTeamInvites);
+
 // Student sees their own registrations + QRs
 router.get("/my", authMiddleware, getMyRegistrations);
 
@@ -26,7 +45,7 @@ router.get("/my", authMiddleware, getMyRegistrations);
 router.get(
   "/:eventId/all",
   authMiddleware,
-  roleMiddleware("MAIN_ADMIN", "ORGANIZER", "STUDENT_COORDINATOR"),
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"),
   getEventRegistrations
 );
 
@@ -34,7 +53,7 @@ router.get(
 router.patch(
   "/attendance/:token",
   authMiddleware,
-  roleMiddleware("ORGANIZER", "STUDENT_COORDINATOR"),
+  roleMiddleware("ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"),
   markAttendance
 );
 
@@ -52,6 +71,14 @@ router.patch(
   authMiddleware,
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   tagWinner
+);
+
+// Remove winner tag (one-time undo)
+router.patch(
+  "/:registrationId/winner/clear",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  untagWinner
 );
 
 export default router;

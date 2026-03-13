@@ -5,6 +5,31 @@ import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const normalizeDepartment = (value = "") => String(value || "").trim();
+const resolveUserDepartment = (user) =>
+  normalizeDepartment(user?.academicProfile?.branch || user?.professionalProfile?.department || user?.department);
+const isEventOver = (event) => {
+  const status = String(event?.status || "").trim().toLowerCase();
+  if (status === "completed" || status === "cancelled" || status === "canceled") return true;
+  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  if (Number.isNaN(endTime)) return false;
+  return Date.now() > endTime;
+};
+
+const parseVisibilityPayload = (raw) => {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
 
 export const createEventController = asyncHandler(async (req, res) => {
 
@@ -24,6 +49,7 @@ export const createEventController = asyncHandler(async (req, res) => {
     registration,
     certificate,
     feedback,
+    visibility,
     isTeamEvent,
     minTeamSize,
     maxTeamSize
@@ -38,6 +64,28 @@ export const createEventController = asyncHandler(async (req, res) => {
 
   // Upload to Cloudinary
   const uploaded = await uploadImageCloudinary(req.file);
+
+  const visibilityPayload = parseVisibilityPayload(visibility);
+  const visibilityScope = String(visibilityPayload?.scope || "").toUpperCase() === "DEPARTMENT"
+    ? "DEPARTMENT"
+    : "COLLEGE";
+  let visibilityDepartment = "";
+  if (visibilityScope === "DEPARTMENT") {
+    const organizerDepartment = resolveUserDepartment(req.user);
+    if (req.user.role === "ORGANIZER") {
+      visibilityDepartment = organizerDepartment;
+    } else {
+      visibilityDepartment =
+        normalizeDepartment(visibilityPayload?.department) ||
+        organizerDepartment;
+    }
+    if (!visibilityDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Department is required for department-level events"
+      });
+    }
+  }
 
   const event = await Event.create({
     title,
@@ -61,6 +109,11 @@ export const createEventController = asyncHandler(async (req, res) => {
     },
     certificate: certificate ? JSON.parse(certificate) : { isEnabled: false },
     feedback: feedback ? JSON.parse(feedback) : { enabled: false },
+
+    visibility: {
+      scope: visibilityScope,
+      department: visibilityDepartment
+    },
 
     isTeamEvent: isTeamEvent === "true",
     minTeamSize: minTeamSize ? Number(minTeamSize) : 1,
@@ -121,12 +174,47 @@ export const getPublishedEvents = async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 10;
 
     const skip = (page - 1) * limit;
+
+    const baseQuery = { status: { $in: ["Published", "Completed"] } };
+    let visibilityFilter = null;
+
+    if (req.user) {
+      if (req.user.role === "STUDENT") {
+        const department = resolveUserDepartment(req.user);
+        const departmentPattern = department ? new RegExp(`^${escapeRegex(department)}$`, "i") : null;
+        visibilityFilter = department
+          ? {
+              $or: [
+                { "visibility.scope": { $exists: false } },
+                { "visibility.scope": "COLLEGE" },
+                { "visibility.scope": "DEPARTMENT", "visibility.department": departmentPattern },
+              ],
+            }
+          : {
+              $or: [
+                { "visibility.scope": { $exists: false } },
+                { "visibility.scope": "COLLEGE" },
+              ],
+            };
+      }
+    } else {
+      visibilityFilter = {
+        $or: [
+          { "visibility.scope": { $exists: false } },
+          { "visibility.scope": "COLLEGE" },
+        ],
+      };
+    }
+
+    const query = visibilityFilter ? { ...baseQuery, ...visibilityFilter } : baseQuery;
     
-    const events = await Event.find({ status: "Published" }).select("-__v -createdBy -updatedBy").skip(skip)
+    const events = await Event.find(query)
+      .select("-__v -createdBy -updatedBy")
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .skip(skip)
       .limit(limit);
 
-
-    const total = await Event.countDocuments({ status: "Published" });
+    const total = await Event.countDocuments(query);
     
     res.status(200).json({
       success: true,
@@ -234,6 +322,34 @@ export const updateEvent = async (req, res, next) => {
     delete req.body._id;
     delete req.body.__v;
 
+    if (req.body.visibility && typeof req.body.visibility === "string") {
+      const parsedVisibility = parseVisibilityPayload(req.body.visibility);
+      if (parsedVisibility) req.body.visibility = parsedVisibility;
+    }
+    if (req.body.visibility) {
+      const scope =
+        String(req.body.visibility?.scope || "").toUpperCase() === "DEPARTMENT"
+          ? "DEPARTMENT"
+          : "COLLEGE";
+      req.body.visibility.scope = scope;
+      if (scope === "COLLEGE") {
+        req.body.visibility.department = "";
+      } else if (req.user.role === "ORGANIZER") {
+        const organizerDepartment = resolveUserDepartment(req.user);
+        if (!organizerDepartment) {
+          return res.status(400).json({
+            success: false,
+            message: "Department is required for department-level events"
+          });
+        }
+        req.body.visibility.department = organizerDepartment;
+      } else if (!String(req.body.visibility?.department || "").trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Department is required for department-level events"
+        });
+      }
+    }
 
     Object.assign(event, req.body);
 
@@ -273,6 +389,21 @@ export const getEvent = async (req, res, next) => {
           message: "Not authorized to view this event"
         })
       }
+
+      if (req.user.role === "STUDENT" && String(event?.visibility?.scope || "COLLEGE") === "DEPARTMENT") {
+        const studentDepartment = resolveUserDepartment(req.user);
+        const eventDepartment = String(event?.visibility?.department || "").trim();
+        if (
+          !studentDepartment ||
+          !eventDepartment ||
+          studentDepartment.toLowerCase() !== eventDepartment.toLowerCase()
+        ) {
+          return res.status(403).json({
+            success: false,
+            message: "Not authorized to view this event"
+          });
+        }
+      }
       
       return res.status(200).json({
       success: true,
@@ -309,8 +440,27 @@ export const assignCoordinator = async (req, res, next) => {
     if (!coordinator)
       return res.status(404).json({ success: false, message: "Coordinator not found" });
 
-    if (coordinator.role !== "STUDENT_COORDINATOR")
-      return res.status(400).json({ success: false, message: "User is not a Student Coordinator" });
+    const allowedCoordinatorRoles = ["STUDENT_COORDINATOR", "STUDENT"];
+    if (!allowedCoordinatorRoles.includes(coordinator.role))
+      return res.status(400).json({ success: false, message: "User must be a student or student coordinator" });
+
+    const coordinatorDepartment = resolveUserDepartment(coordinator);
+
+    if (req.user.role === "ORGANIZER") {
+      const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
+      if (visibilityScope === "DEPARTMENT") {
+        const organizerDepartment = resolveUserDepartment(req.user);
+        if (!organizerDepartment) {
+          return res.status(400).json({ success: false, message: "Organizer department is required" });
+        }
+        if (!coordinatorDepartment || organizerDepartment.toLowerCase() !== coordinatorDepartment.toLowerCase()) {
+          return res.status(403).json({
+            success: false,
+            message: "Coordinators must belong to your department"
+          });
+        }
+      }
+    }
 
     // Check if already assigned
     const alreadyAssigned = event.studentCoordinators.some(
@@ -323,7 +473,8 @@ export const assignCoordinator = async (req, res, next) => {
     event.studentCoordinators.push({
       coordinatorId: coordinator._id,
       name: coordinator.fullName,
-      email: coordinator.email
+      email: coordinator.email,
+      department: coordinatorDepartment || ""
     });
 
     await event.save();
@@ -331,7 +482,7 @@ export const assignCoordinator = async (req, res, next) => {
     await sendNotification({
       recipientId: coordinator._id,
       recipientName: coordinator.fullName,
-      recipientRole: "STUDENT_COORDINATOR",
+      recipientRole: coordinator.role === "STUDENT" ? "STUDENT" : "STUDENT_COORDINATOR",
       title: "New Event Assignment",
       message: `You have been assigned to coordinate ${event.title}`,
       type: "ASSIGNMENT",
@@ -369,10 +520,11 @@ export const getMyEvents = async (req, res, next) => {
 // Coordinator sees events assigned to their account (all statuses)
 export const getMyAssignedEvents = async (req, res, next) => {
   try {
-    if (req.user.role !== "STUDENT_COORDINATOR") {
+    const allowedRoles = ["STUDENT_COORDINATOR", "STUDENT"];
+    if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: "Only coordinators can access assigned events",
+        message: "Only students or coordinators can access assigned events",
       });
     }
 
@@ -391,7 +543,10 @@ export const getMyAssignedEvents = async (req, res, next) => {
       });
     }
 
-    const events = await Event.find(query).sort({ updatedAt: -1, createdAt: -1 });
+    let events = await Event.find(query).sort({ updatedAt: -1, createdAt: -1 });
+    if (req.user.role === "STUDENT") {
+      events = events.filter((event) => !isEventOver(event));
+    }
 
     return res.status(200).json({
       success: true,

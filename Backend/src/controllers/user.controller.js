@@ -5,6 +5,10 @@ import generateOtp from "../utils/generateOtp.js";
 import sendEmail from "../config/sendEmail.js";
 import forgotPasswordTemplate from "../utils/forgotPasswordTemplate.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
+import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
+
+const resolveDepartment = (user) =>
+  String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
 
 // ---------------- PROFILE ----------------
 export const getProfileController = asyncHandler(async (req, res) => {
@@ -65,6 +69,9 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
 export const createOrganizer = async (req, res, next) => {
   try {
     const { fullName, email, password } = req.body;
+    const organizerDepartment = String(
+      req.body?.professionalProfile?.department || req.body?.department || ""
+    ).trim();
 
     if (!fullName || !email || !password) {
       return res.status(400).json({
@@ -89,7 +96,8 @@ export const createOrganizer = async (req, res, next) => {
       password: hashedPassword,
       role: "ORGANIZER",
       createdBy: req.user._id,
-      emailVerified: true // optional to skip OTP for admin-created users
+      emailVerified: true, // optional to skip OTP for admin-created users
+      professionalProfile: organizerDepartment ? { department: organizerDepartment } : undefined
     });
 
     res.status(201).json({
@@ -99,7 +107,9 @@ export const createOrganizer = async (req, res, next) => {
         _id: organizer._id,
         fullName: organizer.fullName,
         email: organizer.email,
-        role: organizer.role
+        role: organizer.role,
+        professionalProfile: organizer.professionalProfile,
+        department: organizer.professionalProfile?.department || ""
       }
     });
 
@@ -112,6 +122,9 @@ export const createOrganizer = async (req, res, next) => {
 export const createCoordinator = async (req, res, next) => {
   try {
     const { fullName, email, password } = req.body;
+    const requestedDepartment = String(
+      req.body?.professionalProfile?.department || req.body?.department || ""
+    ).trim();
 
     if (!fullName || !email || !password) {
       return res.status(400).json({
@@ -130,27 +143,123 @@ export const createCoordinator = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const organizerDepartment = req.user.role === "ORGANIZER" ? resolveDepartment(req.user) : "";
+    if (req.user.role === "ORGANIZER" && !organizerDepartment) {
+      return res.status(400).json({
+        success: false,
+        message: "Organizer department is required to create coordinators"
+      });
+    }
+    const coordinatorDepartment =
+      req.user.role === "ORGANIZER" ? organizerDepartment : requestedDepartment;
+
+    const requiresVerification = req.user.role === "ORGANIZER";
+    const otp = requiresVerification ? generateOtp() : null;
+    const otpExpiry = requiresVerification ? Date.now() + 10 * 60 * 1000 : null;
+
     const coordinator = await User.create({
       fullName,
       email,
       password: hashedPassword,
       role: "STUDENT_COORDINATOR",
       createdBy: req.user._id,
-      emailVerified: true 
+      emailVerified: !requiresVerification,
+      otp,
+      otpExpiry,
+      professionalProfile: coordinatorDepartment ? { department: coordinatorDepartment } : undefined,
     });
+
+    if (requiresVerification) {
+      await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+    }
 
     res.status(201).json({
       success: true,
-      message: "Coordinator created successfully",
+      message: requiresVerification
+        ? "Coordinator created. Verification OTP sent to email."
+        : "Coordinator created successfully",
       data: {
         _id: coordinator._id,
         fullName: coordinator.fullName,
         email: coordinator.email,
         role: coordinator.role,
-        createdBy: coordinator.createdBy
+        createdBy: coordinator.createdBy,
+        professionalProfile: coordinator.professionalProfile,
+        department: coordinator.professionalProfile?.department || ""
       }
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Organizer/Main admin promotes a student to coordinator
+export const promoteCoordinator = async (req, res, next) => {
+  try {
+    const { userId } = req.body;
+    const targetId = userId || req.params.userId;
+    if (!targetId) {
+      return res.status(400).json({
+        success: false,
+        message: "User id is required"
+      });
+    }
+
+    const target = await User.findById(targetId);
+    if (!target) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    if (req.user.role === "ORGANIZER") {
+      const organizerDepartment = resolveDepartment(req.user);
+      const targetDepartment = resolveDepartment(target);
+      if (!organizerDepartment) {
+        return res.status(400).json({
+          success: false,
+          message: "Organizer department is required to promote coordinators"
+        });
+      }
+      if (!targetDepartment || organizerDepartment.toLowerCase() !== targetDepartment.toLowerCase()) {
+        return res.status(403).json({
+          success: false,
+          message: "Student must belong to your department"
+        });
+      }
+    }
+
+    if (target.role === "STUDENT_COORDINATOR") {
+      return res.status(200).json({
+        success: true,
+        message: "User is already a coordinator",
+        user: target
+      });
+    }
+
+    if (target.role !== "STUDENT") {
+      return res.status(400).json({
+        success: false,
+        message: "Only students can be promoted to coordinator"
+      });
+    }
+
+    const departmentFallback = resolveDepartment(target) || resolveDepartment(req.user);
+    target.role = "STUDENT_COORDINATOR";
+    target.professionalProfile = {
+      ...(target.professionalProfile || {}),
+      department: departmentFallback || target.professionalProfile?.department || ""
+    };
+
+    await target.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Student promoted to coordinator",
+      user: target
+    });
   } catch (error) {
     next(error);
   }

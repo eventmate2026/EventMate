@@ -121,6 +121,15 @@ export default function CoordinatorEventDetails() {
     if (!eventData) return null;
 
     const fee = Number(eventData?.registration?.fee || 0);
+    const organizerName =
+      eventData?.organizer?.name ||
+      eventData?.organizer?.fullName ||
+      "Organizer";
+    const organizerDepartment = String(eventData?.organizer?.department || "").trim();
+    const organizedBy =
+      [organizerName, organizerDepartment].filter(Boolean).join(" • ") ||
+      organizerDepartment ||
+      organizerName;
 
     return {
       id: normalizeId(eventData?._id) || normalizeId(eventId),
@@ -136,11 +145,7 @@ export default function CoordinatorEventDetails() {
       startTime: eventData?.schedule?.startTime || "",
       endTime: eventData?.schedule?.endTime || "",
       venue: eventData?.venue?.location || "Venue TBD",
-      organizedBy:
-        eventData?.organizer?.department ||
-        eventData?.organizer?.name ||
-        eventData?.organizer?.fullName ||
-        "Computer Science Dept.",
+      organizedBy,
       contactEmail: eventData?.organizer?.contactEmail || eventData?.organizer?.email || "eventmate@gmail.com",
       contactPhone: eventData?.organizer?.contactPhone || eventData?.organizer?.phone || "Not available",
       isTeamEvent: Boolean(eventData?.isTeamEvent),

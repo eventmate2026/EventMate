@@ -4,6 +4,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { storeAuth } from "../lib/auth";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const yearOptions = ["1st", "2nd", "3rd", "4th"];
 
@@ -14,12 +15,15 @@ const ROLE_LABELS = {
   STUDENT: "Student",
 };
 
+const EDUCATION_LEVELS = ["10th", "12th", "Diploma", "Engineering"];
+
 const emptyForm = {
   fullName: "",
   mobileNumber: "",
   collegeName: "",
   academicBranch: "",
   academicYear: "",
+  educationLevel: "",
   professionalDepartment: "",
   professionalOccupation: "",
 };
@@ -30,6 +34,7 @@ const userToForm = (user) => ({
   collegeName: user?.collegeName || "",
   academicBranch: user?.academicProfile?.branch || "",
   academicYear: user?.academicProfile?.year || "",
+  educationLevel: user?.educationLevel || "",
   professionalDepartment: user?.professionalProfile?.department || "",
   professionalOccupation: user?.professionalProfile?.occupation || "",
 });
@@ -47,6 +52,11 @@ export default function Profile() {
   const isOrganizer = role === "ORGANIZER";
   const isAdmin = role === "MAIN_ADMIN";
   const canEditProfessional = isOrganizer || isAdmin || isCoordinator;
+  const profileDepartment = resolveUserDepartment(profile);
+  const educationLevel = formData.educationLevel;
+  const hideAcademicYear = educationLevel === "10th" || educationLevel === "12th";
+  const academicYearOptions =
+    educationLevel === "Diploma" ? yearOptions.slice(0, 3) : yearOptions;
 
   const roleBadgeClass = useMemo(() => {
     if (isAdmin) return "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200";
@@ -82,6 +92,19 @@ export default function Profile() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleEducationLevelSelect = (level) => {
+    setFormData((prev) => {
+      let nextYear = prev.academicYear;
+      if (level === "10th" || level === "12th") {
+        nextYear = "";
+      }
+      if (level === "Diploma" && nextYear === "4th") {
+        nextYear = "";
+      }
+      return { ...prev, educationLevel: level, academicYear: nextYear };
+    });
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     setLoading((prev) => ({ ...prev, save: true }));
@@ -91,6 +114,7 @@ export default function Profile() {
         fullName: formData.fullName.trim(),
         mobileNumber: formData.mobileNumber.trim() || undefined,
         collegeName: formData.collegeName.trim() || undefined,
+        educationLevel: formData.educationLevel || undefined,
       };
 
       if (isStudent) {
@@ -208,6 +232,9 @@ export default function Profile() {
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">{profile?.fullName || "User"}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{profile?.email || "user@eventmate.com"}</p>
+                {profileDepartment ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{profileDepartment}</p>
+                ) : null}
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{ROLE_LABELS[role] || "User"}</p>
               </div>
             </div>
@@ -274,12 +301,27 @@ export default function Profile() {
                     />
                   </label>
                   <label className="block">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Role</span>
-                    <input
-                      value={ROLE_LABELS[role] || "User"}
-                      readOnly
-                      className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-3 text-sm text-slate-600 dark:text-slate-300"
-                    />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</span>
+                    <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {EDUCATION_LEVELS.map((level) => {
+                        const isSelected = formData.educationLevel === level;
+                        return (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => handleEducationLevelSelect(level)}
+                            aria-pressed={isSelected}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              isSelected
+                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </label>
                 </div>
 
@@ -296,31 +338,34 @@ export default function Profile() {
                         />
                       </label>
                       <label className="block">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Academic Branch</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
                         <input
                           name="academicBranch"
                           value={formData.academicBranch}
                           onChange={handleChange}
+                          placeholder="e.g. Computer Engineering"
                           className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
                         />
                       </label>
                     </div>
-                    <label className="block sm:max-w-xs">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Academic Year</span>
-                      <select
-                        name="academicYear"
-                        value={formData.academicYear}
-                        onChange={handleChange}
-                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
-                      >
-                        <option value="">Select year</option>
-                        {yearOptions.map((year) => (
-                          <option key={year} value={year}>
-                            {year}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    {!hideAcademicYear && (
+                      <label className="block sm:max-w-xs">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Academic Year</span>
+                        <select
+                          name="academicYear"
+                          value={formData.academicYear}
+                          onChange={handleChange}
+                          className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
+                        >
+                          <option value="">Select year</option>
+                          {academicYearOptions.map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                   </>
                 )}
 

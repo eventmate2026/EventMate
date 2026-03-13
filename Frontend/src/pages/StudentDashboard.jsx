@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BadgeCheck, CalendarDays, Loader2, MapPin, MessageSquareMore, Search } from "lucide-react";
+import { BadgeCheck, CalendarDays, Loader2, MapPin, MessageSquareMore, Search, Users2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
 import { fetchRegisteredEventIds } from "../lib/registrationApi";
+import { computeProfileProgress } from "../lib/profileProgress";
+import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 
 const StatCard = ({ label, value, color = "bg-purple-100 text-purple-700 dark:bg-indigo-500/20 dark:text-indigo-200" }) => (
   <div className={`eventmate-kpi flex flex-col items-center p-6 rounded-2xl ${color} shadow-sm`}>
@@ -36,6 +38,34 @@ const dateValue = (value) => {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
+const formatTime = (date) =>
+  date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const formatDate = (date) =>
+  date.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+const resolveGreeting = (date) => {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "Good night";
+};
+
+const LIVE_TIPS = [
+  "Tap an event card to view full details and coordinator info.",
+  "Complete your profile to unlock smarter event recommendations.",
+  "Check feedback tasks after you attend an event.",
+  "Use My Events to track registrations in one place.",
+];
+
 const resolveDashboardStatus = (event) => {
   const mappedStatus = normalizeStatus(event?.status);
   if (mappedStatus === "current") return "current";
@@ -54,6 +84,7 @@ const resolveDashboardStatus = (event) => {
 const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
   const dashboardStatus = resolveDashboardStatus(event);
   const statusLabel = dashboardStatus === "current" ? "Live" : dashboardStatus === "completed" ? "Completed" : "Upcoming";
+  const showRegisterButton = event.registrationOpen || event.isRegistered;
 
   return (
     <div className="eventmate-panel bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full border border-gray-100 dark:border-gray-700 group">
@@ -102,15 +133,17 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
         <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2 mb-6">
           {event.description}
         </p>
-        <div className="mt-auto grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => onRegister(event.id)}
-            disabled={event.isRegistered || registering || !event.registrationOpen}
-            className="w-full py-2.5 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
-          >
-            {registering ? "Registering..." : event.isRegistered ? "Registered" : event.registrationOpen ? "Register" : "Closed"}
-          </button>
+        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+          {showRegisterButton && (
+            <button
+              type="button"
+              onClick={() => onRegister(event.id)}
+              disabled={event.isRegistered || registering || !event.registrationOpen}
+              className="w-full py-2.5 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
+            >
+              {registering ? "Registering..." : event.isRegistered ? "Registered" : event.registrationOpen ? "Register" : "Closed"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onViewDetails(event.id)}
@@ -126,13 +159,16 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const [user, setUser] = useState(() => getStoredUser());
   const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [events, setEvents] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
+  const [assignedEventsCount, setAssignedEventsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
+  const [clock, setClock] = useState(() => new Date());
 
   const fetchDashboardEvents = async () => {
     setLoading(true);
@@ -176,6 +212,33 @@ export default function StudentDashboard() {
     fetchDashboardEvents();
   }, []);
 
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setClock(new Date());
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const fetchAssignedEvents = async () => {
+      try {
+        const response = await api({ ...SummaryApi.get_my_assigned_events, cacheTTL: 30000 });
+        const rows = extractEventList(response.data);
+        setAssignedEventsCount(rows.length);
+      } catch {
+        setAssignedEventsCount(0);
+      }
+    };
+
+    fetchAssignedEvents();
+  }, [user?._id]);
+
+  useEffect(() => {
+    return subscribeAuthUpdates(() => {
+      setUser(getStoredUser());
+    });
+  }, []);
+
   const goToEventDetails = (eventId) => {
     const normalizedId = String(eventId || "").trim();
     if (!normalizedId) return;
@@ -199,11 +262,25 @@ export default function StudentDashboard() {
     [recommendedEvents, showAllRecommended]
   );
 
-  const totalLiveEvents = events.filter((event) => resolveDashboardStatus(event) === "current").length;
-  const totalUpcomingEvents = events.filter((event) => resolveDashboardStatus(event) === "upcoming").length;
-  const totalCompletedEvents = events.filter((event) => resolveDashboardStatus(event) === "completed").length;
-  const totalCompletedMyEvents = myEvents.filter((event) => resolveDashboardStatus(event) === "completed").length;
-  const totalActiveMyEvents = myEvents.filter((event) => resolveDashboardStatus(event) !== "completed").length;
+  const profileProgress = useMemo(() => computeProfileProgress(user), [user]);
+  const showProfileCard = profileProgress.left > 0;
+  const liveGreeting = useMemo(() => resolveGreeting(clock), [clock]);
+  const liveTimeLabel = useMemo(() => formatTime(clock), [clock]);
+  const liveDateLabel = useMemo(() => formatDate(clock), [clock]);
+  const liveTip = useMemo(() => LIVE_TIPS[clock.getMinutes() % LIVE_TIPS.length], [clock]);
+  const userFirstName = String(user?.fullName || "Student").split(" ")[0];
+
+  const coordinatorAction =
+    assignedEventsCount > 0
+      ? {
+          id: "coordinator-workspace",
+          title: "Coordinator Workspace",
+          subtitle: `${assignedEventsCount} assigned`,
+          icon: Users2,
+          iconClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300",
+          path: "/coordinator-dashboard",
+        }
+      : null;
 
   const quickActions = [
     {
@@ -222,6 +299,7 @@ export default function StudentDashboard() {
       iconClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
       path: "/student-dashboard/my-events",
     },
+    ...(coordinatorAction ? [coordinatorAction] : []),
     {
       id: "my-certificates",
       title: "My Certificates",
@@ -286,13 +364,6 @@ export default function StudentDashboard() {
         </div>
       </section>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        <StatCard label="All Events" value={events.length} color="bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" />
-        <StatCard label="My Events" value={myEvents.length} />
-        <StatCard label="Live Now" value={totalLiveEvents} color="bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300" />
-        <StatCard label="Completed" value={totalCompletedEvents} color="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300" />
-      </div>
-
       {loading && (
         <p className="mb-8 text-sm text-gray-500 dark:text-gray-300 inline-flex items-center gap-2">
           <Loader2 size={14} className="animate-spin" />
@@ -352,32 +423,61 @@ export default function StudentDashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="eventmate-panel bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <h2 className="text-xl font-bold mb-5 text-gray-900 dark:text-white">My Activity</h2>
-            <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
-              <p>Active registrations: <span className="font-semibold">{totalActiveMyEvents}</span></p>
-              <p>Upcoming campus events: <span className="font-semibold">{totalUpcomingEvents}</span></p>
-              <p>Completed events: <span className="font-semibold">{totalCompletedMyEvents}</span></p>
+          {showProfileCard && (
+            <div className="bg-gradient-to-br from-purple-600 to-indigo-600 dark:from-indigo-700 dark:to-slate-800 text-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-3">Complete your profile</h2>
+              <p className="mb-4 text-purple-100 dark:text-indigo-100 text-sm">
+                Keep your profile complete for better event targeting and communication.
+              </p>
+              <div className="mb-5">
+                <div className="h-2 rounded-full bg-white/25">
+                  <div
+                    className="h-full rounded-full bg-white transition-all duration-300"
+                    style={{ width: `${profileProgress.percent}%` }}
+                  />
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-white/90">
+                  <span>{profileProgress.percent}% completed</span>
+                  <span>{profileProgress.left} steps left</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/profile")}
+                className="w-full bg-white text-purple-700 dark:text-indigo-700 font-medium py-3 rounded-xl hover:bg-gray-100 transition"
+              >
+                Continue Setup
+              </button>
             </div>
-            <button
-              onClick={() => navigate("/student-dashboard/my-events")}
-              className="mt-5 w-full border border-purple-200 dark:border-indigo-400/40 text-purple-700 dark:text-indigo-200 rounded-lg py-2.5 font-medium hover:bg-purple-50 dark:hover:bg-indigo-500/15 transition"
-            >
-              Open My Events
-            </button>
-          </div>
+          )}
 
-          <div className="bg-gradient-to-br from-purple-600 to-indigo-600 dark:from-indigo-700 dark:to-slate-800 text-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-xl font-bold mb-3">Need profile updates?</h2>
-            <p className="mb-6 text-purple-100 dark:text-indigo-100 text-sm">
-              Keep your profile complete for better event targeting and communication.
-            </p>
-            <button
-              onClick={() => navigate("/profile")}
-              className="w-full bg-white text-purple-700 dark:text-indigo-700 font-medium py-3 rounded-xl hover:bg-gray-100 transition"
-            >
-              Continue Setup
-            </button>
+          <div className="relative overflow-hidden rounded-2xl border border-indigo-200/30 dark:border-white/10 bg-gradient-to-br from-indigo-600 via-purple-600 to-slate-900 text-white shadow-lg p-6">
+            <div className="absolute -top-16 -right-10 h-32 w-32 rounded-full bg-fuchsia-300/40 blur-3xl animate-pulse" />
+            <div className="absolute -bottom-16 -left-10 h-32 w-32 rounded-full bg-indigo-300/35 blur-3xl animate-pulse" />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-indigo-100/80">Live Campus Pulse</p>
+                  <h3 className="mt-2 text-2xl font-semibold">{liveGreeting}, {userFirstName}</h3>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                  Live
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-white/12 p-3">
+                  <p className="text-xs text-indigo-100/90">Time now</p>
+                  <p className="mt-1 text-lg font-semibold">{liveTimeLabel}</p>
+                  <p className="text-xs text-indigo-100/90">{liveDateLabel}</p>
+                </div>
+                <div className="rounded-xl bg-white/12 p-3">
+                  <p className="text-xs text-indigo-100/90">Your snapshot</p>
+                  <p className="mt-1 text-lg font-semibold">{displayedEvents.length} picks</p>
+                  <p className="text-xs text-indigo-100/90">{myEvents.length} registered</p>
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-indigo-100/90">{liveTip}</p>
+            </div>
           </div>
         </div>
       </div>

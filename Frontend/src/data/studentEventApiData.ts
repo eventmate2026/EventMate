@@ -1,3 +1,5 @@
+import { resolveUserDepartment } from "../lib/userDepartment";
+
 const DEFAULT_EVENT_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80";
 
@@ -44,6 +46,27 @@ const formatTimeRange = (schedule) => {
   if (startTime) return startTime;
   if (endTime) return endTime;
   return "Time TBD";
+};
+
+const resolveRegistrationDeadline = (value) => {
+  if (!value) return null;
+  const text = String(value || "").trim();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const hasTime = /\d{2}:\d{2}/.test(text);
+  if (!hasTime) {
+    parsed.setHours(23, 59, 59, 999);
+  }
+  return parsed;
+};
+
+const resolveRegistrationOpen = (event) => {
+  const isPublished = String(event?.status || "") === "Published";
+  if (!isPublished) return false;
+  if (!event?.registration?.isOpen) return false;
+  const deadline = resolveRegistrationDeadline(event?.registration?.lastDate);
+  if (!deadline) return true;
+  return Date.now() <= deadline.getTime();
 };
 
 const fallbackRequirements = (event) => {
@@ -101,7 +124,7 @@ export const mapApiEventToCard = (event, { registeredIds = new Set() } = {}) => 
     startDate: event?.schedule?.startDate || event?.createdAt,
     participantCount: Number(event?.participantCount || 0),
     isRegistered: registeredIds.has(id),
-    registrationOpen: Boolean(event?.registration?.isOpen) && String(event?.status || "") === "Published",
+    registrationOpen: resolveRegistrationOpen(event),
     participationMode: participationMode,
     participationLabel: participationLabelMap[participationMode] || participationLabelMap.INDIVIDUAL,
     eventStatus: event?.status || "Published",
@@ -114,6 +137,9 @@ export const mapApiEventToDetails = (event) => {
   const participationMode = event?.isTeamEvent ? "TEAM" : "INDIVIDUAL";
   const maxTeamMembers = Number(event?.maxTeamSize || 1);
   const minTeamMembers = Number(event?.minTeamSize || 1);
+  const organizerDepartment = resolveUserDepartment(event?.organizer);
+  const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
+  const visibilityDepartment = String(event?.visibility?.department || "").trim();
 
   return {
     id: resolveEventId(event),
@@ -121,10 +147,13 @@ export const mapApiEventToDetails = (event) => {
     type: CATEGORY_STYLE[event?.category] || "Workshop",
     audience: participationLabelMap[participationMode] || participationLabelMap.INDIVIDUAL,
     organizerName: event?.organizer?.name || "Organizer",
+    organizerDepartment,
     coordinators: Array.isArray(event?.studentCoordinators)
       ? event.studentCoordinators.map((item) => ({
+          id: String(item?.coordinatorId || item?._id || item?.id || "").trim(),
           name: item?.name || "Coordinator",
           email: item?.email || "",
+          department: resolveUserDepartment(item),
         }))
       : [],
     contact: {
@@ -144,10 +173,12 @@ export const mapApiEventToDetails = (event) => {
     isFree: fee <= 0,
     price: fee,
     participantCount: Number(event?.participantCount || 0),
-    registrationOpen: Boolean(event?.registration?.isOpen) && String(event?.status || "") === "Published",
+    registrationOpen: resolveRegistrationOpen(event),
     participationMode,
     maxTeamMembers: Number.isFinite(maxTeamMembers) && maxTeamMembers >= 2 ? Math.floor(maxTeamMembers) : 1,
     minTeamMembers: Number.isFinite(minTeamMembers) && minTeamMembers >= 1 ? Math.floor(minTeamMembers) : 1,
+    visibilityScope,
+    visibilityDepartment,
     eventStatus: event?.status || "Published",
     myRegistration: event?.myRegistration || null,
   };

@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, RefreshCcw, Search, ShieldCheck, Trash2, U
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import { resolveUserDepartment } from "../lib/userDepartment";
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -97,11 +98,13 @@ export default function AdminUserManagement() {
   const filteredUsers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return users.filter((user) => {
+      const department = resolveUserDepartment(user).toLowerCase();
       const matchesSearch =
         !term ||
         user.fullName?.toLowerCase().includes(term) ||
         user.email?.toLowerCase().includes(term) ||
-        user.role?.toLowerCase().includes(term);
+        user.role?.toLowerCase().includes(term) ||
+        department.includes(term);
 
       const matchesRole = roleFilter === "ALL" || user.role === roleFilter;
 
@@ -157,6 +160,7 @@ export default function AdminUserManagement() {
     const rows = filteredUsers.map((user) => ({
       Name: user.fullName,
       Email: user.email,
+      Department: resolveUserDepartment(user) || "N/A",
       Role: ROLE_LABELS[user.role] || user.role,
       Active: user.isActive ? "Yes" : "No",
       Verified: user.emailVerified ? "Yes" : "No",
@@ -167,6 +171,7 @@ export default function AdminUserManagement() {
   };
 
   const closeProfileModal = () => setProfileUser(null);
+  const profileDepartment = profileUser ? resolveUserDepartment(profileUser) : "";
 
   return (
     <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
@@ -319,6 +324,11 @@ export default function AdminUserManagement() {
                           <div>
                             <p className="font-semibold text-slate-900 dark:text-white">{user.fullName}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
+                            {resolveUserDepartment(user) ? (
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {resolveUserDepartment(user)}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -390,6 +400,9 @@ export default function AdminUserManagement() {
                   <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                     {profileUser.fullName || "User Profile"}
                   </h2>
+                  {profileDepartment ? (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{profileDepartment}</p>
+                  ) : null}
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {ROLE_LABELS[profileUser.role] || profileUser.role} | ID: {profileUser._id}
                   </p>
