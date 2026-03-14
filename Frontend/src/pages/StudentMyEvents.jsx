@@ -6,17 +6,33 @@ import { fetchMyRegistrations } from "../lib/registrationApi";
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 const formatDate = (value) => {
-  if (!value) return "Date TBD";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Date TBD";
+  const parsed = parseDateValue(value);
+  if (!parsed) return "Date TBD";
   return parsed.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 };
 
 const formatMonthDay = (value) => {
-  if (!value) return { month: "TBD", day: "--" };
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return { month: "TBD", day: "--" };
+  const parsed = parseDateValue(value);
+  if (!parsed) return { month: "TBD", day: "--" };
   return {
     month: parsed.toLocaleDateString([], { month: "short" }),
     day: parsed.toLocaleDateString([], { day: "2-digit" }),
@@ -43,7 +59,8 @@ const deriveEventPhase = (registration) => {
   const explicitStatus = String(registration?.eventStatus || "").trim();
   if (explicitStatus === "Completed" || explicitStatus === "Cancelled") return "completed";
 
-  const dateValue = new Date(registration?.eventStartDate || 0).getTime();
+  const parsedDate = parseDateValue(registration?.eventStartDate);
+  const dateValue = parsedDate ? parsedDate.getTime() : Number.NaN;
   if (Number.isNaN(dateValue)) return "upcoming";
   return Date.now() > dateValue ? "completed" : "upcoming";
 };

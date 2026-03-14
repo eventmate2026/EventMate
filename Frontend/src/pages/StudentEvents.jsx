@@ -26,8 +26,42 @@ const statusRank = {
 };
 
 const getDateValue = (value) => {
-  const parsed = new Date(value || "");
+  if (!value) return 0;
+  const text = String(value || "").trim();
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  }
+  const parsed = new Date(text);
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+};
+
+const fetchAllPublicEvents = async () => {
+  const limit = 50;
+  let page = 1;
+  let pages = 1;
+  const allEvents = [];
+
+  while (page <= pages) {
+    const response = await api({
+      ...SummaryApi.get_public_events,
+      params: { page, limit },
+      cacheTTL: 90000,
+    });
+    const batch = extractEventList(response.data);
+    if (batch.length) {
+      allEvents.push(...batch);
+    }
+
+    const nextPages = Number(response.data?.pages || 0);
+    if (!Number.isFinite(nextPages) || nextPages <= 0) break;
+    pages = nextPages;
+    if (batch.length === 0) break;
+    page += 1;
+  }
+
+  return allEvents;
 };
 
 const filterEvents = (list, term) => {
@@ -144,11 +178,10 @@ export default function StudentEvents() {
     setRegistrationWarning(null);
 
     try {
-      const [publicEventsResponse, registrationInfo] = await Promise.all([
-        api({ ...SummaryApi.get_public_events, cacheTTL: 90000 }),
+      const [publicEvents, registrationInfo] = await Promise.all([
+        fetchAllPublicEvents(),
         fetchMyRegistrations(),
       ]);
-      const publicEvents = extractEventList(publicEventsResponse.data);
       const registeredIds = new Set(
         (registrationInfo.rows || []).map((row) => row.eventId).filter(Boolean)
       );

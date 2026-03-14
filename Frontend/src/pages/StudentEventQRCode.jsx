@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -11,10 +11,27 @@ import {
 } from "lucide-react";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 const formatDate = (value) => {
-  if (!value) return "Date TBD";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Date TBD";
+  const parsed = parseDateValue(value);
+  if (!parsed) return "Date TBD";
   return parsed.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 };
 
@@ -41,13 +58,24 @@ export default function StudentEventQRCode() {
   const [error, setError] = useState(null);
   const [registration, setRegistration] = useState(null);
   const [warning, setWarning] = useState(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
+    let isActive = true;
+    const requestId = ++requestIdRef.current;
+
     const loadRegistration = async () => {
       setLoading(true);
       setError(null);
+      setWarning(null);
       try {
-        const response = await fetchMyRegistrations();
+        const response = await fetchMyRegistrations({ bypassCache: true });
+        if (!isActive || requestIdRef.current !== requestId) return;
+        if (response?.supported === false) {
+          setError(response?.warning || "Registration history is unavailable right now.");
+          setRegistration(null);
+          return;
+        }
         setWarning(response.warning);
         const selected = response.rows.find(
           (item) => String(item?.id || "").trim() === String(registrationId || "").trim()
@@ -60,14 +88,20 @@ export default function StudentEventQRCode() {
           setRegistration(selected);
         }
       } catch (fetchError) {
+        if (!isActive || requestIdRef.current !== requestId) return;
         setError(fetchError?.response?.data?.message || "Unable to load QR pass.");
         setRegistration(null);
       } finally {
+        if (!isActive || requestIdRef.current !== requestId) return;
         setLoading(false);
       }
     };
 
     loadRegistration();
+
+    return () => {
+      isActive = false;
+    };
   }, [registrationId]);
 
   const canShowQr = Boolean(registration?.qr?.qrImageUrl);

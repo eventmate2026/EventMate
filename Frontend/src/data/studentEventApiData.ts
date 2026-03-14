@@ -19,23 +19,46 @@ const resolveEventId = (event) =>
   String(event?._id || event?.id || event?.eventId || "")
     .trim();
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const toLocalDate = (value) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
 export const formatEventDate = (value) => {
-  if (!value) return "Date TBD";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Date TBD";
-  return date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  const parsed = parseDateValue(value);
+  if (!parsed) return "Date TBD";
+  return parsed.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 };
 
 export const deriveEventStatus = (event) => {
   const workflowStatus = String(event?.status || "");
   if (workflowStatus === "Completed" || workflowStatus === "Cancelled") return "completed";
 
-  const startDate = new Date(event?.schedule?.startDate || event?.createdAt || 0);
-  const endDate = new Date(event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0);
-  const now = new Date();
+  const startDate = toLocalDate(event?.schedule?.startDate || event?.createdAt || 0);
+  const endDate = toLocalDate(event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0);
+  const now = toLocalDate(new Date());
 
-  if (!Number.isNaN(endDate.getTime()) && now > endDate) return "completed";
-  if (!Number.isNaN(startDate.getTime()) && now >= startDate && now <= endDate) return "current";
+  if (endDate && now && now > endDate) return "completed";
+  if (startDate && endDate && now && now >= startDate && now <= endDate) return "current";
   return "upcoming";
 };
 

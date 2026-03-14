@@ -134,7 +134,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   );
 
   return (
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 sticky top-0 z-50 shadow-sm">
+    <>
+    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
@@ -326,6 +327,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         </div>
       )}
     </nav>
+    <div aria-hidden="true" className="h-16 shrink-0" />
+    </>
   );
 };
 

@@ -28,6 +28,7 @@ body {
     radial-gradient(circle at 50% 110%, rgba(245, 158, 11, 0.1), transparent 38%),
     var(--ev-bg-light);
   color: var(--ev-text-light);
+  overflow-x: hidden;
 }
 
 #root {
@@ -42,6 +43,38 @@ h1, h2, h3, h4, h5, h6 {
 * {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table thead,
+  table tbody,
+  table tr {
+    width: max-content;
+  }
+
+  table th,
+  table td {
+    white-space: nowrap;
+  }
 }
 
 /* Prevent browser autofill from forcing bright backgrounds in dark inputs. */

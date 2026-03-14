@@ -628,7 +628,7 @@ export default function OrganizerDashboard() {
 
               <div className="mt-5 space-y-3">
                 {filteredEvents.length > 0 ? (
-                  filteredEvents.slice(0, 8).map((event) => {
+                  filteredEvents.map((event) => {
                     const encodedEventId = encodeURIComponent(event.eventId || "");
                     const hasEventId = Boolean(event.eventId);
                     const registrationLabel = event.registrationError

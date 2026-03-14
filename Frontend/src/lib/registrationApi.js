@@ -5,27 +5,48 @@ const REG_CACHE_TTL_MS = 60000;
 let cachedMyRegistrations = null;
 let cachedMyRegistrationsExpiresAt = 0;
 let pendingMyRegistrationsPromise = null;
+let pendingMyRegistrationsRequestId = 0;
+let cacheGeneration = 0;
 
 export const invalidateMyRegistrationsCache = () => {
+  cacheGeneration += 1;
   cachedMyRegistrations = null;
   cachedMyRegistrationsExpiresAt = 0;
+  pendingMyRegistrationsPromise = null;
 };
 
 const toList = (payload) => {
+  if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.registrations)) return payload.registrations;
   if (Array.isArray(payload?.data?.registrations)) return payload.data.registrations;
   return [];
 };
 
-const resolveEventId = (item) =>
-  String(item?.event?._id || item?.eventId || item?.event || item?._id || "")
-    .trim();
+const resolveEventId = (item) => {
+  const event = item?.event;
+  if (typeof event === "string") return event.trim();
+  if (event && typeof event === "object") {
+    const fromEvent = String(event._id || event.id || "").trim();
+    if (fromEvent) return fromEvent;
+  }
+  return String(item?.eventId || item?._id || item?.id || "").trim();
+};
+
+const resolveEventLocation = (eventDoc, item) => {
+  const venue = eventDoc?.venue;
+  if (typeof venue === "string") return venue.trim();
+  if (venue && typeof venue === "object") {
+    const venueText = String(venue.location || venue.name || venue.address || "").trim();
+    if (venueText) return venueText;
+  }
+  return String(eventDoc?.location || item?.eventLocation || "").trim();
+};
 
 const normalizeRegistration = (item) => {
   const qrImageUrl = String(item?.qr?.qrImageUrl || "").trim();
-  const eventDoc = item?.event || {};
-  const eventLocation = String(eventDoc?.venue?.location || eventDoc?.venue || "").trim();
+  const eventDoc = item?.event && typeof item.event === "object" ? item.event : {};
+  const eventLocation = resolveEventLocation(eventDoc, item);
   const eventStartDate = eventDoc?.schedule?.startDate || null;
   const eventStartTime = String(eventDoc?.schedule?.startTime || "").trim();
   const eventEndTime = String(eventDoc?.schedule?.endTime || "").trim();
@@ -54,8 +75,10 @@ const normalizeRegistration = (item) => {
   };
 };
 
-export const fetchMyRegistrations = async () => {
-  if (cachedMyRegistrations && cachedMyRegistrationsExpiresAt > Date.now()) {
+export const fetchMyRegistrations = async (options = {}) => {
+  const { bypassCache = false } = options;
+
+  if (!bypassCache && cachedMyRegistrations && cachedMyRegistrationsExpiresAt > Date.now()) {
     return cachedMyRegistrations;
   }
 
@@ -63,34 +86,43 @@ export const fetchMyRegistrations = async () => {
     return pendingMyRegistrationsPromise;
   }
 
+  const requestGeneration = cacheGeneration;
+  const requestId = ++pendingMyRegistrationsRequestId;
+
   pendingMyRegistrationsPromise = (async () => {
-  try {
-    const response = await api({ ...SummaryApi.get_my_registered_events, cacheTTL: REG_CACHE_TTL_MS });
-    const rows = toList(response.data).map(normalizeRegistration);
-    const result = {
-      rows,
-      supported: true,
-      warning: null,
-    };
-    cachedMyRegistrations = result;
-    cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
-    return result;
-  } catch (error) {
-    const status = Number(error?.response?.status);
-    if (status === 404) {
+    try {
+      const response = await api({ ...SummaryApi.get_my_registered_events, cacheTTL: REG_CACHE_TTL_MS });
+      const rows = toList(response.data).map(normalizeRegistration);
       const result = {
-        rows: [],
-        supported: false,
-        warning: "My registration history endpoint is not available in this backend build.",
+        rows,
+        supported: true,
+        warning: null,
       };
-      cachedMyRegistrations = result;
-      cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
+      if (requestGeneration === cacheGeneration) {
+        cachedMyRegistrations = result;
+        cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
+      }
       return result;
+    } catch (error) {
+      const status = Number(error?.response?.status);
+      if (status === 404) {
+        const result = {
+          rows: [],
+          supported: false,
+          warning: "My registration history endpoint is not available in this backend build.",
+        };
+        if (requestGeneration === cacheGeneration) {
+          cachedMyRegistrations = result;
+          cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
+        }
+        return result;
+      }
+      throw error;
+    } finally {
+      if (pendingMyRegistrationsRequestId === requestId) {
+        pendingMyRegistrationsPromise = null;
+      }
     }
-    throw error;
-  } finally {
-    pendingMyRegistrationsPromise = null;
-  }
   })();
 
   return pendingMyRegistrationsPromise;
