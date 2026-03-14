@@ -16,6 +16,10 @@ const NotificationSchema = new mongoose.Schema(
       role: {
         type: String,
         required: true
+      },
+      email: {
+        type: String,
+        default: ""
       }
     },
 
@@ -40,7 +44,9 @@ const NotificationSchema = new mongoose.Schema(
         "CERTIFICATE",
         "FEEDBACK",
         "CONTACT",
-        "WINNER"
+        "WINNER",
+        "NOTICE",
+        "MESSAGE"
       ],
       required: true
     },
@@ -51,9 +57,32 @@ const NotificationSchema = new mongoose.Schema(
       default: null
     },
 
+    sender: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+      },
+      name: {
+        type: String
+      },
+      role: {
+        type: String
+      }
+    },
+
+    groupId: {
+      type: String,
+      default: null
+    },
+
     isRead: {
       type: Boolean,
       default: false
+    },
+
+    readAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }

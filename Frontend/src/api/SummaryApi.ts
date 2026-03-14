@@ -82,6 +82,36 @@ const SummaryApi = {
     method: "patch",
   },
 
+  admin_send_notification: {
+    url: "/api/notifications/admin-send",
+    method: "post",
+  },
+
+  organizer_send_notification: {
+    url: "/api/notifications/organizer-send",
+    method: "post",
+  },
+
+  organizer_sent_groups: {
+    url: "/api/notifications/organizer-sent",
+    method: "get",
+  },
+
+  organizer_receipts: {
+    url: "/api/notifications/organizer-receipts",
+    method: "get",
+  },
+
+  admin_sent_groups: {
+    url: "/api/notifications/admin-sent",
+    method: "get",
+  },
+
+  admin_receipts: {
+    url: "/api/notifications/admin-receipts",
+    method: "get",
+  },
+
   /* ================= EVENTS ================= */
   create_event: {
     url: "/api/events",

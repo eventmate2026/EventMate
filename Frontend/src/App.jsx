@@ -49,6 +49,12 @@ const AdminNotifications = lazy(() =>
   }))
 );
 
+const AdminContactCenter = lazy(() =>
+  import("./pages/AdminContactCenter").catch(() => ({
+    default: () => <div>Contact center loading...</div>,
+  }))
+);
+
 const AdminSystemOversight = lazy(() =>
   import("./pages/AdminSystemOversight").catch(() => ({
     default: () => <div>System oversight loading...</div>,
@@ -94,6 +100,12 @@ const OrganizerEditEvent = lazy(() =>
 const OrganizerEventDetails = lazy(() =>
   import("./pages/OrganizerEventDetails").catch(() => ({
     default: () => <div>Event details loading...</div>,
+  }))
+);
+
+const OrganizerEventContactCenter = lazy(() =>
+  import("./pages/OrganizerEventContactCenter").catch(() => ({
+    default: () => <div>Contact center loading...</div>,
   }))
 );
 
@@ -572,6 +584,17 @@ export default function App() {
           />
 
           <Route
+            path="/admin-dashboard/contact-center"
+            element={
+              <ProtectedRoute requiredRole="MAIN_ADMIN">
+                <Suspense fallback={<div className="p-8 text-center">Loading Contact Center...</div>}>
+                  <AdminContactCenter />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/admin-dashboard/system-oversight"
             element={
               <ProtectedRoute requiredRole="MAIN_ADMIN">
@@ -654,6 +677,17 @@ export default function App() {
               <ProtectedRoute requiredRole="ORGANIZER">
                 <Suspense fallback={<div className="p-8 text-center">Loading Event Details...</div>}>
                   <OrganizerEventDetails />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/organizer-dashboard/event/:eventId/contact-center"
+            element={
+              <ProtectedRoute requiredRole="ORGANIZER">
+                <Suspense fallback={<div className="p-8 text-center">Loading Contact Center...</div>}>
+                  <OrganizerEventContactCenter />
                 </Suspense>
               </ProtectedRoute>
             }

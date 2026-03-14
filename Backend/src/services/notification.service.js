@@ -16,24 +16,41 @@ export const sendNotification = async ({
   recipientId,
   recipientName,
   recipientRole,
+  recipientEmail,
+  senderId,
+  senderName,
+  senderRole,
   title,
   message,
   type,
-  refId = null
+  refId = null,
+  groupId = null
 }) => {
   try {
-    // Save to DB — works for offline users too
-    const notification = await Notification.create({
+    const payload = {
       recipient: {
         userId: recipientId,
         name: recipientName,
-        role: recipientRole
+        role: recipientRole,
+        email: recipientEmail || ""
       },
       title,
       message,
       type,
-      refId
-    });
+      refId,
+      groupId: groupId || null
+    };
+
+    if (senderId) {
+      payload.sender = {
+        userId: senderId,
+        name: senderName || "User",
+        role: senderRole || "USER"
+      };
+    }
+
+    // Save to DB — works for offline users too
+    const notification = await Notification.create(payload);
 
     // Emit to socket if user is online
     if (io) {

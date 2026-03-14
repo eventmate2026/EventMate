@@ -57,6 +57,10 @@ const typeBadgeClass = (type) => {
   switch (String(type || "").toUpperCase()) {
     case "CONTACT":
       return "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300";
+    case "NOTICE":
+      return "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300";
+    case "MESSAGE":
+      return "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300";
     case "FEEDBACK":
       return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
     case "REGISTRATION":

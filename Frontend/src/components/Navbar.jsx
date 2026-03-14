@@ -157,6 +157,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     setIsAdminUsersMenuOpen(false);
   };
 
+  const closeMenus = () => {
+    setIsMobileMenuOpen(false);
+    setIsUserMenuOpen(false);
+    closeAdminUsersMenuImmediately();
+  };
+
+  useEffect(() => {
+    closeMenus();
+  }, [location.pathname, location.hash, location.search]);
+
   const handleNavClick = (pageName) => {
     if (typeof setActivePage === "function") {
       setActivePage(pageName);
@@ -170,9 +180,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       navigate(roleHomePath[user?.role] || "/");
     }
 
-    setIsMobileMenuOpen(false);
-    setIsUserMenuOpen(false);
-    closeAdminUsersMenuImmediately();
+    closeMenus();
     window.scrollTo(0, 0);
   };
 
@@ -217,6 +225,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     : isPrivileged
       ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
     : "fixed inset-x-0 top-0 z-[110] bg-white/85 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.6)]";
+  const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
   const isAdminUsersRoute =
     location.pathname.startsWith("/admin-dashboard/user-management") ||
     location.pathname.startsWith("/admin-dashboard/organizer-management") ||
@@ -225,6 +234,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const isAdminCertificatesRoute = location.pathname.startsWith("/admin-dashboard/certificates-audit");
   const isAdminSecurityRoute = location.pathname.startsWith("/admin-dashboard/security-reports");
   const isAdminNotificationsRoute = location.pathname.startsWith("/admin-dashboard/notifications");
+  const isAdminContactRoute = location.pathname.startsWith("/admin-dashboard/contact-center");
   const chromeMotion = prefersReducedMotion
     ? {
         initial: { opacity: 1, y: 0 },
@@ -538,6 +548,24 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </Link>
 
               <Link
+                to="/admin-dashboard/contact-center"
+                className={`group relative text-sm font-medium transition-all duration-300 ${
+                  isAdminContactRoute
+                    ? "text-indigo-600 dark:text-indigo-300"
+                    : "text-gray-600 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300"
+                }`}
+              >
+                <span className="relative z-10">Contact Center</span>
+                <span
+                  className={`absolute -bottom-2 left-1/2 h-[2px] w-8 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-purple-500 transition-all duration-300 ${
+                    isAdminContactRoute
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100"
+                  }`}
+                />
+              </Link>
+
+              <Link
                 to="/admin-dashboard/notifications"
                 className={`group relative text-sm font-medium transition-all duration-300 ${
                   isAdminNotificationsRoute
@@ -813,7 +841,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className="-mr-2 flex items-center sm:hidden">
+          <div className={`-mr-2 flex items-center ${mobileVisibilityClass}`}>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
@@ -826,47 +854,126 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
-        <div className={`sm:hidden border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}>
+        <div className={`${mobileVisibilityClass} border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}>
           <div className="pt-2 pb-3 space-y-1">
-            {isAdmin ? (
+            {isPublic ? (
               <>
-                <Link to="/admin-dashboard" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Home
                 </Link>
-                <Link to="/admin-dashboard/system-oversight" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/#events"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Events
+                </Link>
+                <Link
+                  to="/#contact"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Contact us
+                </Link>
+              </>
+            ) : isAdmin ? (
+              <>
+                <Link
+                  to="/admin-dashboard"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Home
+                </Link>
+                <Link
+                  to="/admin-dashboard/system-oversight"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   System Oversight
                 </Link>
-                <Link to="/admin-dashboard/user-management" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/user-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   User Management
                 </Link>
-                <Link to="/admin-dashboard/organizer-management" className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/organizer-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Organizer Management
                 </Link>
-                <Link to="/admin-dashboard/coordinator-management" className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/coordinator-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Coordinator Management
                 </Link>
-                <Link to="/admin-dashboard/notifications" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/notifications"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Notifications
                 </Link>
-                <Link to="/admin-dashboard/certificates-audit" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/contact-center"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Contact Center
+                </Link>
+                <Link
+                  to="/admin-dashboard/certificates-audit"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Certificates & Audit Logs
                 </Link>
-                <Link to="/admin-dashboard/security-reports" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/admin-dashboard/security-reports"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Security & Reports
                 </Link>
               </>
             ) : isOrganizer ? (
               <>
-                <Link to="/organizer-dashboard" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/organizer-dashboard"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Home
                 </Link>
-                <Link to="/organizer-dashboard/coordinator-management" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/organizer-dashboard/coordinator-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Coordinators
                 </Link>
-                <Link to="/organizer-dashboard/contact-admin" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/organizer-dashboard/contact-admin"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Contact Admin
                 </Link>
-                <Link to="/organizer-dashboard/profile" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/organizer-dashboard/profile"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Profile
                 </Link>
               </>
@@ -874,10 +981,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               <>
                 {isCoordinator && (
                   <>
-                    <Link to="/coordinator-dashboard" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                    <Link
+                      to="/coordinator-dashboard"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
                       Home
                     </Link>
-                    <Link to="/coordinator-dashboard/contact-admin" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                    <Link
+                      to="/coordinator-dashboard/contact-admin"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
                       Contact Admin
                     </Link>
                   </>
@@ -890,10 +1005,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     <button onClick={() => handleNavClick('events')} className="w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
                       Events
                     </button>
-                    <Link to="/student-dashboard/my-events" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                    <Link
+                      to="/student-dashboard/my-events"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
                       My Events
                     </Link>
-                    <Link to="/student-dashboard/contact-us" className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                    <Link
+                      to="/student-dashboard/contact-us"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
                       Contact us
                     </Link>
                   </>
@@ -933,10 +1056,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </>
             ) : (
               <div className="px-4 space-y-2">
-                <Link to="/login" className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Link
+                  to="/login"
+                  onClick={closeMenus}
+                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
                   Login
                 </Link>
-                <Link to="/signup" className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
+                <Link
+                  to="/signup"
+                  onClick={closeMenus}
+                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                >
                   Sign Up
                 </Link>
                 <button

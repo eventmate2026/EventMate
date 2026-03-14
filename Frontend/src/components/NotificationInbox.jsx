@@ -36,6 +36,10 @@ const typeBadgeClass = (type) => {
       return "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300";
     case "CONTACT":
       return "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300";
+    case "NOTICE":
+      return "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300";
+    case "MESSAGE":
+      return "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300";
     case "REGISTRATION":
       return "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300";
     default:

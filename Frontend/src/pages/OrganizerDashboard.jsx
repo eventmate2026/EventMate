@@ -12,6 +12,7 @@ import {
   QrCode,
   RefreshCcw,
   Search,
+  SendHorizontal,
   Sparkles,
   Star,
   Users2,
@@ -661,7 +662,7 @@ export default function OrganizerDashboard() {
                               </div>
                               <h3 className="mt-1 truncate text-lg font-bold text-slate-900 dark:text-white">{event.title}</h3>
                               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                Workflow: {event.status} • Updated {formatDateTime(event.updatedAt)}
+                                Workflow: {event.status} | Updated {formatDateTime(event.updatedAt)}
                               </p>
                             </div>
                           </div>
@@ -716,6 +717,27 @@ export default function OrganizerDashboard() {
                             </>
                           ) : (
                             <>
+                              {event.status === "Completed" || event.status === "Cancelled" ? (
+                                <button
+                                  type="button"
+                                  disabled={!hasEventId}
+                                  onClick={() => navigate(`/organizer-dashboard/event/${encodedEventId}/contact-center`)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                                >
+                                  <MessageSquareMore size={13} />
+                                  History
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={!hasEventId}
+                                  onClick={() => navigate(`/organizer-dashboard/event/${encodedEventId}/contact-center`)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60 dark:border-indigo-400/30 dark:text-indigo-200 dark:hover:bg-indigo-500/20"
+                                >
+                                  <SendHorizontal size={13} />
+                                  Message
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 disabled={!hasEventId}
