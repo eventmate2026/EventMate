@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Loader2, RefreshCcw, Users } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCcw, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 
@@ -24,7 +24,6 @@ export default function StudentTeamRegistration() {
   const { registrationId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(null);
@@ -53,33 +52,6 @@ export default function StudentTeamRegistration() {
   useEffect(() => {
     loadStatus();
   }, [registrationId]);
-
-  const handleConfirm = async () => {
-    if (!registration?.canContinue || saving) return;
-    setSaving(true);
-    setNotice(null);
-    try {
-      const response = await api({
-        ...SummaryApi.confirm_team_registration,
-        url: SummaryApi.confirm_team_registration.url.replace(
-          ":registrationId",
-          encodeURIComponent(registrationId || "")
-        ),
-      });
-      setNotice({
-        type: "success",
-        text: response.data?.message || "Registration confirmed.",
-      });
-      await loadStatus({ silent: true });
-    } catch (confirmError) {
-      setNotice({
-        type: "error",
-        text: confirmError.response?.data?.message || "Unable to confirm registration.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleResend = async () => {
     if (!registrationId || resending) return;
@@ -193,7 +165,7 @@ export default function StudentTeamRegistration() {
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Team Members</h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                    Invitations must be accepted before you can continue.
+                    Invitations must be accepted before the registration is completed.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-300">
@@ -259,20 +231,9 @@ export default function StudentTeamRegistration() {
                       : registration.anyRejected
                         ? "A team member rejected the invitation. You cannot continue."
                         : registration.allAccepted
-                          ? "All members accepted. You can continue to confirm registration."
+                          ? "All members accepted. Registration will be confirmed automatically."
                           : "Waiting for team members to accept the invitation."}
                 </div>
-                {registration.canContinue && (
-                  <button
-                    type="button"
-                    onClick={handleConfirm}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                  >
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    {saving ? "Confirming..." : "Continue"}
-                  </button>
-                )}
               </div>
             </section>
           </>

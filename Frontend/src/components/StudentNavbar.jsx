@@ -70,6 +70,10 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       const socket = io(API_BASE_URL || "http://localhost:5000", {
         transports: ["websocket", "polling"],
         withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 800,
+        timeout: 8000,
       });
 
       socketRef.current = socket;
@@ -296,7 +300,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           </div>
           
           <div className="pt-4 pb-4 border-t border-gray-200">
-            <div className="flex items-center px-4">
+            <button
+              type="button"
+              onClick={() => {
+                navigate("/profile");
+                setIsMobileMenuOpen(false);
+                setIsUserMenuOpen(false);
+              }}
+              className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
+              aria-label="Open profile"
+            >
               <div className="flex-shrink-0">
                 {renderAvatar("h-10 w-10", "text-base")}
               </div>
@@ -304,7 +317,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                 <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
                 <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
               </div>
-            </div>
+            </button>
             <div className="mt-3 space-y-1">
               <button
                 type="button"

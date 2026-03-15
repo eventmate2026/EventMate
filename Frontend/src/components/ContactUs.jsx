@@ -100,58 +100,9 @@ export default function ContactUs() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-start">
-          
-          {/* Left Side: Contact Info Cards */}
-          <div className="lg:col-span-2 space-y-6 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
-            
-            <div className="bg-white dark:bg-gray-800/60 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:border-indigo-500/30 transition-all duration-300 group">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-300">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Email</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">support@eventmate.com</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800/60 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:border-purple-500/30 transition-all duration-300 group">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-purple-50 dark:bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-300">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Phone</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">+91 98765 43210</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800/60 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:border-pink-500/30 transition-all duration-300 group">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-pink-50 dark:bg-pink-500/10 rounded-2xl flex items-center justify-center text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform duration-300">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Office</h3>
-                  <p className="text-gray-500 dark:text-gray-400 mt-1">Main Campus, Block B</p>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right Side: Form */}
-          <div className="lg:col-span-3 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+        <div className="grid grid-cols-1 gap-12 items-start">
+          {/* Contact Form */}
+          <div className="w-full max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-2xl border border-white/50 dark:border-gray-700 relative overflow-hidden">
               
               {/* Decorative top gradient line */}

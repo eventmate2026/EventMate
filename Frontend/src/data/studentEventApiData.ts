@@ -71,13 +71,19 @@ const formatTimeRange = (schedule) => {
   return "Time TBD";
 };
 
+const isMidnightUtc = (date) =>
+  date.getUTCHours() === 0 &&
+  date.getUTCMinutes() === 0 &&
+  date.getUTCSeconds() === 0 &&
+  date.getUTCMilliseconds() === 0;
+
 const resolveRegistrationDeadline = (value) => {
   if (!value) return null;
   const text = String(value || "").trim();
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   const hasTime = /\d{2}:\d{2}/.test(text);
-  if (!hasTime) {
+  if (!hasTime || isMidnightUtc(parsed)) {
     parsed.setHours(23, 59, 59, 999);
   }
   return parsed;

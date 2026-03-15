@@ -17,6 +17,22 @@ const clampNumber = (value, min, max, fallback) => {
   return Math.min(max, Math.max(min, numeric));
 };
 
+const buildAuthUser = (user) => {
+  if (!user) return null;
+  return {
+    _id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    mobileNumber: user.mobileNumber || "",
+    collegeName: user.collegeName || "",
+    educationLevel: user.educationLevel || "",
+    academicProfile: user.academicProfile || {},
+    professionalProfile: user.professionalProfile || {},
+    avatar: user.avatar || null
+  };
+};
+
 // ---------------- REGISTER ----------------
 export const registerUserController = asyncHandler(async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -143,7 +159,13 @@ export const loginController = asyncHandler(async (req, res) => {
     console.error("Pending team invite check failed:", error.message);
   });
 
-  res.json({ success: true, accessToken, refreshToken, role: user.role });
+  res.json({
+    success: true,
+    accessToken,
+    refreshToken,
+    role: user.role,
+    user: buildAuthUser(user)
+  });
 });
 
 // ---------------- LOGOUT ----------------

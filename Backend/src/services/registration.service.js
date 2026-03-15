@@ -36,6 +36,28 @@ const refreshEventAttendanceTotal = async (eventId) => {
 
 const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
 const normalizeDepartment = (value = "") => String(value || "").trim().toLowerCase();
+const isMidnightUtc = (date) =>
+  date.getUTCHours() === 0 &&
+  date.getUTCMinutes() === 0 &&
+  date.getUTCSeconds() === 0 &&
+  date.getUTCMilliseconds() === 0;
+const resolveRegistrationDeadline = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (isMidnightUtc(parsed)) {
+    return new Date(
+      parsed.getFullYear(),
+      parsed.getMonth(),
+      parsed.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
+  }
+  return parsed;
+};
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
@@ -449,13 +471,13 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   }
 
   if (isTeam && participantEmails.length > 0) {
-    const coordinatorUsers = await User.find({
-      role: "STUDENT_COORDINATOR",
+    const restrictedUsers = await User.find({
+      role: { $in: ["STUDENT_COORDINATOR", "ORGANIZER", "MAIN_ADMIN"] },
       email: { $in: participantEmails }
-    }).select("email");
+    }).select("email role");
 
-    if (coordinatorUsers.length > 0) {
-      throw new Error("Coordinators cannot participate in team events");
+    if (restrictedUsers.length > 0) {
+      throw new Error("Admin, organizer, or coordinator accounts cannot be added as team participants");
     }
   }
 
@@ -465,10 +487,8 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   if (!event.registration?.isOpen)
     throw new Error("Registration is closed");
 
-  if (
-    event.registration?.lastDate &&
-    new Date() > new Date(event.registration.lastDate)
-  )
+  const registrationDeadline = resolveRegistrationDeadline(event.registration?.lastDate);
+  if (registrationDeadline && Date.now() > registrationDeadline.getTime())
     throw new Error("Registration deadline has passed");
 
   const activeRegistrations = await EventRegistration.find({
@@ -806,11 +826,26 @@ export const respondToTeamInvitation = async (token, action) => {
 
   const invites = await TeamInvitation.find({ registration: registration._id });
   const allAccepted = invites.length > 0 && invites.every((entry) => entry.status === "ACCEPTED");
+  const anyRejected = invites.some((entry) => entry.status === "REJECTED");
   registration.allMembersVerified = allAccepted;
+
+  let event = null;
+  let autoConfirmed = false;
+  if (allAccepted && !anyRejected && String(registration.status || "") === "PendingMemberVerification") {
+    event = await Event.findById(registration.event);
+    const isPaid = event?.registration?.fee > 0;
+    registration.status = isPaid ? "PendingPayment" : "Confirmed";
+    autoConfirmed = true;
+  }
+
   await registration.save();
 
+  if (autoConfirmed && registration.status === "Confirmed" && event) {
+    await generateQRsForRegistration(registration, event);
+  }
+
   try {
-    const event = await Event.findById(registration.event);
+    if (!event) event = await Event.findById(registration.event);
     const actionLabel = nextStatus === "ACCEPTED" ? "accepted" : "rejected";
     await sendNotification({
       recipientId: registration.registeredBy,
@@ -969,6 +1004,10 @@ export const sendPendingTeamInvitesForUser = async (user) => {
   if (!invites.length) return { sent: 0 };
 
   let sentCount = 0;
+  let userDepartment = normalizeDepartment(
+    user?.academicProfile?.branch || user?.professionalProfile?.department || ""
+  );
+  const isStudentAccount = String(user?.role || "").toUpperCase() === "STUDENT";
 
   for (const invite of invites) {
     try {
@@ -978,6 +1017,25 @@ export const sendPendingTeamInvitesForUser = async (user) => {
 
       const event = await Event.findById(registration.event);
       if (!event) continue;
+
+      if (!userDepartment && isStudentAccount) {
+        const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
+        if (visibilityScope === "DEPARTMENT") {
+          const leaderDepartment = normalizeDepartment(
+            registration?.teamLeader?.branch || registration?.teamLeader?.department || ""
+          );
+          const eventDepartment = normalizeDepartment(event?.visibility?.department || "");
+          const nextDepartment = leaderDepartment || eventDepartment;
+          if (nextDepartment) {
+            user.academicProfile = {
+              ...(user.academicProfile || {}),
+              branch: nextDepartment
+            };
+            await user.save();
+            userDepartment = nextDepartment;
+          }
+        }
+      }
 
       if (invite.role === "leader") {
         invite.status = "ACCEPTED";

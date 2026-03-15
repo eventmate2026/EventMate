@@ -8,6 +8,7 @@ import {
   publishEvent,
   getPublishedEvents,
   cancelEvent,
+  completeEvent,
   updateEvent,
   getEvent,
   assignCoordinator,
@@ -52,6 +53,13 @@ router.patch(
   "/:id/cancel",
   authMiddleware,
   cancelEvent
+);
+
+router.patch(
+  "/:id/complete",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  completeEvent
 );
 
 router.patch(

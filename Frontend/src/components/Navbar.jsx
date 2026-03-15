@@ -302,16 +302,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               <span
                 className={`font-extrabold text-2xl tracking-tight relative ${isPublic ? "nav-public-logo-shell" : ""}`}
               >
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 animate-nav-gradient">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
-                <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-indigo-400/25 blur-lg animate-logo-glow" />
-                {isPublic && (
-                  <>
-                    <span className="nav-public-logo-orbit" />
-                    <span className="nav-public-logo-sheen" />
-                  </>
-                )}
+                <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-indigo-400/25 blur-lg" />
+                {isPublic && null}
               </span>
             </div>
 
@@ -1027,7 +1022,15 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="pt-4 pb-4 border-t border-gray-200 dark:border-white/10">
             {isAuthenticated ? (
               <>
-                <div className="flex items-center px-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenus();
+                    navigate(currentProfilePath);
+                  }}
+                  className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
+                  aria-label="Open profile"
+                >
                   <AvatarWithFrame
                     src={avatarUrl}
                     alt="Profile"
@@ -1039,7 +1042,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
                     <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
                   </div>
-                </div>
+                </button>
                 <div className="mt-3 space-y-1">
                   <button
                     type="button"

@@ -55,7 +55,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
       const status = Number(fetchError?.response?.status);
       if (status === 401 || status === 403) {
         setCanReadHistory(false);
-        setApiWarning("Message history is visible only to MAIN_ADMIN accounts. You can still submit messages.");
+        setApiWarning(null);
       } else {
         setApiWarning(fetchError.response?.data?.message || "Unable to load message history.");
       }

@@ -77,6 +77,63 @@ table {
   }
 }
 
+@media (max-width: 768px) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body {
+    background: var(--ev-bg-light);
+  }
+
+  .dark body {
+    background: var(--ev-bg-dark);
+  }
+
+  .eventmate-page::before,
+  .eventmate-page::after,
+  .eventmate-ambient,
+  .eventmate-orb,
+  .eventmate-scanline,
+  .eventmate-scroll-progress,
+  .eventmate-interaction-glow,
+  .eventmate-interaction-grain,
+  .eventmate-route-shell > .eventmate-interaction-glow,
+  .eventmate-route-shell > .eventmate-interaction-grain {
+    display: none !important;
+  }
+
+  .eventmate-panel,
+  .eventmate-kpi {
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  .eventmate-panel::before,
+  .eventmate-kpi::before {
+    display: none;
+  }
+
+  .eventmate-reveal-ready {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+
+  :where(.eventmate-route-shell, .eventmate-page, body) :where(
+    svg.lucide,
+    svg.eventmate-icon,
+    svg[class*="h-"][class*="w-"][stroke="currentColor"],
+    svg[class*="h-"][class*="w-"][fill="none"],
+    svg[class*="h-"][class*="w-"][fill="currentColor"]
+  ):not(.animate-spin):not(.eventmate-icon-static) {
+    animation: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}
+
 /* Prevent browser autofill from forcing bright backgrounds in dark inputs. */
 :where(input, textarea, select):-webkit-autofill,
 :where(input, textarea, select):-webkit-autofill:hover,

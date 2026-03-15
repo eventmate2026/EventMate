@@ -40,7 +40,6 @@ export default function OrganizerEditEvent() {
   const user = getStoredUser();
   const organizerDepartment =
     user?.professionalProfile?.department || user?.academicProfile?.branch || "";
-  const isOrganizer = String(user?.role || "").toUpperCase() === "ORGANIZER";
 
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(true);
@@ -112,7 +111,7 @@ export default function OrganizerEditEvent() {
         ...prev,
         visibilityScope: value,
         visibilityDepartment:
-          value === "DEPARTMENT" && isOrganizer ? organizerDepartment : prev.visibilityDepartment,
+          value === "DEPARTMENT" ? organizerDepartment : prev.visibilityDepartment,
       }));
       return;
     }
@@ -146,7 +145,7 @@ export default function OrganizerEditEvent() {
     }
 
     const visibilityDepartment =
-      form.visibilityScope === "DEPARTMENT" && isOrganizer ? organizerDepartment : form.visibilityDepartment;
+      form.visibilityScope === "DEPARTMENT" ? organizerDepartment : form.visibilityDepartment;
     if (form.visibilityScope === "DEPARTMENT" && !visibilityDepartment.trim()) {
       return "Department is required for department-level events.";
     }
@@ -184,7 +183,7 @@ export default function OrganizerEditEvent() {
         scope: form.visibilityScope === "DEPARTMENT" ? "DEPARTMENT" : "COLLEGE",
         department:
           form.visibilityScope === "DEPARTMENT"
-            ? (isOrganizer ? organizerDepartment : form.visibilityDepartment).trim()
+            ? organizerDepartment.trim()
             : "",
       },
     };
@@ -344,11 +343,9 @@ export default function OrganizerEditEvent() {
             <input value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
             {form.visibilityScope === "DEPARTMENT" && (
               <input
-                name={isOrganizer ? undefined : "visibilityDepartment"}
-                value={isOrganizer ? (organizerDepartment || "Department not set in profile") : form.visibilityDepartment}
-                onChange={isOrganizer ? undefined : handleChange}
+                value={organizerDepartment || "Department not set in profile"}
                 placeholder="Department"
-                readOnly={isOrganizer}
+                readOnly
                 className="lg:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
               />
             )}

@@ -40,7 +40,6 @@ export default function OrganizerCreateEvent() {
   const user = getStoredUser();
   const defaultDepartment =
     user?.professionalProfile?.department || user?.academicProfile?.branch || "";
-  const isOrganizer = String(user?.role || "").toUpperCase() === "ORGANIZER";
 
   const buildInitialForm = () => ({
     ...initialForm,
@@ -136,7 +135,7 @@ export default function OrganizerCreateEvent() {
         ...prev,
         visibilityScope: value,
         visibilityDepartment:
-          value === "DEPARTMENT" && isOrganizer ? defaultDepartment : prev.visibilityDepartment,
+          value === "DEPARTMENT" ? defaultDepartment : prev.visibilityDepartment,
       }));
       return;
     }
@@ -202,7 +201,7 @@ export default function OrganizerCreateEvent() {
     }
 
     const visibilityDepartment =
-      form.visibilityScope === "DEPARTMENT" && isOrganizer ? defaultDepartment : form.visibilityDepartment;
+      form.visibilityScope === "DEPARTMENT" ? defaultDepartment : form.visibilityDepartment;
     if (form.visibilityScope === "DEPARTMENT" && !visibilityDepartment.trim()) {
       return "Department is required for department-level events.";
     }
@@ -248,7 +247,7 @@ export default function OrganizerCreateEvent() {
     payload.append("certificate", JSON.stringify({ isEnabled: false }));
     payload.append("feedback", JSON.stringify({ enabled: true }));
     const visibilityDepartment =
-      form.visibilityScope === "DEPARTMENT" && isOrganizer ? defaultDepartment : form.visibilityDepartment;
+      form.visibilityScope === "DEPARTMENT" ? defaultDepartment : form.visibilityDepartment;
     payload.append(
       "visibility",
       JSON.stringify({
@@ -492,21 +491,11 @@ export default function OrganizerCreateEvent() {
                 {form.visibilityScope === "DEPARTMENT" && (
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Department</span>
-                    {isOrganizer ? (
-                      <input
-                        value={defaultDepartment || "Department not set in profile"}
-                        readOnly
-                        className={`mt-1 ${fieldClass} bg-slate-100 dark:bg-white/10`}
-                      />
-                    ) : (
-                      <input
-                        name="visibilityDepartment"
-                        value={form.visibilityDepartment}
-                        onChange={handleChange}
-                        placeholder="e.g. Computer Engineering"
-                        className={`mt-1 ${fieldClass}`}
-                      />
-                    )}
+                    <input
+                      value={defaultDepartment || "Department not set in profile"}
+                      readOnly
+                      className={`mt-1 ${fieldClass} bg-slate-100 dark:bg-white/10`}
+                    />
                   </label>
                 )}
               </div>
@@ -843,12 +832,6 @@ export default function OrganizerCreateEvent() {
                 )}
               </div>
 
-              {!form.poster && (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15 rounded-lg px-3 py-2 inline-flex items-center gap-2">
-                  <AlertCircle size={13} />
-                  Poster is required by current backend for event creation.
-                </p>
-              )}
             </section>
           </div>
         </section>

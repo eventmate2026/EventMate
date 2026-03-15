@@ -31,6 +31,8 @@ const STATUS_STYLES = {
   Cancelled: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300",
 };
 
+const COMPLETION_GRACE_MS = 6 * 60 * 60 * 1000;
+
 const STAGE_FILTERS = [
   { key: "all", label: "All" },
   { key: "live", label: "Live" },
@@ -100,6 +102,37 @@ const formatTimeRange = (schedule) => {
   const endTime = String(schedule?.endTime || "").trim();
   if (startTime && endTime) return `${startTime} - ${endTime}`;
   return startTime || endTime || "Time TBD";
+};
+
+const buildEventEndDateTime = (event) => {
+  const endDate = event?.schedule?.endDate;
+  const endTime = event?.schedule?.endTime;
+  if (!endDate || !endTime) return null;
+
+  const [hours, minutes] = String(endTime).split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  const rawDate = new Date(endDate);
+  if (Number.isNaN(rawDate.getTime())) return null;
+
+  return new Date(
+    rawDate.getUTCFullYear(),
+    rawDate.getUTCMonth(),
+    rawDate.getUTCDate(),
+    hours,
+    minutes,
+    0,
+    0
+  );
+};
+
+const canManuallyComplete = (event) => {
+  if (!event || event.status !== "Published") return false;
+  const endDateTime = buildEventEndDateTime(event);
+  if (!endDateTime) return false;
+  const now = Date.now();
+  const endAt = endDateTime.getTime();
+  return now >= endAt && now <= endAt + COMPLETION_GRACE_MS;
 };
 
 const getEventRating = (event) =>
@@ -189,6 +222,7 @@ export default function OrganizerDashboard() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [pendingEventId, setPendingEventId] = useState("");
+  const [completingEventId, setCompletingEventId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
@@ -280,6 +314,28 @@ export default function OrganizerDashboard() {
       });
     } finally {
       setPendingEventId("");
+    }
+  };
+
+  const handleCompleteEvent = async (eventId) => {
+    if (!eventId) return;
+    setCompletingEventId(eventId);
+    setMessage(null);
+
+    try {
+      const response = await api({
+        ...SummaryApi.complete_event,
+        url: SummaryApi.complete_event.url.replace(":eventId", eventId),
+      });
+      setMessage({ type: "success", text: response.data?.message || "Event marked completed successfully." });
+      await fetchMyEvents({ silent: true });
+    } catch (err) {
+      setMessage({
+        type: "error",
+        text: err.response?.data?.message || "Unable to mark event completed.",
+      });
+    } finally {
+      setCompletingEventId("");
     }
   };
 
@@ -640,6 +696,8 @@ export default function OrganizerDashboard() {
                       ? "Loading registrations..."
                       : "0 registrations";
                     const showScanButton = event.status === "Published" || event.stage.key === "live";
+                    const manualCompleteAllowed = canManuallyComplete(event);
+                    const isCompleting = completingEventId === event.eventId;
 
                     return (
                       <article
@@ -736,6 +794,17 @@ export default function OrganizerDashboard() {
                                 >
                                   <SendHorizontal size={13} />
                                   Message
+                                </button>
+                              )}
+                              {manualCompleteAllowed && (
+                                <button
+                                  type="button"
+                                  disabled={!hasEventId || isCompleting}
+                                  onClick={() => handleCompleteEvent(event.eventId)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                  <BadgeCheck size={13} />
+                                  {isCompleting ? "Completing..." : "Mark Completed"}
                                 </button>
                               )}
                               <button

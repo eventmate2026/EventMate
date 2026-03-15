@@ -3,6 +3,7 @@ import User from "../models/User.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
+import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
@@ -511,6 +512,94 @@ export const getMyEvents = async (req, res, next) => {
       success: true,
       count: events.length,
       data: events
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// complete event (manual)
+export const completeEvent = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const event = await Event.findById(id);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    if (event.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Event is already completed"
+      });
+    }
+
+    if (event.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Cancelled event cannot be completed"
+      });
+    }
+
+    if (event.status !== "Published") {
+      return res.status(400).json({
+        success: false,
+        message: "Only published events can be completed"
+      });
+    }
+
+    if (
+      req.user.role !== "MAIN_ADMIN" &&
+      event.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to complete this event"
+      });
+    }
+
+    const eventEndDateTime = buildEventEndDateTime(
+      event.schedule?.endDate,
+      event.schedule?.endTime
+    );
+
+    if (!eventEndDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Event end time is missing or invalid"
+      });
+    }
+
+    const now = new Date();
+    if (now < eventEndDateTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Event has not ended yet"
+      });
+    }
+
+    const manualWindowEndsAt = new Date(eventEndDateTime.getTime() + COMPLETION_GRACE_MS);
+    if (now > manualWindowEndsAt) {
+      return res.status(400).json({
+        success: false,
+        message: "Manual completion window has passed; event will be auto-completed"
+      });
+    }
+
+    event.status = "Completed";
+    event.updatedBy = req.user._id;
+
+    await event.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Event marked completed successfully",
+      data: event
     });
   } catch (error) {
     next(error);

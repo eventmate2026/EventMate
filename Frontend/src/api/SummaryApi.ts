@@ -158,6 +158,11 @@ const SummaryApi = {
     method: "patch",
   },
 
+  complete_event: {
+    url: "/api/events/:eventId/complete",
+    method: "patch",
+  },
+
   register_for_event: {
     url: "/api/registrations/:eventId/draft",
     method: "post",

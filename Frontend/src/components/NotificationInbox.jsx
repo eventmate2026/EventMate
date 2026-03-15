@@ -108,6 +108,10 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
     const socket = io(API_BASE_URL || "http://localhost:5000", {
       transports: ["websocket", "polling"],
       withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 800,
+      timeout: 8000,
     });
 
     socketRef.current = socket;

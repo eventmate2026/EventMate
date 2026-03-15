@@ -1,26 +1,6 @@
 import cron from "node-cron";
 import Event from "../models/Event.model.js";
-
-const buildEventEndDateTime = (endDate, endTime) => {
-  if (!endDate || !endTime) return null;
-
-  const [hours, minutes] = String(endTime).split(":").map(Number);
-  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
-
-  const rawDate = new Date(endDate);
-  if (Number.isNaN(rawDate.getTime())) return null;
-
-  // Preserve the stored calendar day and merge it with schedule end time.
-  return new Date(
-    rawDate.getUTCFullYear(),
-    rawDate.getUTCMonth(),
-    rawDate.getUTCDate(),
-    hours,
-    minutes,
-    0,
-    0
-  );
-};
+import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "./eventTime.js";
 
 const autoCompleteEvents = async () => {
   try {
@@ -35,7 +15,8 @@ const autoCompleteEvents = async () => {
 
       if (!eventEndDateTime) continue;
 
-      if (now >= eventEndDateTime) {
+      const autoCompleteAt = new Date(eventEndDateTime.getTime() + COMPLETION_GRACE_MS);
+      if (now >= autoCompleteAt) {
         await Event.findByIdAndUpdate(event._id, {
           status: "Completed",
           updatedAt: now
