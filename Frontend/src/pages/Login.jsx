@@ -207,7 +207,7 @@ export default function Login() {
                       autoComplete="email"
                       autoFocus
                       placeholder="xyz@gmail.com"
-                      className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      className="w-full bg-transparent text-sm text-slate-900 outline-none border-0 ring-0 shadow-none appearance-none focus:outline-none focus:ring-0 focus:border-0 placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                       value={data.email}
                       onChange={handleChange}
                     />
@@ -227,7 +227,7 @@ export default function Login() {
                       name="password"
                       autoComplete="current-password"
                       placeholder="********"
-                      className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      className="w-full bg-transparent text-sm text-slate-900 outline-none border-0 ring-0 shadow-none appearance-none focus:outline-none focus:ring-0 focus:border-0 placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
                       value={data.password}
                       onChange={handleChange}
                     />
