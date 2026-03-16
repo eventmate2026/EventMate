@@ -6,7 +6,6 @@ import { motion, useReducedMotion, useScroll } from "framer-motion";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
-import { getStoredToken } from "../lib/auth";
 
 // --- Icons ---
 const SearchIcon = () => (
@@ -179,15 +178,6 @@ export default function Landing() {
 
   const handleRegister = () => {
     navigate("/login");
-  };
-
-  const handleViewDetails = (eventId) => {
-    if (!getStoredToken()) {
-      navigate("/login");
-      return;
-    }
-    if (!eventId) return;
-    navigate(`/student-dashboard/events/${encodeURIComponent(eventId)}`);
   };
 
   useEffect(() => {
@@ -509,13 +499,12 @@ export default function Landing() {
                       Register
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleViewDetails(event.id)}
+                    <Link
+                      to={`/events/${encodeURIComponent(event.id || "")}`}
                       className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold text-center hover:bg-indigo-700 transition duration-300 flex items-center justify-center"
                     >
                       Details <ArrowRight />
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </motion.div>

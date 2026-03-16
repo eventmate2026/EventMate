@@ -70,7 +70,7 @@ router.patch(
 
 router.get(
   "/:id",
-  authMiddleware,
+  optionalAuthMiddleware,
   getEvent
 );
 

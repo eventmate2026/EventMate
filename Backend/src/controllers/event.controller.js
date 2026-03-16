@@ -382,31 +382,52 @@ export const getEvent = async (req, res, next) => {
         message: "Event not found!"
       });
     }
-    
-    if(req.user.role !== "MAIN_ADMIN" &&
-      event.createdBy.toString() !== req.user._id.toString() && event.status !== "Published"){
-       return res.status(403).json({
+
+    const status = String(event?.status || "").trim();
+    const isPublishedLike = ["Published", "Completed"].includes(status);
+    const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
+
+    if (!req.user) {
+      if (!isPublishedLike || visibilityScope === "DEPARTMENT") {
+        return res.status(403).json({
           success: false,
           message: "Not authorized to view this event"
-        })
+        });
       }
 
-      if (req.user.role === "STUDENT" && String(event?.visibility?.scope || "COLLEGE") === "DEPARTMENT") {
-        const studentDepartment = resolveUserDepartment(req.user);
-        const eventDepartment = String(event?.visibility?.department || "").trim();
-        if (
-          !studentDepartment ||
-          !eventDepartment ||
-          studentDepartment.toLowerCase() !== eventDepartment.toLowerCase()
-        ) {
-          return res.status(403).json({
-            success: false,
-            message: "Not authorized to view this event"
-          });
-        }
-      }
-      
       return res.status(200).json({
+        success: true,
+        message: "Access Granted!",
+        data: event
+      });
+    }
+
+    const isAdmin = req.user.role === "MAIN_ADMIN";
+    const isOwner = event.createdBy.toString() === req.user._id.toString();
+
+    if (!isAdmin && !isOwner && !isPublishedLike) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to view this event"
+      });
+    }
+
+    if (req.user.role === "STUDENT" && visibilityScope === "DEPARTMENT") {
+      const studentDepartment = resolveUserDepartment(req.user);
+      const eventDepartment = String(event?.visibility?.department || "").trim();
+      if (
+        !studentDepartment ||
+        !eventDepartment ||
+        studentDepartment.toLowerCase() !== eventDepartment.toLowerCase()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to view this event"
+        });
+      }
+    }
+      
+    return res.status(200).json({
       success: true,
       message: "Access Granted!",
       data: event

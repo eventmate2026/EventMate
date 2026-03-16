@@ -265,6 +265,12 @@ const AttendanceVerify = lazy(() =>
   }))
 );
 
+const PublicEventDetails = lazy(() =>
+  import("./pages/PublicEventDetails").catch(() => ({
+    default: () => <div>Event details loading...</div>,
+  }))
+);
+
 const routeMotionVariants = {
   initial: { opacity: 0, y: 18, scale: 0.996, filter: "blur(6px)" },
   animate: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
@@ -509,8 +515,16 @@ export default function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Landing />} />
-          <Route path="/hackathon" element={<Hackathon />} />
-          <Route path="/login" element={<Login />} />
+        <Route path="/hackathon" element={<Hackathon />} />
+        <Route
+          path="/events/:eventId"
+          element={
+            <Suspense fallback={<div className="p-8 text-center">Loading event details...</div>}>
+              <PublicEventDetails />
+            </Suspense>
+          }
+        />
+        <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/verify-registration" element={<VerifyRegistration />} />
