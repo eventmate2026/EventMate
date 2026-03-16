@@ -115,10 +115,7 @@ const toParticipantRows = (registration) => {
 };
 
 const parseParticipantRows = (payload) =>
-  parseRegistrationRows(payload)
-    .filter((registration) => String(registration?.status || "").trim() === "Confirmed")
-    .flatMap((registration) => toParticipantRows(registration))
-    .filter((row) => row.hasQr);
+  parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
 
 const parseDate = (value) => {
   const date = new Date(value || 0);
