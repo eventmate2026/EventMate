@@ -255,7 +255,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION (Synced Animation) --- */}
-      <section className="relative z-10 pt-32 pb-16 lg:pt-48 lg:pb-24 px-6">
+      <section className="relative z-10 pt-24 pb-12 px-4 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="hero-spotlight hero-spotlight--one" />
           <div className="hero-spotlight hero-spotlight--two" />
@@ -283,7 +283,7 @@ export default function Landing() {
               {/* Main Title (Word by word effect) */}
               <motion.h1
                 variants={textReveal}
-                className="hero-title text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
+                className="hero-title text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
               >
                 Manage Campus Events <br />
                 <motion.span
@@ -297,12 +297,12 @@ export default function Landing() {
               </motion.h1>
 
               {/* Description */}
-              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
                 The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
               </motion.p>
 
               {/* Buttons */}
-              <motion.div variants={textReveal} className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-5">
+              <motion.div variants={textReveal} className="mt-10 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
                 <Link
                   to="/signup"
                   className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 cta-glow"
@@ -319,7 +319,7 @@ export default function Landing() {
       </section>
 
       {/* --- HOW IT WORKS --- */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -328,7 +328,7 @@ export default function Landing() {
           className="text-center mb-20"
         >
           <motion.p variants={fadeUp} className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-xs mb-4">How It Works</motion.p>
-          <motion.h2 variants={fadeUp} className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">How EventMate Works</motion.h2>
+          <motion.h2 variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">How EventMate Works</motion.h2>
           <motion.div variants={fadeUp} className="w-20 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto rounded-full"></motion.div>
         </motion.div>
 
@@ -337,7 +337,7 @@ export default function Landing() {
           whileInView="show"
           viewport={viewportOnce}
           variants={stagger}
-          className="grid md:grid-cols-3 gap-8"
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8"
         >
           {[
             { icon: "🔍", title: "Discover Events", desc: "Browse all upcoming campus events with full details.", color: "from-indigo-100/50 to-transparent dark:from-indigo-500/20" },
@@ -348,14 +348,14 @@ export default function Landing() {
               key={card.title}
               variants={fadeUp}
               whileHover={reduceMotion ? {} : { y: -10 }}
-              className="group relative bg-white dark:bg-white/5 backdrop-blur-xl rounded-[2rem] p-10 border border-gray-200 dark:border-white/10 text-center overflow-hidden hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 shadow-sm dark:shadow-none"
+              className="group relative bg-white dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 text-center overflow-hidden p-6 sm:p-8 lg:p-10 hover:border-gray-300 dark:hover:border-white/20 transition-all duration-300 shadow-sm dark:shadow-none"
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
               <div className="relative z-10">
-                <div className="w-24 h-24 mx-auto bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-3xl flex items-center justify-center text-5xl mb-8 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-gray-100 bg-gray-50 text-4xl shadow-inner transition-transform duration-500 group-hover:scale-110 dark:border-white/10 dark:bg-white/5 sm:mb-7 sm:h-20 sm:w-20 sm:text-5xl lg:mb-8 lg:h-24 lg:w-24">
                   {card.icon}
                 </div>
-                <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">{card.title}</h3>
+                <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{card.title}</h3>
                 <p className="text-gray-600 dark:text-gray-400">{card.desc}</p>
               </div>
             </motion.div>
@@ -364,7 +364,7 @@ export default function Landing() {
       </section>
 
       {/* --- BENTO GRID LAYOUT (Why EventMate) --- */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -373,7 +373,7 @@ export default function Landing() {
           className="mb-16 text-center"
         >
           <motion.p variants={fadeUp} className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-xs mb-4">Why Choose Us</motion.p>
-          <motion.h2 variants={fadeUp} className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white">Why EventMate?</motion.h2>
+          <motion.h2 variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white">Why EventMate?</motion.h2>
         </motion.div>
 
         <motion.div
@@ -381,19 +381,19 @@ export default function Landing() {
           whileInView="show"
           viewport={viewportOnce}
           variants={stagger}
-          className="grid md:grid-cols-4 md:grid-rows-2 gap-6 h-auto md:h-[600px]"
+          className="grid gap-6 md:grid-cols-4 md:grid-rows-2 h-auto md:h-[600px]"
         >
           {/* Large Span Card */}
-          <motion.div variants={fadeUp} whileHover={{ scale: 0.98 }} className="md:col-span-2 md:row-span-2 relative bg-indigo-50 dark:bg-indigo-600/10 backdrop-blur-3xl rounded-[2.5rem] p-10 border border-indigo-100 dark:border-indigo-500/20 overflow-hidden group">
+          <motion.div variants={fadeUp} whileHover={{ scale: 0.98 }} className="md:col-span-2 md:row-span-2 relative bg-indigo-50 dark:bg-indigo-600/10 backdrop-blur-3xl rounded-[2.5rem] border border-indigo-100 dark:border-indigo-500/20 overflow-hidden group p-6 sm:p-8 lg:p-10">
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100/50 to-transparent dark:from-indigo-600/20 opacity-0 group-hover:opacity-100 transition duration-500"></div>
              <div className="relative z-10 h-full flex flex-col justify-between">
                 <div>
-                  <div className="w-16 h-16 bg-white dark:bg-indigo-500/20 rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-sm dark:shadow-none">⚡</div>
-                  <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-4">Lightning Fast</h3>
-                  <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">Automated workflows that save hours of manual admin work. No more Excel sheets.</p>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-indigo-500/20 dark:shadow-none sm:mb-6 sm:h-14 sm:w-14 sm:text-3xl">⚡</div>
+                  <h3 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-4">Lightning Fast</h3>
+                  <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">Automated workflows that save hours of manual admin work. No more Excel sheets.</p>
                 </div>
                 <div className="mt-8">
-                  <div className="w-full h-32 bg-indigo-100 dark:bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
+                  <div className="w-full h-24 sm:h-32 bg-indigo-100 dark:bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
                     <span className="text-4xl">⚡</span>
                   </div>
                 </div>
@@ -401,26 +401,26 @@ export default function Landing() {
           </motion.div>
 
           {/* Standard Card 1 */}
-          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] p-8 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all">
+          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
              <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🔐</div>
-             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Secure Access</h3>
+             <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Secure Access</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Role-based protection ensures data stays safe.</p>
           </motion.div>
 
           {/* Standard Card 2 */}
-          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] p-8 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all">
+          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
              <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🌱</div>
-             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Paperless</h3>
+             <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Paperless</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Digital tickets and certificates.</p>
           </motion.div>
 
           {/* Wide Card at Bottom */}
-          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="md:col-span-2 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-white/10 dark:to-purple-900/20 backdrop-blur-xl rounded-[2rem] p-8 border border-transparent dark:border-white/10 flex items-center justify-between group">
+          <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="md:col-span-2 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-white/10 dark:to-purple-900/20 backdrop-blur-xl rounded-[2rem] border border-transparent dark:border-white/10 p-6 sm:p-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center group">
              <div className="z-10">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Ready to transform your campus?</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Ready to transform your campus?</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Join 500+ clubs today.</p>
              </div>
-             <div className="w-16 h-16 rounded-full bg-white dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition shadow-md dark:shadow-none">
+             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white dark:bg-white/10 flex items-center justify-center group-hover:scale-110 transition shadow-md dark:shadow-none">
                 <ArrowRight />
              </div>
           </motion.div>
@@ -428,11 +428,11 @@ export default function Landing() {
       </section>
 
       {/* --- UPCOMING EVENTS --- */}
-      <section id="events" className="relative z-10 max-w-7xl mx-auto px-6 py-24">
+      <section id="events" className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
         <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={stagger} className="mb-16">
           <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-12">
             <div>
-              <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
               <div className="w-24 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
             </div>
 
@@ -445,7 +445,7 @@ export default function Landing() {
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500"
+                className="w-full rounded-full border border-gray-200 bg-gray-100 pl-12 pr-4 py-3 text-sm text-gray-900 placeholder-gray-500 transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-gray-500 sm:py-4 sm:text-base"
               />
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function Landing() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-6 py-2.5 rounded-full text-sm font-bold uppercase tracking-wide transition-all duration-300 border ${
+                className={`rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-wide transition-all duration-300 sm:px-6 sm:py-2.5 sm:text-sm ${
                   selectedCategory === cat
                     ? "bg-gray-900 dark:bg-white text-white dark:text-black border-transparent shadow-[0_0_20px_rgba(0,0,0,0.2)]"
                     : "bg-transparent text-gray-600 dark:text-gray-400 border-gray-300 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/30 hover:text-gray-900 dark:hover:text-white"
@@ -472,7 +472,7 @@ export default function Landing() {
           whileInView="show"
           viewport={{ once: true, amount: 0.1 }}
           variants={stagger}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 sm:gap-8"
         >
           {isLoadingEvents ? (
             <div className="col-span-3 flex flex-col items-center justify-center py-24 bg-gray-50 dark:bg-white/5 rounded-3xl border border-dashed border-gray-300 dark:border-white/10">
@@ -492,9 +492,9 @@ export default function Landing() {
                 key={event.id}
                 variants={fadeUp}
                 whileHover={reduceMotion ? {} : { y: -10 }}
-                className="group relative bg-white dark:bg-white/5 backdrop-blur-md rounded-[2rem] border border-gray-200 dark:border-white/10 overflow-hidden flex flex-col hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all duration-500 shadow-xl dark:shadow-none"
+                className="group relative flex flex-col overflow-hidden rounded-[2rem] border border-gray-200 bg-white shadow-xl transition-all duration-500 hover:border-indigo-300 dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:hover:border-indigo-500/50"
               >
-                <div className="relative h-56 overflow-hidden">
+                <div className="relative h-48 sm:h-56 overflow-hidden">
                   <img
                     src={event.image}
                     alt={event.title}
@@ -503,7 +503,7 @@ export default function Landing() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   <div
-                    className={`absolute top-6 right-6 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-lg backdrop-blur-md ${
+                    className={`absolute top-4 right-4 rounded-xl px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-md sm:top-6 sm:right-6 sm:px-4 sm:py-2 sm:text-sm ${
                       event.price === "Free" ? "bg-emerald-600" : "bg-indigo-600"
                     }`}
                   >
@@ -511,15 +511,15 @@ export default function Landing() {
                   </div>
                 </div>
 
-                <div className="p-8 flex flex-col flex-grow">
+                <div className="p-6 sm:p-8 flex flex-col flex-grow">
                   <span className="inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 uppercase tracking-wider bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10">
                     {event.category}
                   </span>
 
-                  <h3 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  <h3 className="text-xl sm:text-2xl font-bold mb-3 text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                     {event.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6 line-clamp-2 text-sm leading-relaxed">
+                  <p className="text-gray-600 dark:text-gray-400 mb-5 line-clamp-2 text-sm leading-relaxed">
                     {event.description}
                   </p>
 
@@ -528,17 +528,17 @@ export default function Landing() {
                     <div className="flex items-center"><MapPinIcon /> {event.location}</div>
                   </div>
 
-                  <div className="mt-auto flex gap-3">
+                  <div className="mt-auto flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={() => handleRegister(event.title)}
-                      className="flex-1 border border-gray-300 dark:border-white/20 text-gray-900 dark:text-white py-3 rounded-xl font-bold hover:bg-gray-900 hover:text-white dark:hover:bg-white dark:hover:text-black transition duration-300"
+                      className="flex-1 rounded-xl border border-gray-300 py-2.5 font-bold text-gray-900 transition duration-300 hover:bg-gray-900 hover:text-white dark:border-white/20 dark:text-white dark:hover:bg-white dark:hover:text-black sm:py-3"
                     >
                       Register
                     </button>
 
                     <Link
                       to={`/events/${encodeURIComponent(event.id || "")}`}
-                      className="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold text-center hover:bg-indigo-700 transition duration-300 flex items-center justify-center"
+                      className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-center font-bold text-white transition duration-300 hover:bg-indigo-700 flex items-center justify-center sm:py-3"
                     >
                       Details <ArrowRight />
                     </Link>
@@ -551,12 +551,12 @@ export default function Landing() {
       </section>
 
       {/* --- FEATURES SECTION --- */}
-      <section className="relative z-10 max-w-7xl mx-auto px-6 py-24">
-        <motion.h2 initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-4xl md:text-5xl font-black text-center mb-16 text-gray-900 dark:text-white">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
+        <motion.h2 initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-center mb-16 text-gray-900 dark:text-white">
           Everything you need to run events
         </motion.h2>
 
-        <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={stagger} className="grid md:grid-cols-3 gap-8">
+        <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={stagger} className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 md:gap-8">
           {[
             { icon: "📱", title: "QR Check-in", desc: "Fast, contactless attendance marking with real-time sync." },
             { icon: "🏆", title: "Instant Certificates", desc: "Auto-generated digital certificates after feedback." },
@@ -566,10 +566,10 @@ export default function Landing() {
               key={f.title}
               variants={fadeUp}
               whileHover={reduceMotion ? {} : { y: -6 }}
-              className="bg-gray-50 dark:bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-lg dark:shadow-none"
+              className="bg-gray-50 dark:bg-white/5 backdrop-blur-md rounded-3xl border border-gray-200 dark:border-white/10 p-6 sm:p-8 lg:p-10 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-lg dark:shadow-none"
             >
-              <div className="text-5xl mb-6">{f.icon}</div>
-              <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">{f.title}</h3>
+              <div className="text-4xl sm:text-5xl mb-6">{f.icon}</div>
+              <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{f.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{f.desc}</p>
             </motion.div>
           ))}
@@ -577,11 +577,11 @@ export default function Landing() {
       </section>
 
       {/* --- CONTACT SECTION --- */}
-      <section id="contact" className="relative z-10 py-24">
-        <div className="max-w-4xl mx-auto px-6">
+      <section id="contact" className="relative z-10 py-16 sm:py-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">Get in Touch</h2>
-            <p className="text-xl text-gray-600 dark:text-gray-400">Need to talk to us? Send us a message.</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">Get in Touch</h2>
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">Need to talk to us? Send us a message.</p>
           </motion.div>
           <ContactUs />
         </div>
@@ -667,3 +667,4 @@ export default function Landing() {
     </div>
   );
 }
+

@@ -45,6 +45,14 @@ h1, h2, h3, h4, h5, h6 {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:where(.eventmate-page, .eventmate-route-shell) {
+  overflow-wrap: anywhere;
+}
+
+:where(.eventmate-page, .eventmate-route-shell) * {
+  min-width: 0;
+}
+
 img,
 video,
 canvas,

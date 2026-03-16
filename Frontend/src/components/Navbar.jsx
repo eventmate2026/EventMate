@@ -74,6 +74,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     setIsUserMenuOpen(false);
     navigate(currentProfilePath);
   };
+  const handleCoordinatorProfileMenu = () => {
+    setIsUserMenuOpen((prev) => !prev);
+  };
   const handleMobileProfileClick = () => {
     handleProfileClick();
     setIsMobileMenuOpen(false);
@@ -288,8 +291,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
         </>
       )}
-      <div className="relative max-w-[1400px] mx-auto px-6 lg:px-10">
-        <div className="flex items-center justify-between h-[72px]">
+      <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between h-16 sm:h-[72px]">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
           <div className="flex items-center gap-4">
@@ -752,9 +755,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 <div className="relative ml-3 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handleProfileClick}
+                    onClick={isCoordinator ? handleCoordinatorProfileMenu : handleProfileClick}
                     className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300 transition duration-150 ease-in-out"
-                    aria-label="Open profile"
+                    aria-label={isCoordinator ? "Toggle user menu" : "Open profile"}
                   >
                     <AvatarWithFrame
                       src={avatarUrl}
@@ -764,14 +767,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                       fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
                     />
                   </button>
-                  <button
-                    type="button"
-                    aria-label="Toggle user menu"
-                    className="rounded-full border border-slate-200 dark:border-white/10 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
-                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  >
-                    <ChevronDown size={16} />
-                  </button>
+                  {!isCoordinator && (
+                    <button
+                      type="button"
+                      aria-label="Toggle user menu"
+                      className="rounded-full border border-slate-200 dark:border-white/10 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  )}
 
                   {/* Dropdown Menu */}
                   {isUserMenuOpen && (
@@ -1330,7 +1335,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       `}</style>
       )}
       </motion.nav>
-      <div aria-hidden="true" className="h-[72px] shrink-0" />
+      <div aria-hidden="true" className="h-16 sm:h-[72px] shrink-0" />
     </>
   );
 };

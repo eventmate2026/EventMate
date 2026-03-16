@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
   CircleDashed,
   Loader2,
   MapPin,
-  QrCode,
   RefreshCcw,
   Search,
   UserCircle2,
@@ -160,20 +158,6 @@ const deriveStatus = (event) => {
   return "upcoming";
 };
 
-const isAttendanceWindowOpen = (event) => {
-  const start = parseDate(event?.schedule?.startDate);
-  const end = parseDate(event?.schedule?.endDate || event?.schedule?.startDate);
-  if (!start || !end) return false;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDate = new Date(start);
-  startDate.setHours(0, 0, 0, 0);
-  const endDate = new Date(end);
-  endDate.setHours(0, 0, 0, 0);
-  return today >= startDate && today <= endDate;
-};
-
 const STATUS_BADGE = {
   live: "bg-emerald-100 text-emerald-700",
   upcoming: "bg-indigo-100 text-indigo-700",
@@ -312,8 +296,6 @@ export default function CoordinatorRegistrations() {
   }, [assignedEvents, selectedEventId]);
 
   const selectedStatus = deriveStatus(selectedEvent);
-  const scannerEnabled = selectedEvent && selectedStatus !== "cancelled";
-  const attendanceWindowOpen = isAttendanceWindowOpen(selectedEvent);
 
   const visibleRegistrationRows = useMemo(() => {
     const normalizedQuery = String(registrationQuery || "").trim().toLowerCase();
@@ -365,15 +347,31 @@ export default function CoordinatorRegistrations() {
           <ArrowLeft size={17} />
         </button>
 
-        <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900">Coordinator Event Workspace</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              View assigned events and run attendance scan from backend-supported coordinator APIs.
-            </p>
+            <h1 className="text-3xl font-bold text-slate-900">Registered Students</h1>
+            <p className="mt-1 text-sm text-slate-500">View registrations for your assigned events.</p>
+            {selectedEvent && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="inline-flex items-center gap-1">
+                  <CalendarDays size={12} />
+                  {formatDate(selectedEvent?.schedule?.startDate)} | {formatTime(selectedEvent?.schedule?.startTime)} -{" "}
+                  {formatTime(selectedEvent?.schedule?.endTime)}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <MapPin size={12} className="text-indigo-500" />
+                  {selectedEvent?.venue?.location || "Venue TBD"}
+                </span>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[selectedStatus] || STATUS_BADGE.upcoming}`}
+                >
+                  {STATUS_LABEL[selectedStatus] || STATUS_LABEL.upcoming}
+                </span>
+              </div>
+            )}
           </div>
           {assignedEvents.length > 0 && (
-            <label className="eventmate-panel rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+            <label className="eventmate-panel w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 sm:w-auto">
               <span className="mr-2 font-semibold text-slate-700">Event</span>
               <select
                 value={normalizeId(selectedEvent?._id)}
@@ -382,7 +380,7 @@ export default function CoordinatorRegistrations() {
                   setSelectedEventId(nextId);
                   navigate(`/coordinator-dashboard/event/${encodeURIComponent(nextId)}/registrations`);
                 }}
-                className="rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900"
+                className="mt-2 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 sm:mt-0 sm:w-auto"
               >
                 {assignedEvents.map((event) => (
                   <option key={normalizeId(event?._id)} value={normalizeId(event?._id)}>
@@ -409,103 +407,10 @@ export default function CoordinatorRegistrations() {
         ) : selectedEvent ? (
           <>
             <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-2xl font-bold text-slate-900">{selectedEvent?.title || "Selected Event"}</h2>
-                  <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-slate-500">
-                    <CalendarDays size={12} />
-                    {formatDate(selectedEvent?.schedule?.startDate)} | {formatTime(selectedEvent?.schedule?.startTime)} - {formatTime(selectedEvent?.schedule?.endTime)}
-                  </p>
-                </div>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[selectedStatus] || STATUS_BADGE.upcoming}`}>
-                  {STATUS_LABEL[selectedStatus] || STATUS_LABEL.upcoming}
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Category</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{selectedEvent?.category || "General"}</p>
-                </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Location</p>
-                  <p className="mt-0.5 inline-flex items-center gap-1 text-sm font-semibold text-slate-900">
-                    <MapPin size={12} className="text-indigo-500" />
-                    {selectedEvent?.venue?.location || "Venue TBD"}
-                  </p>
-                </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Registration Ends</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{formatDate(selectedEvent?.registration?.lastDate)}</p>
-                </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Max Participants</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{selectedEvent?.registration?.maxParticipants ?? "N/A"}</p>
-                </article>
-              </div>
-            </section>
-
-            <section className="eventmate-panel mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                  <AlertTriangle size={13} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Coordinator workspace</p>
-                  <p className="mt-1 text-xs text-amber-700">
-                    Open event details, review registrations, and run QR attendance scanning from this page.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
-              <button
-                type="button"
-                onClick={() => navigate(`/coordinator-dashboard/event/${encodeURIComponent(normalizeId(selectedEvent?._id))}/details`)}
-                className="eventmate-kpi rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-              >
-                View Details
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(`/coordinator-dashboard/event/${encodeURIComponent(normalizeId(selectedEvent?._id))}/scan`)}
-                disabled={!scannerEnabled}
-                className={`eventmate-kpi inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold ${
-                  scannerEnabled
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                    : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                }`}
-              >
-                <QrCode size={15} />
-                Open Attendance Scanner
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/coordinator-dashboard/notifications")}
-                className="eventmate-kpi rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-              >
-                View Notifications
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/coordinator-dashboard/contact-admin")}
-                className="eventmate-kpi rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-              >
-                Contact Admin
-              </button>
-            </section>
-
-            <p className="mt-2 text-xs text-slate-500">
-              {attendanceWindowOpen
-                ? "Attendance window is open based on event dates."
-                : "Attendance marking will be accepted by backend only on event date range."}
-            </p>
-
-            <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Registered Students</h3>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Event</p>
+                  <h2 className="text-lg font-bold text-slate-900">{selectedEvent?.title || "Selected Event"}</h2>
                   <p className="text-xs text-slate-500">Live list of registrations for this event.</p>
                 </div>
                 <button
@@ -559,52 +464,48 @@ export default function CoordinatorRegistrations() {
                 </p>
               ) : registrationRows.length === 0 ? (
                 <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                  No confirmed registrations with QR sent for this event yet.
+                  No registrations found for this event yet.
                 </p>
               ) : (
                 <>
-                  <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-slate-100/80">
-                        <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2.5 font-semibold">Student Name</th>
-                          <th className="px-3 py-2.5 font-semibold">Branch &amp; Year</th>
-                          <th className="px-3 py-2.5 font-semibold">Team</th>
-                          <th className="px-3 py-2.5 font-semibold">Reg. Date</th>
-                          <th className="px-3 py-2.5 font-semibold">Attendance Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white">
-                        {visibleRegistrationRows.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
-                              No participants match the current search.
-                            </td>
-                          </tr>
-                        ) : (
-                          visibleRegistrationRows.map((row) => (
-                            <tr key={`${row.registrationId}-${row.id}`} className="align-top">
-                              <td className="px-3 py-3">
-                                <div className="flex items-start gap-2.5">
-                                  <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
-                                  <div>
-                                    <p className="font-semibold text-slate-900">{row.participantName}</p>
-                                    <p className="mt-0.5 text-xs text-slate-500">{row.participantEmail || "-"}</p>
-                                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}>
-                                      {row.registrationStatus}
-                                    </span>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-3 py-3">
-                                <p className="text-slate-800">{row.department || "-"}</p>
-                                <p className="mt-0.5 text-xs text-slate-500">{row.year || "-"}</p>
-                              </td>
-                              <td className="px-3 py-3 text-slate-700">{row.teamName || "Individual"}</td>
-                              <td className="px-3 py-3">
-                                <span className="text-xs text-slate-600">{formatDateTime(row.registeredAt)}</span>
-                              </td>
-                              <td className="px-3 py-3">
+                  {visibleRegistrationRows.length === 0 ? (
+                    <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                      No participants match the current search.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="mt-4 space-y-3 sm:hidden">
+                        {visibleRegistrationRows.map((row) => (
+                          <article key={`${row.registrationId}-${row.id}`} className="rounded-xl border border-slate-200 bg-white p-3">
+                            <div className="flex items-start gap-2.5">
+                              <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900">{row.participantName}</p>
+                                <p className="mt-0.5 text-xs text-slate-500 break-words">{row.participantEmail || "-"}</p>
+                                <span
+                                  className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}
+                                >
+                                  {row.registrationStatus}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Branch &amp; Year</p>
+                                <p className="mt-0.5 text-sm text-slate-800">
+                                  {row.department || "-"} {row.year ? `• ${row.year}` : ""}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Team</p>
+                                <p className="mt-0.5 text-sm text-slate-800">{row.teamName || "Individual"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Reg. Date</p>
+                                <p className="mt-0.5 text-sm text-slate-800">{formatDateTime(row.registeredAt)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Attendance</p>
                                 {row.attendanceMarked ? (
                                   <div>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
@@ -619,72 +520,77 @@ export default function CoordinatorRegistrations() {
                                     Pending
                                   </span>
                                 )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
 
-                  <p className="mt-3 text-xs text-slate-500">
-                    Showing {visibleRegistrationRows.length} of {registrationRows.length} participants.
-                  </p>
+                      <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 sm:block">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-slate-100/80">
+                            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                              <th className="px-3 py-2.5 font-semibold">Student Name</th>
+                              <th className="px-3 py-2.5 font-semibold">Branch &amp; Year</th>
+                              <th className="px-3 py-2.5 font-semibold">Team</th>
+                              <th className="px-3 py-2.5 font-semibold">Reg. Date</th>
+                              <th className="px-3 py-2.5 font-semibold">Attendance Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 bg-white">
+                            {visibleRegistrationRows.map((row) => (
+                              <tr key={`${row.registrationId}-${row.id}`} className="align-top">
+                                <td className="px-3 py-3">
+                                  <div className="flex items-start gap-2.5">
+                                    <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
+                                    <div>
+                                      <p className="font-semibold text-slate-900">{row.participantName}</p>
+                                      <p className="mt-0.5 text-xs text-slate-500">{row.participantEmail || "-"}</p>
+                                      <span
+                                        className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}
+                                      >
+                                        {row.registrationStatus}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3">
+                                  <p className="text-slate-800">{row.department || "-"}</p>
+                                  <p className="mt-0.5 text-xs text-slate-500">{row.year || "-"}</p>
+                                </td>
+                                <td className="px-3 py-3 text-slate-700">{row.teamName || "Individual"}</td>
+                                <td className="px-3 py-3">
+                                  <span className="text-xs text-slate-600">{formatDateTime(row.registeredAt)}</span>
+                                </td>
+                                <td className="px-3 py-3">
+                                  {row.attendanceMarked ? (
+                                    <div>
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                        <CheckCircle2 size={11} />
+                                        Checked In
+                                      </span>
+                                      <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.attendanceMarkedAt)}</p>
+                                    </div>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                      <CircleDashed size={11} />
+                                      Pending
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <p className="mt-3 text-xs text-slate-500">
+                        Showing {visibleRegistrationRows.length} of {registrationRows.length} participants.
+                      </p>
+                    </>
+                  )}
                 </>
               )}
-            </section>
-
-            <section className="mt-5 space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">All Assigned Events</h3>
-              {assignedEvents.map((event) => {
-                const eventStatus = deriveStatus(event);
-                const eventIdValue = normalizeId(event?._id);
-                const canScan = eventStatus !== "cancelled";
-
-                return (
-                  <article key={eventIdValue} className="eventmate-panel rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{event?.title || "Untitled Event"}</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {formatDate(event?.schedule?.startDate)} | {formatTime(event?.schedule?.startTime)} - {formatTime(event?.schedule?.endTime)}
-                        </p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STATUS_BADGE[eventStatus] || STATUS_BADGE.upcoming}`}>
-                        {STATUS_LABEL[eventStatus] || STATUS_LABEL.upcoming}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/coordinator-dashboard/event/${encodeURIComponent(eventIdValue)}/details`)}
-                        className="rounded-md border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/coordinator-dashboard/event/${encodeURIComponent(eventIdValue)}/registrations`)}
-                        className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                      >
-                        Open Workspace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/coordinator-dashboard/event/${encodeURIComponent(eventIdValue)}/scan`)}
-                        disabled={!canScan}
-                        className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                          canScan
-                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                            : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                        }`}
-                      >
-                        Scan Attendance
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
             </section>
           </>
         ) : null}

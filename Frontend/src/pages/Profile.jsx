@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, ShieldCheck, UploadCloud, UserCircle2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
@@ -7,6 +7,7 @@ import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
 const yearOptions = ["1st", "2nd", "3rd", "4th"];
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -57,8 +58,10 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
   const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
   const [loading, setLoading] = useState({ profile: true, save: false, avatar: false });
   const [message, setMessage] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const role = profile?.role || "";
   const isStudent = role === "STUDENT";
@@ -100,6 +103,14 @@ export default function Profile() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -191,7 +202,14 @@ export default function Profile() {
         storeAuth({ user: nextProfile });
       }
 
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
       setAvatarFile(null);
+      setAvatarPreview("");
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
       setMessage({ type: "success", text: response.data?.message || "Avatar updated successfully." });
     } catch (error) {
       setMessage({
@@ -200,6 +218,49 @@ export default function Profile() {
       });
     } finally {
       setLoading((prev) => ({ ...prev, avatar: false }));
+    }
+  };
+
+  const handleAvatarSelect = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setAvatarFile(null);
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+      setAvatarPreview("");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setMessage({ type: "error", text: "Please choose a valid image file." });
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      setMessage({ type: "error", text: "Image must be 2 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setMessage(null);
+  };
+
+  const clearAvatarSelection = () => {
+    setAvatarFile(null);
+    if (avatarPreview) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+    setAvatarPreview("");
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = "";
     }
   };
 
@@ -239,7 +300,7 @@ export default function Profile() {
 
             <div className="mt-4 flex items-center gap-4">
               <AvatarWithFrame
-                src={profile?.avatar || ""}
+                src={avatarPreview || profile?.avatar || ""}
                 alt="Avatar"
                 className="h-20 w-20 shrink-0"
                 coreClassName="h-full w-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5"
@@ -257,15 +318,36 @@ export default function Profile() {
 
             <div className="mt-5 space-y-3">
               <input
+                ref={avatarInputRef}
+                id="avatar-upload"
                 type="file"
                 accept="image/*"
-                onChange={(event) => setAvatarFile(event.target.files?.[0] || null)}
-                className="w-full text-sm text-slate-600 dark:text-slate-300"
+                onChange={handleAvatarSelect}
+                className="hidden"
               />
+              <label
+                htmlFor="avatar-upload"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-indigo-400/50"
+              >
+                <UploadCloud size={16} />
+                Choose Image
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                <span className="truncate">{avatarFile ? avatarFile.name : "No file selected"}</span>
+                <button
+                  type="button"
+                  onClick={clearAvatarSelection}
+                  disabled={!avatarFile}
+                  className="text-xs font-semibold text-slate-500 hover:text-indigo-600 disabled:opacity-50 dark:text-slate-400 dark:hover:text-indigo-300"
+                >
+                  Remove
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">PNG, JPG, or WebP up to 2 MB.</p>
               <button
                 type="button"
                 onClick={handleAvatarUpload}
-                disabled={loading.avatar}
+                disabled={loading.avatar || !avatarFile}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-70"
               >
                 {loading.avatar ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />}
