@@ -660,15 +660,15 @@ const certificateEmailTemplate = ({
 }) => {
   const isWinner = certificateType === "winner";
   const subject = isWinner
-    ? `ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â  Congratulations! Your Winner Certificate ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ${eventName}`
-    : `ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Your Certificate of Participation ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ${eventName}`;
+    ? `Congratulations! Your Winner Certificate - ${eventName}`
+    : `Your Certificate of Participation - ${eventName}`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f9f9f9;">
       
       <div style="background: linear-gradient(135deg, #7C3AED, #EC4899); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
         <h1 style="color: white; margin: 0; font-size: 22px;">
-          ${isWinner ? "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã‚Â  Congratulations!" : "ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸Ãƒâ€¦Ã‚Â½ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ Certificate Issued!"}
+          ${isWinner ? "Congratulations!" : "Certificate Issued!"}
         </h1>
       </div>
 
@@ -711,7 +711,7 @@ const certificateEmailTemplate = ({
       </div>
 
       <p style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 16px;">
-        ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â EventMate Team ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· Bajaj Chandrapur Polytechnic, Chandrapur
+        EventMate Team, Bajaj Chandrapur Polytechnic, Chandrapur
       </p>
 
     </div>
