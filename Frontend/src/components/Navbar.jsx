@@ -831,6 +831,30 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
           {/* MOBILE MENU BUTTON */}
           <div className={`-mr-2 flex items-center gap-2 ${mobileVisibilityClass}`}>
+            {isPublic && !isAuthenticated && (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+                >
+                  Sign Up
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Toggle theme"
+                  onClick={toggleTheme}
+                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+              </div>
+            )}
             {isAuthenticated && !isPublic && currentNotificationsPath && (
               <Link
                 to={currentNotificationsPath}
