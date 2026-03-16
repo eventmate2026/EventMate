@@ -253,7 +253,6 @@ export default function CoordinatorAttendanceScanner() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState(false);
-  const [tokenInput, setTokenInput] = useState("");
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
@@ -388,7 +387,6 @@ export default function CoordinatorAttendanceScanner() {
       registrationStatus: participant?.registrationStatus || "Unknown",
       alreadyMarked: Boolean(participant?.attendanceMarked),
     });
-    setTokenInput(token);
     setMessage(null);
     return true;
   }, []);
@@ -415,7 +413,7 @@ export default function CoordinatorAttendanceScanner() {
     const jsQrDecoder = detector ? null : await jsQrWarmup;
     if (!detector && !jsQrDecoder) {
       setCameraSupported(false);
-      setCameraError("Live QR scanner is not supported in this browser. Use manual token entry.");
+      setCameraError("Live QR scanner is not supported in this browser. Use image upload instead.");
       return;
     }
 
@@ -651,15 +649,6 @@ export default function CoordinatorAttendanceScanner() {
     [addRecentScan, canReadRegistrations, load]
   );
 
-  const handleManualSubmit = async (event) => {
-    event.preventDefault();
-    const success = await markAttendanceWithToken(tokenInput, "Manual entry");
-    if (success) {
-      setTokenInput("");
-      setPendingScan(null);
-    }
-  };
-
   const handleConfirmPending = async () => {
     if (!pendingScan?.token) return;
     await markAttendanceWithToken(pendingScan.token, pendingScan.sourceLabel || "Live camera");
@@ -696,7 +685,7 @@ export default function CoordinatorAttendanceScanner() {
 
     if (!detector && !decoder) {
       setCameraSupported(false);
-      setMessage({ type: "error", text: "Image QR scan is not supported in this browser. Use manual token entry." });
+      setMessage({ type: "error", text: "Image QR scan is not supported in this browser." });
       return;
     }
 
@@ -879,43 +868,12 @@ export default function CoordinatorAttendanceScanner() {
                     <p className="text-[11px] text-slate-500 dark:text-slate-300">Engine: {scannerEngineLabel}</p>
                     {!cameraSupported && (
                       <p className="text-[11px] text-amber-700 dark:text-amber-300">
-                        Browser QR support is limited. Use image or manual check-in.
+                        Browser QR support is limited. Use image upload instead.
                       </p>
                     )}
                   </div>
                 </section>
 
-                <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-3">
-                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-300">Trouble Scanning?</p>
-                  <form onSubmit={handleManualSubmit} className="mt-2 flex flex-col sm:flex-row gap-2">
-                    <input
-                      value={tokenInput}
-                      onChange={(event) => setTokenInput(event.target.value)}
-                      placeholder="Enter attendance token"
-                      className="flex-1 rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
-                    />
-                    <button
-                      type="submit"
-                      disabled={marking}
-                      className="inline-flex items-center justify-center gap-1 rounded-md bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-70 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
-                    >
-                      {marking ? <Loader2 size={13} className="animate-spin" /> : null}
-                      {marking ? "Checking..." : "Check In"}
-                    </button>
-                  </form>
-
-                  {message && (
-                    <p
-                      className={`mt-2 rounded-md px-2.5 py-2 text-xs ${
-                        message.type === "success"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                          : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-                      }`}
-                    >
-                      {message.text}
-                    </p>
-                  )}
-                </section>
               </div>
 
               <aside className="space-y-3">
