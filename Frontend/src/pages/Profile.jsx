@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, ShieldCheck, UploadCloud, UserCircle2 } from "lucide-react";
+import { Loader2, Plus, ShieldCheck, UploadCloud, UserCircle2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { storeAuth } from "../lib/auth";
@@ -299,13 +299,23 @@ export default function Profile() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Account</h2>
 
             <div className="mt-4 flex items-center gap-4">
-              <AvatarWithFrame
-                src={avatarPreview || profile?.avatar || ""}
-                alt="Avatar"
-                className="h-20 w-20 shrink-0"
-                coreClassName="h-full w-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5"
-                fallback={<UserCircle2 className="h-10 w-10 text-slate-400" />}
-              />
+              <div className="relative h-20 w-20 shrink-0">
+                <AvatarWithFrame
+                  src={avatarPreview || profile?.avatar || ""}
+                  alt="Avatar"
+                  className="h-20 w-20"
+                  coreClassName="h-full w-full border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5"
+                  fallback={<UserCircle2 className="h-10 w-10 text-slate-400" />}
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-indigo-400/50"
+                  aria-label="Change avatar"
+                >
+                  <Plus size={14} />
+                </button>
+              </div>
               <div>
                 <p className="font-semibold text-slate-900 dark:text-white">{profile?.fullName || "User"}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{profile?.email || "user@eventmate.com"}</p>
@@ -325,13 +335,6 @@ export default function Profile() {
                 onChange={handleAvatarSelect}
                 className="hidden"
               />
-              <label
-                htmlFor="avatar-upload"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-indigo-400/50"
-              >
-                <UploadCloud size={16} />
-                Choose Image
-              </label>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                 <span className="truncate">{avatarFile ? avatarFile.name : "No file selected"}</span>
                 <button
