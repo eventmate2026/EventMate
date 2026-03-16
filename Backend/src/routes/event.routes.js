@@ -56,7 +56,7 @@ router.patch(
 );
 
 router.patch(
-  "/:id/complete",
+  "/:eventId/complete",
   authMiddleware,
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   completeEvent

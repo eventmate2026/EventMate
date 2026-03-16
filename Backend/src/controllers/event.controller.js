@@ -542,9 +542,9 @@ export const getMyEvents = async (req, res, next) => {
 // complete event (manual)
 export const completeEvent = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const eventId = req.params.eventId || req.params.id;
 
-    const event = await Event.findById(id);
+    const event = await Event.findById(eventId);
 
     if (!event) {
       return res.status(404).json({

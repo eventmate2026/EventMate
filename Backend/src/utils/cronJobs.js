@@ -30,8 +30,8 @@ const autoCompleteEvents = async () => {
 };
 
 const startCronJobs = () => {
-  // Run every minute so events are completed close to their end date/time.
-  cron.schedule("* * * * *", autoCompleteEvents);
+  // Run every hour to reduce load while still completing events promptly.
+  cron.schedule("0 * * * *", autoCompleteEvents);
   console.log("[AUTO_COMPLETE] Cron jobs started");
 };
 
