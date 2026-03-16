@@ -199,7 +199,7 @@ const decodeSourceWithJsQr = async (source, decoder, canvasRef) => {
   const sourceHeight = Number(source?.videoHeight || source?.naturalHeight || source?.height || 0);
   if (!sourceWidth || !sourceHeight) return "";
 
-  const maxDimension = 960;
+  const maxDimension = 1280;
   const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
   const width = Math.max(1, Math.floor(sourceWidth * scale));
   const height = Math.max(1, Math.floor(sourceHeight * scale));
@@ -216,6 +216,7 @@ const decodeSourceWithJsQr = async (source, decoder, canvasRef) => {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) return "";
 
+  context.imageSmoothingEnabled = false;
   context.drawImage(source, 0, 0, width, height);
   const imageData = context.getImageData(0, 0, width, height);
   const result = decoder(imageData.data, width, height, { inversionAttempts: "attemptBoth" });
@@ -390,7 +391,9 @@ export default function OrganizerEventScanQR() {
       detectorRef.current = detector;
     }
 
-    const jsQrDecoder = detector ? null : await resolveJsQrDecoder();
+    const jsQrWarmup = resolveJsQrDecoder();
+    void jsQrWarmup;
+    const jsQrDecoder = detector ? null : await jsQrWarmup;
     if (!detector && !jsQrDecoder) {
       setCameraSupported(false);
       setCameraError("Live QR scanner is not supported in this browser. Use manual token entry.");
@@ -411,6 +414,21 @@ export default function OrganizerEventScanQR() {
       });
 
       streamRef.current = stream;
+      const track = stream.getVideoTracks?.()[0];
+      if (track?.getCapabilities && track?.applyConstraints) {
+        const capabilities = track.getCapabilities();
+        const advanced = {};
+        if (Array.isArray(capabilities?.focusMode) && capabilities.focusMode.includes("continuous")) {
+          advanced.focusMode = "continuous";
+        }
+        if (Object.keys(advanced).length > 0) {
+          try {
+            await track.applyConstraints({ advanced: [advanced] });
+          } catch {
+            // Ignore focus constraint errors.
+          }
+        }
+      }
       const video = videoRef.current;
       if (!video) {
         stopCamera();
@@ -457,7 +475,9 @@ export default function OrganizerEventScanQR() {
               ? barcodes.find((item) => String(item?.rawValue || "").trim())
               : null;
             rawValue = String(match?.rawValue || "").trim();
-          } else if (jsQrRef.current || jsQrDecoder) {
+          }
+
+          if (!rawValue && (jsQrRef.current || jsQrDecoder)) {
             const resolvedDecoder = jsQrRef.current || jsQrDecoder;
             rawValue = await decodeSourceWithJsQr(videoNode, resolvedDecoder, decodeCanvasRef);
           }

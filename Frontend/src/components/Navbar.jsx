@@ -676,13 +676,20 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 >
                   {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
-                <AvatarWithFrame
-                  src={avatarUrl}
-                  alt="Profile"
-                  className="h-9 w-9"
-                  coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
-                  fallback={<span>{avatarInitials || "OR"}</span>}
-                />
+                <button
+                  type="button"
+                  onClick={handleProfileClick}
+                  aria-label="Open profile"
+                  className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  <AvatarWithFrame
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="h-9 w-9"
+                    coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
+                    fallback={<span>{avatarInitials || "OR"}</span>}
+                  />
+                </button>
                 <button
                   type="button"
                   onClick={() => onLogout?.()}
