@@ -747,10 +747,17 @@ export default function OrganizerEventScanQR() {
                   </div>
 
                   <div className="mt-3 relative overflow-hidden rounded-lg border border-slate-200 dark:border-white/10 bg-slate-900 aspect-[16/9]">
-                    {cameraActive ? (
-                      <video ref={videoRef} playsInline muted autoPlay className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(224,231,255,0.8),rgba(38,38,38,0.9)_38%),linear-gradient(125deg,#dedf77,#243f16)] flex items-center justify-center">
+                    <video
+                      ref={videoRef}
+                      playsInline
+                      muted
+                      autoPlay
+                      className={`h-full w-full object-cover transition-opacity duration-200 ${
+                        cameraActive ? "opacity-100" : "opacity-0 pointer-events-none"
+                      }`}
+                    />
+                    {!cameraActive && (
+                      <div className="absolute inset-0 h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(224,231,255,0.8),rgba(38,38,38,0.9)_38%),linear-gradient(125deg,#dedf77,#243f16)] flex items-center justify-center">
                         <p className="text-sm text-slate-100 text-center px-4">
                           {cameraError
                             ? cameraError

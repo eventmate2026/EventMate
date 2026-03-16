@@ -271,45 +271,13 @@ export default function Landing() {
                   className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 cta-glow"
                 >
                   <div className="relative bg-white dark:bg-[#030712] rounded-full px-8 py-4 group-hover:bg-opacity-0 transition-all duration-300">
-                    <span className="relative z-10 text-gray-900 dark:text-white font-bold text-lg flex items-center">
-                      Get Started Free <ArrowRight />
+                    <span className="relative z-10 text-gray-900 dark:text-white font-bold text-lg">
+                      Get Started
                     </span>
-                  </div>
-                </Link>
-
-                <Link
-                  to="/login"
-                  className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 shadow-[0_12px_35px_-16px_rgba(99,102,241,0.7)] hover:shadow-[0_16px_45px_-16px_rgba(99,102,241,0.9)] transition-all duration-300"
-                >
-                  <div className="relative rounded-full px-8 py-4 bg-white dark:bg-[#030712] border border-white/60 dark:border-white/10 group-hover:bg-opacity-0 transition-all duration-300">
-                    <span className="relative z-10 text-gray-900 dark:text-white font-semibold text-lg tracking-wide">
-                      Login
-                    </span>
-                    <span className="absolute inset-0 rounded-full ring-1 ring-indigo-500/10 dark:ring-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   </div>
                 </Link>
               </motion.div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* --- INFINITE MARQUEE --- */}
-      <section className="relative z-10 py-8 overflow-hidden border-y border-gray-200 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
-        <div className="flex whitespace-nowrap gap-12">
-          {[...Array(2)].map((_, i) => (
-            <div key={i} className="flex flex-wrap gap-6 md:gap-12 min-w-full justify-center">
-              <span className="text-2xl font-bold text-gray-300 dark:text-white/10 uppercase tracking-widest">Hackathon</span>
-              <span className="text-2xl font-bold text-indigo-300 dark:text-indigo-500/20 uppercase tracking-widest">•</span>
-              <span className="text-2xl font-bold text-gray-300 dark:text-white/10 uppercase tracking-widest">Quiz Competition</span>
-              <span className="text-2xl font-bold text-indigo-300 dark:text-indigo-500/20 uppercase tracking-widest">•</span>
-              <span className="text-2xl font-bold text-gray-300 dark:text-white/10 uppercase tracking-widest">Cultural Fest</span>
-              <span className="text-2xl font-bold text-indigo-300 dark:text-indigo-500/20 uppercase tracking-widest">•</span>
-              <span className="text-2xl font-bold text-gray-300 dark:text-white/10 uppercase tracking-widest">Workshop</span>
-              <span className="text-2xl font-bold text-indigo-300 dark:text-indigo-500/20 uppercase tracking-widest">•</span>
-              <span className="text-2xl font-bold text-gray-300 dark:text-white/10 uppercase tracking-widest">Seminar</span>
-              <span className="text-2xl font-bold text-indigo-300 dark:text-indigo-500/20 uppercase tracking-widest">•</span>
-            </div>
-          ))}
         </div>
       </section>
 
