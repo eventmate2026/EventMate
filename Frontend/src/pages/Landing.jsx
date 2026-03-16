@@ -30,6 +30,35 @@ const fallbackImages = {
   Workshop: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&auto=format",
 };
 
+const EVENTS_CACHE_KEY = "eventmate:public-events-cache";
+const EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const readEventsCache = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(EVENTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || !Array.isArray(parsed?.events)) return null;
+    if (Date.now() - parsed.timestamp > EVENTS_CACHE_TTL_MS) return null;
+    return parsed.events;
+  } catch {
+    return null;
+  }
+};
+
+const writeEventsCache = (events) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      EVENTS_CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), events })
+    );
+  } catch {
+    // Ignore cache write errors (storage full or disabled).
+  }
+};
+
 const formatEventDate = (value) => {
   if (!value) return "Date TBD";
   const parsed = new Date(value);
@@ -104,38 +133,46 @@ export default function Landing() {
   const scaleX = scrollYProgress;
   useEffect(() => {
     let isMounted = true;
+    const cachedEvents = readEventsCache();
+    const hasCachedEvents = Array.isArray(cachedEvents) && cachedEvents.length > 0;
+
+    if (hasCachedEvents) {
+      setEvents(cachedEvents);
+      setIsLoadingEvents(false);
+      setEventsError(null);
+    }
 
     const fetchEvents = async () => {
-      setIsLoadingEvents(true);
-      setEventsError(null);
+      if (!hasCachedEvents) {
+        setIsLoadingEvents(true);
+        setEventsError(null);
+      }
       try {
-        let response;
-        try {
-          response = await api({
-            ...SummaryApi.get_public_events,
-          });
-        } catch (err) {
-          if (err.response?.status !== 401) throw err;
-          response = await api({
-            ...SummaryApi.get_public_events,
-            skipAuth: true,
-          });
-        }
+        const response = await api({
+          ...SummaryApi.get_public_events,
+          skipAuth: true,
+          params: { page: 1, limit: 6 },
+        });
 
         if (isMounted) {
           const mapped = extractEventList(response.data)
             .sort((a, b) => getEventRecencyTimestamp(b) - getEventRecencyTimestamp(a))
             .map(mapDbEvent);
           setEvents(mapped);
+          writeEventsCache(mapped);
         }
       } catch (err) {
         if (isMounted) {
-          setEvents([]);
-          setEventsError(err.response?.data?.message || "Unable to load events right now.");
+          if (!hasCachedEvents) {
+            setEvents([]);
+            setEventsError(err.response?.data?.message || "Unable to load events right now.");
+          }
         }
       } finally {
         if (isMounted) {
-          setIsLoadingEvents(false);
+          if (!hasCachedEvents) {
+            setIsLoadingEvents(false);
+          }
         }
       }
     };
