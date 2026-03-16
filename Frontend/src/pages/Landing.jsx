@@ -109,10 +109,19 @@ export default function Landing() {
       setIsLoadingEvents(true);
       setEventsError(null);
       try {
-        const response = await api({
-          ...SummaryApi.get_public_events,
-          skipAuth: true,
-        });
+        let response;
+        try {
+          response = await api({
+            ...SummaryApi.get_public_events,
+          });
+        } catch (err) {
+          if (err.response?.status !== 401) throw err;
+          response = await api({
+            ...SummaryApi.get_public_events,
+            skipAuth: true,
+          });
+        }
+
         if (isMounted) {
           const mapped = extractEventList(response.data)
             .sort((a, b) => getEventRecencyTimestamp(b) - getEventRecencyTimestamp(a))
@@ -268,11 +277,16 @@ export default function Landing() {
                   </div>
                 </Link>
 
-                <Link 
+                <Link
                   to="/login"
-                  className="cta-secondary px-8 py-4 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-full font-bold text-lg transition-all"
+                  className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 shadow-[0_12px_35px_-16px_rgba(99,102,241,0.7)] hover:shadow-[0_16px_45px_-16px_rgba(99,102,241,0.9)] transition-all duration-300"
                 >
-                  Login
+                  <div className="relative rounded-full px-8 py-4 bg-white dark:bg-[#030712] border border-white/60 dark:border-white/10 group-hover:bg-opacity-0 transition-all duration-300">
+                    <span className="relative z-10 text-gray-900 dark:text-white font-semibold text-lg tracking-wide">
+                      Login
+                    </span>
+                    <span className="absolute inset-0 rounded-full ring-1 ring-indigo-500/10 dark:ring-indigo-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  </div>
                 </Link>
               </motion.div>
           </motion.div>

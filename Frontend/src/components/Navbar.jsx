@@ -62,10 +62,21 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     STUDENT_COORDINATOR: "/coordinator-dashboard/profile",
     STUDENT: "/profile",
   };
+  const roleNotificationsPath = {
+    MAIN_ADMIN: "/admin-dashboard/notifications",
+    ORGANIZER: "/organizer-dashboard/notifications",
+    STUDENT_COORDINATOR: "/coordinator-dashboard/notifications",
+    STUDENT: "/student-dashboard/notifications",
+  };
   const currentProfilePath = roleProfilePath[user?.role] || "/profile";
+  const currentNotificationsPath = roleNotificationsPath[user?.role] || "";
   const handleProfileClick = () => {
     setIsUserMenuOpen(false);
     navigate(currentProfilePath);
+  };
+  const handleMobileProfileClick = () => {
+    handleProfileClick();
+    setIsMobileMenuOpen(false);
   };
 
   const studentRouteMap = {
@@ -836,7 +847,38 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-2 flex items-center ${mobileVisibilityClass}`}>
+          <div className={`-mr-2 flex items-center gap-2 ${mobileVisibilityClass}`}>
+            {isAuthenticated && !isPublic && currentNotificationsPath && (
+              <Link
+                to={currentNotificationsPath}
+                onClick={closeMenus}
+                aria-label="Notifications"
+                className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
+              >
+                <Bell className="h-5 w-5" />
+                {roleUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1">
+                    {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
+                  </span>
+                )}
+              </Link>
+            )}
+            {isAuthenticated && !isPublic && (
+              <button
+                type="button"
+                onClick={handleMobileProfileClick}
+                aria-label="Open profile"
+                className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                <AvatarWithFrame
+                  src={avatarUrl}
+                  alt="Profile"
+                  className="h-9 w-9"
+                  coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
+                  fallback={<span>{avatarInitials || "U"}</span>}
+                />
+              </button>
+            )}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"

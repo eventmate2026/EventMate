@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -129,6 +129,7 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [modal, setModal] = useState(null);
   const [pendingRegistrationId, setPendingRegistrationId] = useState("");
   const [pendingTeamRegistrationId, setPendingTeamRegistrationId] = useState("");
   const [registrationWarning, setRegistrationWarning] = useState(null);
@@ -136,8 +137,6 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
-  const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
 
   const [registrationType, setRegistrationType] = useState("INDIVIDUAL");
   const [teamName, setTeamName] = useState("");
@@ -236,22 +235,8 @@ export default function StudentEventDetails({ mode = "details" }) {
     fetchEventDetails();
   }, [eventId]);
 
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  const pushToast = (payload) => {
-    setToast(payload);
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 4500);
+  const handleModalClose = () => {
+    setModal(null);
   };
 
   const allowedRegistrationTypes = useMemo(() => {
@@ -472,7 +457,7 @@ export default function StudentEventDetails({ mode = "details" }) {
             : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
       };
       setMessage(popupPayload);
-      pushToast(popupPayload);
+      setModal(popupPayload);
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
       setEvent((prev) =>
@@ -522,14 +507,33 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   return (
     <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
-      {toast && (
-        <div className="fixed top-6 right-6 z-50">
-          <div
-            className={`rounded-xl px-4 py-3 shadow-lg text-sm ${
-              toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
-            }`}
-          >
-            {toast.text}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
+                modal.type === "success"
+                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
+                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
+              }`}
+            >
+              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
+            </div>
+            <h2 className="mt-4 text-xl font-semibold">
+              {modal.type === "success" ? "Thank You!" : "Unable to Register"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
+                modal.type === "success"
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-rose-500 hover:bg-rose-600"
+              }`}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

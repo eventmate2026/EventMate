@@ -231,26 +231,28 @@ export default function StudentFeedbackPending() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 backdrop-blur-sm">
-          <div
-            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-2xl dark:border-white/10 dark:bg-gray-900"
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
             <div
-              className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
-                modal.type === "success" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
+                modal.type === "success"
+                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
+                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
               }`}
             >
-              {modal.type === "success" ? <CheckCircle2 size={26} /> : <AlertCircle size={26} />}
+              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
             </div>
-            <h2 className="mt-3 text-lg font-semibold text-slate-900 dark:text-white">
+            <h2 className="mt-4 text-xl font-semibold">
               {modal.type === "success" ? "Thank You!" : "Unable to Submit"}
             </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{modal.text}</p>
+            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
             <button
               type="button"
               onClick={handleModalClose}
-              className={`mt-5 w-full rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                modal.type === "success" ? "bg-emerald-500 hover:bg-emerald-600" : "bg-rose-500 hover:bg-rose-600"
+              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
+                modal.type === "success"
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-rose-500 hover:bg-rose-600"
               }`}
             >
               OK

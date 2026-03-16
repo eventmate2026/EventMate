@@ -112,6 +112,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     setIsUserMenuOpen(false);
     window.scrollTo(0, 0);
   };
+  const handleMobileProfileClick = () => {
+    navigate("/profile");
+    setIsMobileMenuOpen(false);
+    setIsUserMenuOpen(false);
+  };
 
   const isActivePage = (pageName) => activePage === pageName;
   const desktopLinkClass = (pageName) =>
@@ -250,7 +255,28 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           </div>
 
           {/* --- MOBILE MENU BUTTON --- */}
-          <div className="-mr-2 flex items-center sm:hidden">
+          <div className="-mr-2 flex items-center gap-2 sm:hidden">
+            <button
+              type="button"
+              onClick={() => handleNavClick("notifications")}
+              className="relative rounded-full p-2 text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-indigo-300 focus:outline-none"
+              aria-label="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1 ring-2 ring-white dark:ring-gray-900">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleMobileProfileClick}
+              aria-label="Open profile"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              {renderAvatar("h-8 w-8", "text-sm")}
+            </button>
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
