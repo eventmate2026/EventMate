@@ -15,6 +15,19 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_BACKEND_PORT": JSON.stringify(backendPort),
       "import.meta.env.VITE_API_URL": JSON.stringify(backendApiUrl),
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "react-vendor": ["react", "react-dom", "react-router-dom"],
+            motion: ["framer-motion"],
+            icons: ["lucide-react", "react-icons"],
+            http: ["axios"],
+            socket: ["socket.io-client"],
+          },
+        },
+      },
+    },
     server: {
       host: true,
       port: 5173,

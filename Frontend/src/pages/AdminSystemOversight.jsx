@@ -92,6 +92,9 @@ export default function AdminSystemOversight() {
   const [contacts, setContacts] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [search, setSearch] = useState("");
+  const [activeControlId, setActiveControlId] = useState(null);
+  const [actionBusyId, setActionBusyId] = useState(null);
+  const [actionNotice, setActionNotice] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -130,6 +133,15 @@ export default function AdminSystemOversight() {
     load();
   }, []);
 
+  useEffect(() => {
+    const handleDocumentClick = (event) => {
+      if (event.target.closest("[data-emergency-menu]")) return;
+      setActiveControlId(null);
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => document.removeEventListener("click", handleDocumentClick);
+  }, []);
+
   const eventRows = useMemo(() => {
     return toList({ data: events })
       .map((event) => {
@@ -141,6 +153,7 @@ export default function AdminSystemOversight() {
           title: String(event?.title || "Untitled Event"),
           organizer: String(event?.organizer?.name || "Organizer"),
           department: String(event?.organizer?.department || "Department not set"),
+          status: String(event?.status || ""),
           state: deriveEventState(event),
           present,
           capacity,
@@ -229,6 +242,69 @@ export default function AdminSystemOversight() {
     downloadCsv("system-oversight-report.csv", rows);
   };
 
+  const handleEmergencyAction = async (row, action) => {
+    if (!row?.id || actionBusyId) return;
+    const normalizedStatus = String(row.status || "").toLowerCase();
+
+    if (action === "complete" && normalizedStatus !== "published") {
+      setActionNotice({
+        type: "error",
+        text: "Only published events can be completed.",
+      });
+      setActiveControlId(null);
+      return;
+    }
+
+    const confirmText =
+      action === "cancel"
+        ? `Cancel "${row.title}"? This will immediately stop registrations and hide the event.`
+        : `Mark "${row.title}" as completed?`;
+
+    if (!window.confirm(confirmText)) {
+      setActiveControlId(null);
+      return;
+    }
+
+    setActionBusyId(row.id);
+    setActionNotice(null);
+
+    try {
+      const config = action === "cancel" ? SummaryApi.cancel_event : SummaryApi.complete_event;
+      await api({
+        ...config,
+        url: config.url.replace(":eventId", row.id),
+      });
+
+      setEvents((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        if (action === "cancel") {
+          return prev.filter((item) => String(item?._id || "") !== row.id);
+        }
+        return prev.map((item) =>
+          String(item?._id || "") === row.id ? { ...item, status: "Completed" } : item
+        );
+      });
+
+      setActionNotice({
+        type: "success",
+        text:
+          action === "cancel"
+            ? "Event cancelled successfully."
+            : "Event marked as completed.",
+      });
+    } catch (actionError) {
+      setActionNotice({
+        type: "error",
+        text:
+          actionError?.response?.data?.message ||
+          "Unable to perform this emergency action.",
+      });
+    } finally {
+      setActionBusyId(null);
+      setActiveControlId(null);
+    }
+  };
+
   return (
     <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-5">
@@ -297,6 +373,17 @@ export default function AdminSystemOversight() {
                   className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-slate-100"
                 />
               </div>
+              {actionNotice && (
+                <div
+                  className={`mt-4 rounded-lg border px-3 py-2 text-sm ${
+                    actionNotice.type === "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                      : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-200"
+                  }`}
+                >
+                  {actionNotice.text}
+                </div>
+              )}
 
               <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
                 <table className="min-w-full text-sm">
@@ -360,13 +447,57 @@ export default function AdminSystemOversight() {
                             </div>
                           </td>
                           <td className="px-3 py-3 text-center">
-                            <button
-                              type="button"
-                              className="inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-white/10 p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10"
-                              title="Emergency controls"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
+                            <div className="relative inline-flex" data-emergency-menu>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setActiveControlId((prev) => (prev === row.id ? null : row.id));
+                                }}
+                                disabled={actionBusyId === row.id}
+                                className="inline-flex items-center justify-center rounded-md border border-slate-200 dark:border-white/10 p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 disabled:opacity-60"
+                                title="Emergency controls"
+                                aria-label="Emergency controls"
+                              >
+                                {actionBusyId === row.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <MoreHorizontal size={14} />
+                                )}
+                              </button>
+                              {activeControlId === row.id && (
+                                <div
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="absolute right-0 mt-2 w-44 rounded-lg border border-slate-200 bg-white p-1 text-left text-xs shadow-lg dark:border-white/10 dark:bg-slate-950 z-20"
+                                >
+                                  {String(row.status || "").toLowerCase() === "published" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEmergencyAction(row, "complete")}
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-emerald-600 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                    >
+                                      <CheckCircle2 size={14} />
+                                      Mark Completed
+                                    </button>
+                                  ) : null}
+                                  {String(row.status || "").toLowerCase() !== "completed" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEmergencyAction(row, "cancel")}
+                                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                    >
+                                      <AlertTriangle size={14} />
+                                      Cancel Event
+                                    </button>
+                                  )}
+                                  {String(row.status || "").toLowerCase() === "completed" && (
+                                    <div className="px-3 py-2 text-slate-500 dark:text-slate-400">
+                                      No actions available
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))

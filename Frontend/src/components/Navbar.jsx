@@ -898,7 +898,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
-        <div className={`${mobileVisibilityClass} border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}>
+        <div
+          className={`${mobileVisibilityClass} max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}
+        >
           <div className="pt-2 pb-3 space-y-1">
             {isPublic ? (
               <>
