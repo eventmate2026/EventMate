@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -27,6 +27,8 @@ const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
   TEAM: "Team",
 };
+
+const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "MINING"];
 
 const createBlankProfile = (department = "") => ({
   fullName: "",
@@ -117,6 +119,7 @@ export default function StudentEventDetails({ mode = "details" }) {
   const { eventId } = useParams();
   const navigate = useNavigate();
   const user = getStoredUser();
+  const lockedDepartment = String(user?.academicProfile?.branch || "").trim();
   const isRegistrationMode = mode === "register";
   const normalizedEventId = String(eventId || "").trim();
   const detailsPath = `/student-dashboard/events/${encodeURIComponent(normalizedEventId)}`;
@@ -133,6 +136,8 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   const [registrationType, setRegistrationType] = useState("INDIVIDUAL");
   const [teamName, setTeamName] = useState("");
@@ -231,6 +236,24 @@ export default function StudentEventDetails({ mode = "details" }) {
     fetchEventDetails();
   }, [eventId]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const pushToast = (payload) => {
+    setToast(payload);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4500);
+  };
+
   const allowedRegistrationTypes = useMemo(() => {
     const participationMode = event?.participationMode || "INDIVIDUAL";
     if (participationMode === "TEAM") return ["TEAM"];
@@ -241,6 +264,23 @@ export default function StudentEventDetails({ mode = "details" }) {
   const eventVisibilityScope = String(event?.visibilityScope || "COLLEGE").toUpperCase();
   const eventVisibilityDepartment = String(event?.visibilityDepartment || "").trim();
   const isDepartmentEvent = eventVisibilityScope === "DEPARTMENT" && Boolean(eventVisibilityDepartment);
+  const departmentOptions = useMemo(() => {
+    const base = [...DEPARTMENT_OPTIONS];
+    if (isDepartmentEvent && eventVisibilityDepartment) {
+      const exists = base.some(
+        (option) => option.toLowerCase() === eventVisibilityDepartment.toLowerCase()
+      );
+      if (!exists) return [eventVisibilityDepartment, ...base];
+    }
+    return base;
+  }, [isDepartmentEvent, eventVisibilityDepartment]);
+
+  useEffect(() => {
+    if (!lockedDepartment) return;
+    setLeaderProfile((prev) =>
+      prev.branch === lockedDepartment ? prev : { ...prev, branch: lockedDepartment }
+    );
+  }, [lockedDepartment]);
 
   useEffect(() => {
     if (!allowedRegistrationTypes.includes(registrationType)) {
@@ -304,6 +344,7 @@ export default function StudentEventDetails({ mode = "details" }) {
   }, [isDepartmentEvent, eventVisibilityDepartment]);
 
   const updateLeaderField = (field, value) => {
+    if (field === "branch") return;
     setLeaderProfile((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -408,7 +449,10 @@ export default function StudentEventDetails({ mode = "details" }) {
         url: SummaryApi.register_for_event.url.replace(":eventId", eventId),
         data: {
           teamName: isTeamRegistration ? String(teamName || "").trim() : undefined,
-          teamLeader: profileToParticipant(leaderProfile),
+          teamLeader: profileToParticipant({
+            ...leaderProfile,
+            branch: lockedDepartment || leaderProfile.branch,
+          }),
           teamMembers: isTeamRegistration ? teamMembers.map(profileToParticipant) : [],
         },
       });
@@ -428,6 +472,7 @@ export default function StudentEventDetails({ mode = "details" }) {
             : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
       };
       setMessage(popupPayload);
+      pushToast(popupPayload);
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
       setEvent((prev) =>
@@ -477,6 +522,17 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   return (
     <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
+      {toast && (
+        <div className="fixed top-6 right-6 z-50">
+          <div
+            className={`rounded-xl px-4 py-3 shadow-lg text-sm ${
+              toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            }`}
+          >
+            {toast.text}
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -626,7 +682,12 @@ export default function StudentEventDetails({ mode = "details" }) {
                       <input type="email" placeholder="Email Address *" value={leaderProfile.email} onChange={(eventValue) => updateLeaderField("email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input placeholder="Department *" value={leaderProfile.branch} onChange={(eventValue) => updateLeaderField("branch", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input
+                        placeholder="Department *"
+                        value={leaderProfile.branch}
+                        readOnly
+                        className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-not-allowed"
+                      />
                       <input placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                     </div>
 
@@ -653,13 +714,26 @@ export default function StudentEventDetails({ mode = "details" }) {
                                 <input placeholder="Email Address *" value={member.email} onChange={(eventValue) => updateMemberField(index, "email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
-                                <input
-                                  placeholder="Department *"
-                                  value={isDepartmentEvent ? eventVisibilityDepartment : member.branch}
-                                  onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)}
-                                  readOnly={isDepartmentEvent}
-                                  className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
-                                />
+                                {isDepartmentEvent ? (
+                                  <input
+                                    value={eventVisibilityDepartment}
+                                    readOnly
+                                    className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 cursor-not-allowed"
+                                  />
+                                ) : (
+                                  <select
+                                    value={member.branch}
+                                    onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)}
+                                    className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
+                                  >
+                                    <option value="">Select department</option>
+                                    {departmentOptions.map((department) => (
+                                      <option key={department} value={department}>
+                                        {department}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
                                 <input placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                               </div>
                             </div>

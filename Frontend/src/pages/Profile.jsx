@@ -16,6 +16,20 @@ const ROLE_LABELS = {
 };
 
 const EDUCATION_LEVELS = ["10th", "12th", "Diploma", "Engineering"];
+const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "MINING"];
+
+const normalizeDepartment = (value) => {
+  const next = String(value || "").trim();
+  if (!next) return "";
+  const upper = next.toUpperCase();
+  if (DEPARTMENT_OPTIONS.includes(upper)) return upper;
+  if (upper.includes("COMPUTER")) return "COMPUTER";
+  if (upper.includes("CIVIL")) return "CIVIL";
+  if (upper.includes("MECHANICAL")) return "MECHANICAL";
+  if (upper.includes("ELECTRICAL") || upper.includes("EEE")) return "ELECTRICAL";
+  if (upper.includes("MINING")) return "MINING";
+  return "";
+};
 
 const emptyForm = {
   fullName: "",
@@ -32,10 +46,10 @@ const userToForm = (user) => ({
   fullName: user?.fullName || "",
   mobileNumber: user?.mobileNumber || "",
   collegeName: user?.collegeName || "",
-  academicBranch: user?.academicProfile?.branch || "",
+  academicBranch: normalizeDepartment(user?.academicProfile?.branch),
   academicYear: user?.academicProfile?.year || "",
   educationLevel: user?.educationLevel || "",
-  professionalDepartment: user?.professionalProfile?.department || "",
+  professionalDepartment: normalizeDepartment(user?.professionalProfile?.department),
   professionalOccupation: user?.professionalProfile?.occupation || "",
 });
 
@@ -110,6 +124,8 @@ export default function Profile() {
     setLoading((prev) => ({ ...prev, save: true }));
     setMessage(null);
     try {
+      const academicDepartment = normalizeDepartment(formData.academicBranch);
+      const professionalDepartment = normalizeDepartment(formData.professionalDepartment);
       const payload = {
         fullName: formData.fullName.trim(),
         mobileNumber: formData.mobileNumber.trim() || undefined,
@@ -119,14 +135,14 @@ export default function Profile() {
 
       if (isStudent) {
         payload.academicProfile = {
-          branch: formData.academicBranch.trim() || undefined,
+          branch: academicDepartment || undefined,
           year: formData.academicYear || undefined,
         };
       }
 
       if (canEditProfessional) {
         payload.professionalProfile = {
-          department: formData.professionalDepartment.trim() || undefined,
+          department: professionalDepartment || undefined,
           occupation: formData.professionalOccupation.trim() || undefined,
         };
       }
@@ -339,13 +355,19 @@ export default function Profile() {
                       </label>
                       <label className="block">
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
-                        <input
+                        <select
                           name="academicBranch"
                           value={formData.academicBranch}
                           onChange={handleChange}
-                          placeholder="e.g. Computer Engineering"
                           className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
-                        />
+                        >
+                          <option value="">Select department</option>
+                          {DEPARTMENT_OPTIONS.map((department) => (
+                            <option key={department} value={department}>
+                              {department}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                     </div>
                     {!hideAcademicYear && (
@@ -373,12 +395,19 @@ export default function Profile() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <label className="block">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Department</span>
-                      <input
+                      <select
                         name="professionalDepartment"
                         value={formData.professionalDepartment}
                         onChange={handleChange}
                         className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
-                      />
+                      >
+                        <option value="">Select department</option>
+                        {DEPARTMENT_OPTIONS.map((department) => (
+                          <option key={department} value={department}>
+                            {department}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                     <label className="block">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Occupation</span>
