@@ -2,7 +2,7 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
-import upload from "../middleware/multer.middleware.js";
+import { eventUpload } from "../middleware/multer.middleware.js";
 import {
   createEventController,
   publishEvent,
@@ -22,7 +22,10 @@ router.post(
   "/",
   authMiddleware,
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
-  upload.single("poster"),
+  eventUpload.fields([
+    { name: "poster", maxCount: 1 },
+    { name: "resourceFile", maxCount: 1 }
+  ]),
   createEventController
 );
 

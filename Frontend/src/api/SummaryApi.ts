@@ -182,6 +182,14 @@ const SummaryApi = {
     url: "/api/registrations/team/:registrationId/resend-invites",
     method: "post",
   },
+  lookup_team_member_profile: {
+    url: "/api/registrations/team/:eventId/member-lookup",
+    method: "get",
+  },
+  update_team_member_email: {
+    url: "/api/registrations/team/:registrationId/member-email",
+    method: "patch",
+  },
 
   get_team_invite: {
     url: "/api/registrations/invite/:token",

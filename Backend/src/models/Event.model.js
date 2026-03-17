@@ -20,6 +20,12 @@ const EventSchema = new mongoose.Schema(
     },
 
     posterUrl: String,
+    resource: {
+      name: String,
+      url: String,
+      mimeType: String,
+      uploadedAt: Date
+    },
 
     /* ================= ORGANIZER ================= */
 

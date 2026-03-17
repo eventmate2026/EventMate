@@ -25,6 +25,9 @@ export default function StudentTeamRegistration() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState(false);
+  const [updatingEmailIndex, setUpdatingEmailIndex] = useState(null);
+  const [editingEmailIndex, setEditingEmailIndex] = useState(null);
+  const [emailDrafts, setEmailDrafts] = useState({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(null);
   const [registration, setRegistration] = useState(null);
@@ -53,6 +56,11 @@ export default function StudentTeamRegistration() {
     loadStatus();
   }, [registrationId]);
 
+  useEffect(() => {
+    setEditingEmailIndex(null);
+    setEmailDrafts({});
+  }, [registration?.registrationId]);
+
   const handleResend = async () => {
     if (!registrationId || resending) return;
     setResending(true);
@@ -80,10 +88,58 @@ export default function StudentTeamRegistration() {
     }
   };
 
+  const startEmailEdit = (index, email) => {
+    setEditingEmailIndex(index);
+    setEmailDrafts((prev) => ({ ...prev, [index]: email || "" }));
+  };
+
+  const cancelEmailEdit = () => {
+    setEditingEmailIndex(null);
+  };
+
+  const handleEmailSave = async (member, index) => {
+    const nextEmail = String(emailDrafts[index] || "").trim();
+    if (!nextEmail) {
+      setNotice({ type: "error", text: "Email is required." });
+      return;
+    }
+    if (!registrationId || !member?.email) return;
+
+    setUpdatingEmailIndex(index);
+    setNotice(null);
+    try {
+      const response = await api({
+        ...SummaryApi.update_team_member_email,
+        url: SummaryApi.update_team_member_email.url.replace(
+          ":registrationId",
+          encodeURIComponent(registrationId || "")
+        ),
+        data: {
+          currentEmail: member.email,
+          nextEmail,
+        },
+      });
+      setNotice({
+        type: "success",
+        text: response.data?.message || "Team member email updated.",
+      });
+      await loadStatus({ silent: true });
+      setEditingEmailIndex(null);
+    } catch (updateError) {
+      setNotice({
+        type: "error",
+        text: updateError.response?.data?.message || "Unable to update team member email.",
+      });
+    } finally {
+      setUpdatingEmailIndex(null);
+    }
+  };
+
   const statusSummary = useMemo(() => registration?.summary || null, [registration]);
   const canResend =
     registration?.status === "PendingMemberVerification" &&
     ((statusSummary?.pending || 0) + (statusSummary?.awaitingSignup || 0) > 0);
+  const canEditMembers = registration?.status === "PendingMemberVerification";
 
   return (
     <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
@@ -186,15 +242,66 @@ export default function StudentTeamRegistration() {
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40">
                     {registration.members?.length ? (
-                      registration.members.map((member) => {
+                      registration.members.map((member, index) => {
                         const status = String(member?.status || "PENDING").trim();
+                        const normalizedStatus = status.toUpperCase();
+                        const isMemberEditable =
+                          canEditMembers &&
+                          String(member?.role || "").toLowerCase() !== "leader" &&
+                          (normalizedStatus === "PENDING" || normalizedStatus === "AWAITING_SIGNUP");
+                        const isEditing = editingEmailIndex === index;
+                        const draftEmail = emailDrafts[index] ?? member.email ?? "";
                         return (
-                          <tr key={member.email || member.name}>
+                          <tr key={`${member.email || member.name}-${index}`}>
                             <td className="px-3 py-3 font-semibold text-slate-900 dark:text-white">
                               {member.name || "Member"}
                             </td>
                             <td className="px-3 py-3 text-slate-600 dark:text-slate-300">
-                              {member.email || "-"}
+                              {isEditing ? (
+                                <div className="flex flex-col gap-2">
+                                  <input
+                                    value={draftEmail}
+                                    onChange={(event) =>
+                                      setEmailDrafts((prev) => ({
+                                        ...prev,
+                                        [index]: event.target.value,
+                                      }))
+                                    }
+                                    placeholder="Enter email"
+                                    className="w-full rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1.5 text-xs text-slate-900 dark:text-slate-100"
+                                  />
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEmailSave(member, index)}
+                                      disabled={updatingEmailIndex === index}
+                                      className="rounded-md bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                                    >
+                                      {updatingEmailIndex === index ? "Saving..." : "Save"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEmailEdit}
+                                      className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="break-all">{member.email || "-"}</span>
+                                  {isMemberEditable && (
+                                    <button
+                                      type="button"
+                                      onClick={() => startEmailEdit(index, member.email)}
+                                      className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
+                                    >
+                                      Change
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-slate-600 dark:text-slate-300">
                               {formatRole(member?.role)}

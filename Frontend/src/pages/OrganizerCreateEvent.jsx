@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CalendarDays, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -29,11 +29,18 @@ const initialForm = {
   visibilityDepartment: "",
 };
 
+const MAX_RESOURCE_SIZE_MB = 10;
 const fieldClass =
   "w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 dark:text-slate-100 dark:placeholder-slate-500 dark:[color-scheme:dark]";
 const dateTimeFieldClass = `${fieldClass} dark:[color-scheme:dark]`;
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const formatBytes = (bytes = 0) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+};
 
 export default function OrganizerCreateEvent() {
   const navigate = useNavigate();
@@ -51,6 +58,8 @@ export default function OrganizerCreateEvent() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const resourceInputRef = useRef(null);
+  const [resourceError, setResourceError] = useState("");
   const [coordinatorOptions, setCoordinatorOptions] = useState([]);
   const [coordinatorPick, setCoordinatorPick] = useState("");
   const [selectedCoordinatorIds, setSelectedCoordinatorIds] = useState([]);
@@ -127,7 +136,12 @@ export default function OrganizerCreateEvent() {
       return;
     }
     if (type === "file") {
-      setForm((prev) => ({ ...prev, [name]: files?.[0] || null }));
+      const nextFile = files?.[0] || null;
+      if (name === "resourceFile") {
+        handleResourceFile(nextFile);
+        return;
+      }
+      setForm((prev) => ({ ...prev, [name]: nextFile }));
       return;
     }
     if (name === "visibilityScope") {
@@ -140,6 +154,43 @@ export default function OrganizerCreateEvent() {
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleResourceFile = (file) => {
+    if (!file) {
+      setForm((prev) => ({ ...prev, resourceFile: null }));
+      setResourceError("");
+      return;
+    }
+
+    const isPdf = file.type === "application/pdf";
+    const isImage = file.type.startsWith("image/");
+    if (!isPdf && !isImage) {
+      setResourceError("Only PNG, JPG, or PDF files are supported.");
+      setForm((prev) => ({ ...prev, resourceFile: null }));
+      return;
+    }
+
+    if (file.size > MAX_RESOURCE_SIZE_MB * 1024 * 1024) {
+      setResourceError(`Resource file must be under ${MAX_RESOURCE_SIZE_MB}MB.`);
+      setForm((prev) => ({ ...prev, resourceFile: null }));
+      return;
+    }
+
+    setResourceError("");
+    setForm((prev) => ({ ...prev, resourceFile: file }));
+  };
+
+  const clearResourceFile = () => {
+    setForm((prev) => ({ ...prev, resourceFile: null }));
+    setResourceError("");
+    if (resourceInputRef.current) {
+      resourceInputRef.current.value = "";
+    }
+  };
+
+  const triggerResourcePicker = () => {
+    resourceInputRef.current?.click();
   };
 
   const handleListItemChange = (setter, index, key, value) => {
@@ -260,6 +311,9 @@ export default function OrganizerCreateEvent() {
     payload.append("isTeamEvent", String(isTeamEvent));
     payload.append("minTeamSize", isTeamEvent ? String(Number(form.minTeamSize || 2)) : "1");
     payload.append("maxTeamSize", isTeamEvent ? String(Number(form.maxTeamSize || 4)) : "1");
+    if (form.resourceFile) {
+      payload.append("resourceFile", form.resourceFile);
+    }
 
     return payload;
   };
@@ -342,6 +396,10 @@ export default function OrganizerCreateEvent() {
 
       setForm(buildInitialForm());
       setPreviewUrl("");
+      setResourceError("");
+      if (resourceInputRef.current) {
+        resourceInputRef.current.value = "";
+      }
       setCoordinatorPick("");
       setSelectedCoordinatorIds([]);
       setJudges([]);
@@ -798,20 +856,54 @@ export default function OrganizerCreateEvent() {
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Schedule & Resources</p>
                 <button
                   type="button"
-                  onClick={() => setMessage({ type: "success", text: "Resources upload is optional and not required for publish." })}
+                  onClick={triggerResourcePicker}
                   className="text-xs font-semibold text-indigo-600 dark:text-indigo-300"
                 >
                   + Add Resource / Schedule
                 </button>
               </div>
 
-              <label className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-white/20 p-5 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5">
+              <label
+                className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-white/20 p-5 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const dropped = event.dataTransfer?.files?.[0];
+                  if (dropped) handleResourceFile(dropped);
+                }}
+              >
                 <UploadCloud size={18} className="text-indigo-500" />
                 <span className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                   Upload a file or drag and drop (PNG, JPG, PDF up to 10MB)
                 </span>
-                <input type="file" name="resourceFile" onChange={handleChange} accept=".pdf,.png,.jpg,.jpeg" className="hidden" />
+                <input
+                  ref={resourceInputRef}
+                  type="file"
+                  name="resourceFile"
+                  onChange={handleChange}
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  className="hidden"
+                />
               </label>
+              {resourceError && (
+                <p className="mt-2 text-xs text-rose-600 dark:text-rose-300 text-center">
+                  {resourceError}
+                </p>
+              )}
+              {form.resourceFile && (
+                <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-white/5 px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                  <span className="truncate">
+                    {form.resourceFile.name} · {formatBytes(form.resourceFile.size)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearResourceFile}
+                    className="text-rose-600 hover:text-rose-700 dark:text-rose-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400 text-center">
                 Resource upload is optional.
               </p>

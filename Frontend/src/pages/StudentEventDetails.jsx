@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -146,6 +146,10 @@ export default function StudentEventDetails({ mode = "details" }) {
     studentAuthenticity: false,
     certificateAwareness: false,
   });
+  const [memberLookupErrors, setMemberLookupErrors] = useState({});
+  const [memberLookupLoading, setMemberLookupLoading] = useState({});
+  const memberLookupCache = useRef(new Map());
+  const pendingMemberLookup = useRef({});
 
   useEffect(() => {
     const fetchEventDetails = async () => {
@@ -218,6 +222,10 @@ export default function StudentEventDetails({ mode = "details" }) {
             ? [createBlankProfile(isDepartmentVisibility ? mappedVisibilityDepartment : "")]
             : []
         );
+        setMemberLookupErrors({});
+        setMemberLookupLoading({});
+        memberLookupCache.current.clear();
+        pendingMemberLookup.current = {};
         setTeamName("");
         setLeaderProfile(createDefaultProfile(user));
         setDeclarations({
@@ -349,6 +357,78 @@ export default function StudentEventDetails({ mode = "details" }) {
         memberIndex === index ? { ...member, [field]: value } : member
       )
     );
+  };
+
+  const applyMemberProfile = (index, profile) => {
+    if (!profile) return;
+    setTeamMembers((prev) =>
+      prev.map((member, memberIndex) => {
+        if (memberIndex !== index) return member;
+        return {
+          ...member,
+          fullName: profile.fullName || member.fullName,
+          email: profile.email || member.email,
+          mobileNumber: profile.mobileNumber || member.mobileNumber,
+          collegeName: profile.collegeName || member.collegeName,
+          branch: profile.branch || member.branch,
+          year: profile.year || member.year,
+        };
+      })
+    );
+  };
+
+  const handleMemberEmailChange = (index, value) => {
+    updateMemberField(index, "email", value);
+    setMemberLookupErrors((prev) => ({ ...prev, [index]: "" }));
+    setMemberLookupLoading((prev) => ({ ...prev, [index]: false }));
+  };
+
+  const lookupMemberProfile = async (index, emailValue) => {
+    const rawEmail = String(emailValue || "").trim();
+    if (!rawEmail) return;
+    const normalized = normalizeEmail(rawEmail);
+
+    pendingMemberLookup.current[index] = normalized;
+    setMemberLookupErrors((prev) => ({ ...prev, [index]: "" }));
+
+    if (memberLookupCache.current.has(normalized)) {
+      const cached = memberLookupCache.current.get(normalized);
+      if (pendingMemberLookup.current[index] === normalized && cached) {
+        applyMemberProfile(index, cached);
+      }
+      return;
+    }
+
+    setMemberLookupLoading((prev) => ({ ...prev, [index]: true }));
+    try {
+      const response = await api({
+        ...SummaryApi.lookup_team_member_profile,
+        url: SummaryApi.lookup_team_member_profile.url.replace(
+          ":eventId",
+          encodeURIComponent(eventId || "")
+        ),
+        params: { email: rawEmail },
+      });
+      if (pendingMemberLookup.current[index] !== normalized) return;
+      const payload = response.data?.data;
+      setMemberLookupLoading((prev) => ({ ...prev, [index]: false }));
+
+      if (payload?.exists && payload?.profile) {
+        memberLookupCache.current.set(normalized, payload.profile);
+        applyMemberProfile(index, payload.profile);
+      } else {
+        memberLookupCache.current.set(normalized, null);
+      }
+    } catch (lookupError) {
+      if (pendingMemberLookup.current[index] !== normalized) return;
+      setMemberLookupLoading((prev) => ({ ...prev, [index]: false }));
+      setMemberLookupErrors((prev) => ({
+        ...prev,
+        [index]:
+          lookupError.response?.data?.message ||
+          "Unable to fetch saved profile for this email.",
+      }));
+    }
   };
 
   const addMember = () => {
@@ -730,7 +810,25 @@ export default function StudentEventDetails({ mode = "details" }) {
                               </div>
                               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <input placeholder="Full Name *" value={member.fullName} onChange={(eventValue) => updateMemberField(index, "fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
-                                <input placeholder="Email Address *" value={member.email} onChange={(eventValue) => updateMemberField(index, "email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <div className="space-y-1">
+                                  <input
+                                    placeholder="Email Address *"
+                                    value={member.email}
+                                    onChange={(eventValue) => handleMemberEmailChange(index, eventValue.target.value)}
+                                    onBlur={() => lookupMemberProfile(index, member.email)}
+                                    className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
+                                  />
+                                  {memberLookupLoading[index] && (
+                                    <p className="text-[10px] text-slate-400">
+                                      Checking saved profile...
+                                    </p>
+                                  )}
+                                  {!memberLookupLoading[index] && memberLookupErrors[index] && (
+                                    <p className="text-[10px] text-rose-600 dark:text-rose-300">
+                                      {memberLookupErrors[index]}
+                                    </p>
+                                  )}
+                                </div>
                                 <input placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <input placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 {isDepartmentEvent ? (

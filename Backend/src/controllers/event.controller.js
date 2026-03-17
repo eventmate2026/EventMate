@@ -34,7 +34,10 @@ const parseVisibilityPayload = (raw) => {
 
 export const createEventController = asyncHandler(async (req, res) => {
 
-  if (!req.file) {
+  const posterFile = req.files?.poster?.[0] || req.file;
+  const resourceFile = req.files?.resourceFile?.[0];
+
+  if (!posterFile) {
     return res.status(400).json({
       success: false,
       message: "Event poster is required"
@@ -63,8 +66,34 @@ export const createEventController = asyncHandler(async (req, res) => {
     });
   }
 
-  // Upload to Cloudinary
-  const uploaded = await uploadImageCloudinary(req.file);
+  if (posterFile?.size && posterFile.size > 5 * 1024 * 1024) {
+    return res.status(400).json({
+      success: false,
+      message: "Event poster must be 5MB or smaller"
+    });
+  }
+
+  // Upload poster to Cloudinary
+  const uploaded = await uploadImageCloudinary(posterFile, {
+    folder: "eventmate/events/posters",
+    resourceType: "image"
+  });
+
+  let resourcePayload = null;
+  if (resourceFile) {
+    const isPdf = resourceFile.mimetype === "application/pdf";
+    const uploadedResource = await uploadImageCloudinary(resourceFile, {
+      folder: "eventmate/events/resources",
+      resourceType: isPdf ? "raw" : "image",
+      ...(isPdf ? { format: "pdf" } : {})
+    });
+    resourcePayload = {
+      name: resourceFile.originalname,
+      url: uploadedResource.url,
+      mimeType: resourceFile.mimetype,
+      uploadedAt: new Date()
+    };
+  }
 
   const visibilityPayload = parseVisibilityPayload(visibility);
   const visibilityScope = String(visibilityPayload?.scope || "").toUpperCase() === "DEPARTMENT"
@@ -93,6 +122,7 @@ export const createEventController = asyncHandler(async (req, res) => {
     description,
     category,
     posterUrl: uploaded.url,
+    ...(resourcePayload ? { resource: resourcePayload } : {}),
 
     organizer: {
       organizerId: req.user._id,

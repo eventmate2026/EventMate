@@ -992,6 +992,206 @@ export const resendTeamInvites = async (registrationId, requesterId) => {
 };
 
 /* ================================================
+   UPDATE TEAM MEMBER EMAIL
+   Team leader can fix a member email before acceptance
+================================================ */
+
+export const updateTeamMemberEmail = async (registrationId, requesterId, payload) => {
+  const currentEmail = normalizeEmail(payload?.currentEmail);
+  const nextEmail = normalizeEmail(payload?.nextEmail);
+
+  if (!currentEmail || !nextEmail) {
+    throw new Error("Current email and new email are required.");
+  }
+  if (currentEmail === nextEmail) {
+    return {
+      message: "Email is unchanged.",
+      data: { email: nextEmail }
+    };
+  }
+
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  if (registration.registeredBy.toString() !== requesterId.toString()) {
+    throw new Error("Not authorized to update this registration");
+  }
+
+  if (String(registration.status || "") !== "PendingMemberVerification") {
+    throw new Error("Team member emails can only be updated while invitations are pending.");
+  }
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+  if (!event.isTeamEvent) throw new Error("This registration is not a team registration");
+
+  const leaderEmail = normalizeEmail(registration?.teamLeader?.email);
+  if (leaderEmail && nextEmail === leaderEmail) {
+    throw new Error("Team leader email cannot be used as a team member.");
+  }
+
+  const memberIndex = registration.teamMembers.findIndex(
+    (member) => normalizeEmail(member?.email) === currentEmail
+  );
+  if (memberIndex < 0) throw new Error("Team member not found");
+
+  const duplicateMember = registration.teamMembers.some((member, idx) => {
+    if (idx === memberIndex) return false;
+    return normalizeEmail(member?.email) === nextEmail;
+  });
+  if (duplicateMember) {
+    throw new Error("This email is already added to the team.");
+  }
+
+  const organizerEmail = normalizeEmail(event?.organizer?.contactEmail);
+  if (organizerEmail && organizerEmail === nextEmail) {
+    throw new Error("Organizer email cannot be used as a team member.");
+  }
+
+  const coordinatorEmails = new Set(
+    (event?.studentCoordinators || []).map((coordinator) => normalizeEmail(coordinator?.email)).filter(Boolean)
+  );
+  if (coordinatorEmails.has(nextEmail)) {
+    throw new Error("Assigned coordinators cannot be added as team members.");
+  }
+
+  const restrictedUser = await User.findOne({
+    role: { $in: ["STUDENT_COORDINATOR", "ORGANIZER", "MAIN_ADMIN"] },
+    email: nextEmail
+  }).select("email role lastLoginAt");
+  if (restrictedUser) {
+    throw new Error("Admin, organizer, or coordinator accounts cannot be added as team participants");
+  }
+
+  const existingInvite = await TeamInvitation.findOne({
+    registration: registration._id,
+    email: currentEmail
+  });
+  if (existingInvite && ["ACCEPTED", "REJECTED"].includes(existingInvite.status)) {
+    throw new Error("This member has already responded to the invitation.");
+  }
+
+  const conflictingInvite = await TeamInvitation.findOne({
+    registration: registration._id,
+    email: nextEmail
+  });
+  if (conflictingInvite) {
+    throw new Error("This email already has a pending invitation.");
+  }
+
+  registration.teamMembers[memberIndex].email = nextEmail;
+  registration.teamMembers[memberIndex].emailVerified = false;
+  await registration.save();
+
+  if (currentEmail) {
+    await MemberVerification.deleteMany({
+      registration: registration._id,
+      email: currentEmail
+    });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const existingUser = await User.findOne({ email: nextEmail }).select("_id email lastLoginAt");
+  const hasSignedIn = Boolean(existingUser?.lastLoginAt);
+  const inviteStatus = hasSignedIn ? "PENDING" : "AWAITING_SIGNUP";
+  const invitePayload = {
+    email: nextEmail,
+    name: registration.teamMembers[memberIndex]?.name || "Member",
+    role: "member",
+    token,
+    status: inviteStatus,
+    user: existingUser?._id || null,
+    inviteSentAt: inviteStatus === "PENDING" ? new Date() : null,
+    respondedAt: null
+  };
+
+  let inviteDoc = null;
+  if (existingInvite) {
+    await TeamInvitation.updateOne(
+      { _id: existingInvite._id },
+      { $set: invitePayload }
+    );
+    inviteDoc = { ...existingInvite.toObject(), ...invitePayload };
+  } else {
+    inviteDoc = await TeamInvitation.create({
+      registration: registration._id,
+      ...invitePayload
+    });
+  }
+
+  if (inviteDoc) {
+    try {
+      if (inviteStatus === "PENDING") {
+        await sendTeamInvitationEmail({ invite: inviteDoc, event, registration });
+        await TeamInvitation.updateOne(
+          { _id: inviteDoc._id },
+          { $set: { inviteSentAt: new Date() } }
+        );
+      } else if (inviteStatus === "AWAITING_SIGNUP") {
+        await sendTeamSignupEmail({ invite: inviteDoc, event, registration });
+        await TeamInvitation.updateOne(
+          { _id: inviteDoc._id },
+          { $set: { inviteSentAt: new Date() } }
+        );
+      }
+    } catch (error) {
+      console.error("Team invite email error:", error.message);
+    }
+  }
+
+  return {
+    message: "Team member email updated successfully.",
+    data: { email: nextEmail }
+  };
+};
+
+/* ================================================
+   LOOKUP TEAM MEMBER PROFILE (PRE-REGISTRATION)
+================================================ */
+
+export const lookupTeamMemberProfile = async (eventId, requesterId, email) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    throw new Error("Email is required.");
+  }
+
+  const requester = await User.findById(requesterId).select("role email");
+  if (!requester) throw new Error("User not found");
+
+  const event = await Event.findById(eventId).select(
+    "isTeamEvent organizer studentCoordinators visibility"
+  );
+  if (!event) throw new Error("Event not found");
+  if (!event.isTeamEvent) throw new Error("This event is not a team registration");
+
+  const user = await User.findOne({ email: normalizedEmail }).select(
+    "fullName email mobileNumber collegeName academicProfile professionalProfile role"
+  );
+  if (!user) {
+    return { exists: false };
+  }
+
+  const role = String(user?.role || "").toUpperCase();
+  if (role !== "STUDENT") {
+    throw new Error("Admin, organizer, or coordinator accounts cannot be added as team participants");
+  }
+
+  const profile = {
+    fullName: user.fullName || "",
+    email: user.email || normalizedEmail,
+    mobileNumber: user.mobileNumber || "",
+    collegeName: user.collegeName || "",
+    branch: user.academicProfile?.branch || user.professionalProfile?.department || "",
+    year: user.academicProfile?.year || ""
+  };
+
+  return {
+    exists: true,
+    profile
+  };
+};
+
+/* ================================================
    SEND PENDING TEAM INVITES AFTER SIGN-IN
 ================================================ */
 

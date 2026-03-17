@@ -193,6 +193,41 @@ export const resendTeamInvites = async (req, res, next) => {
   }
 };
 
+// Team leader - lookup existing member profile by email
+export const lookupTeamMemberProfile = async (req, res, next) => {
+  try {
+    const result = await registrationService.lookupTeamMemberProfile(
+      req.params.eventId,
+      req.user._id,
+      req.query?.email
+    );
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Team leader - update team member email
+export const updateTeamMemberEmail = async (req, res, next) => {
+  try {
+    const result = await registrationService.updateTeamMemberEmail(
+      req.params.registrationId,
+      req.user._id,
+      req.body
+    );
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Remove winner tag (one-time undo)
 export const untagWinner = async (req, res, next) => {
   try {

@@ -17,6 +17,7 @@ export default function VerifyEmail() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === "email") return;
     setFormData((prev) => ({ ...prev, [name]: value.trim() }));
   };
 
@@ -62,9 +63,10 @@ export default function VerifyEmail() {
               name="email"
               type="email"
               value={formData.email}
-              onChange={handleChange}
+              readOnly
+              aria-readonly="true"
               placeholder="you@college.edu"
-              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/60 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40 cursor-not-allowed"
             />
           </div>
           <div>

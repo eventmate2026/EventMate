@@ -9,6 +9,8 @@ import {
   getTeamInvitationDetails,
   respondToTeamInvitation,
   resendTeamInvites,
+  lookupTeamMemberProfile,
+  updateTeamMemberEmail,
   getMyRegistrations,
   getEventRegistrations,
   markAttendanceManual,
@@ -37,6 +39,12 @@ router.post("/team/:registrationId/confirm", authMiddleware, confirmTeamRegistra
 
 // Team leader - resend team invitations
 router.post("/team/:registrationId/resend-invites", authMiddleware, resendTeamInvites);
+
+// Team leader - lookup member profile by email
+router.get("/team/:eventId/member-lookup", authMiddleware, lookupTeamMemberProfile);
+
+// Team leader - update team member email
+router.patch("/team/:registrationId/member-email", authMiddleware, updateTeamMemberEmail);
 
 // Student sees their own registrations + QRs
 router.get("/my", authMiddleware, getMyRegistrations);
