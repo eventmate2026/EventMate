@@ -25,7 +25,7 @@ const EMPTY_FORM = {
   department: "",
 };
 
-const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "MINING"];
+const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "ELECTRONICS", "MINING"];
 
 const normalizeDepartment = (value) => {
   const next = String(value || "").trim();

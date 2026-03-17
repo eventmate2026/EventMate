@@ -19,7 +19,7 @@ const ROLE_LABELS = {
 };
 
 const EDUCATION_LEVELS = ["10th", "12th", "Diploma", "Engineering"];
-const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "MINING"];
+const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "ELECTRONICS", "MINING"];
 
 const normalizeDepartment = (value) => {
   const next = String(value || "").trim();

@@ -28,7 +28,7 @@ const registrationTypeLabels = {
   TEAM: "Team",
 };
 
-const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "MINING"];
+const DEPARTMENT_OPTIONS = ["COMPUTER", "CIVIL", "MECHANICAL", "ELECTRICAL", "ELECTRONICS", "MINING"];
 
 const createBlankProfile = (department = "") => ({
   fullName: "",

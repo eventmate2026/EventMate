@@ -3,13 +3,27 @@ import { Link } from "react-router-dom";
 import { Rocket, Sparkles, Users2 } from "lucide-react";
 
 const TEAM_MEMBERS = [
-  { name: "Dakshat Nagrale" },
-  { name: "Saksham Khaire" },
-  { name: "Aditya Jambhulkar", role: "Team Leader", isLead: true },
-  { name: "Abhinay Borkar" },
-  { name: "Tanvi Uttaarwar" },
-  { name: "Tushar Waratkar" },
-  { name: "Samyak Waghmare" },
+  {
+    name: "Aditya Jambhulkar",
+    role: "Leader & UI/UX Designer",
+    githubUrl: "https://github.com/adityaj143",
+    isLead: true,
+  },
+  {
+    name: "Dakshat Nagrale",
+    role: "Frontend Developer",
+    githubUrl: "https://github.com/DakshatNagrale",
+  },
+  {
+    name: "Abhinay Borkar",
+    role: "Backend Developer",
+    githubUrl: "https://github.com/off-abhi-1287",
+  },
+  {
+    name: "Saksham Khaire",
+    role: "Database Admin",
+    githubUrl: "https://github.com/off-saksham-2007",
+  },
 ];
 
 const VALUE_PANELS = [
@@ -52,6 +66,13 @@ const buildInitials = (name) =>
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+
+const formatGithubHandle = (url) => {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/github\.com\/([^/]+)$/i);
+  return match ? match[1] : trimmed;
+};
 
 export default function DeveloperTeam() {
   const prefersReducedMotion = useReducedMotion();
@@ -159,8 +180,18 @@ export default function DeveloperTeam() {
                     {member.name}
                   </h3>
                   <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-500 dark:text-slate-400">
-                    EliteX Core Team
+                    {member.role}
                   </p>
+                  {member.githubUrl && (
+                    <a
+                      href={member.githubUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-cyan-200 dark:hover:text-cyan-100"
+                    >
+                      GitHub: {formatGithubHandle(member.githubUrl)}
+                    </a>
+                  )}
                   <div className="mt-4 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                     Building EventMate experiences
