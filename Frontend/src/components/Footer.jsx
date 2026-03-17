@@ -133,7 +133,7 @@ export default function Footer() {
             <div className="mt-4 space-y-2 text-sm text-gray-600 dark:text-slate-300">
               <p>
                 <span className="font-medium text-indigo-600 dark:text-cyan-300">Email: </span>
-                eventmate@gmail.com
+                eventmate2026@gmail.com
               </p>
               <p>
                 <span className="font-medium text-indigo-600 dark:text-indigo-300">Address: </span>

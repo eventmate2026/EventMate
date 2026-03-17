@@ -71,13 +71,15 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   };
   const currentProfilePath = roleProfilePath[user?.role] || "/profile";
   const currentNotificationsPath = roleNotificationsPath[user?.role] || "";
-  const hideNavExtras = location.pathname.startsWith("/profile/customization");
+  const hideNavExtras = [
+    "/profile",
+    "/organizer-dashboard/profile",
+    "/coordinator-dashboard/profile",
+    "/admin-dashboard/profile",
+  ].some((path) => location.pathname.startsWith(path));
   const handleProfileClick = () => {
     setIsUserMenuOpen(false);
     navigate(currentProfilePath);
-  };
-  const handleCoordinatorProfileMenu = () => {
-    setIsUserMenuOpen((prev) => !prev);
   };
   const toggleMobileProfileMenu = () => {
     setIsUserMenuOpen(false);
@@ -781,9 +783,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 <div className="relative ml-3 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={isCoordinator ? handleCoordinatorProfileMenu : handleProfileClick}
+                    onClick={() => setIsUserMenuOpen((prev) => !prev)}
                     className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300 transition duration-150 ease-in-out"
-                    aria-label={isCoordinator ? "Toggle user menu" : "Open profile"}
+                    aria-label="Toggle user menu"
                   >
                     <AvatarWithFrame
                       src={avatarUrl}
@@ -793,16 +795,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                       fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
                     />
                   </button>
-                  {!isCoordinator && (
-                    <button
-                      type="button"
-                      aria-label="Toggle user menu"
-                      className="rounded-full border border-slate-200 dark:border-white/10 p-1 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
-                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    >
-                      <ChevronDown size={16} />
-                    </button>
-                  )}
 
                   {/* Dropdown Menu */}
                   {isUserMenuOpen && (
