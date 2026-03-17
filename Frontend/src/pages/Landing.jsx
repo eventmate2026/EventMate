@@ -430,10 +430,10 @@ export default function Landing() {
       {/* --- UPCOMING EVENTS --- */}
       <section id="events" className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
         <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={stagger} className="mb-16">
-          <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-12">
-            <div>
+          <div className="flex flex-col md:flex-row justify-between items-center md:items-end gap-8 mb-12">
+            <div className="text-center md:text-left">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
-              <div className="w-24 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+              <div className="w-24 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full mx-auto md:mx-0"></div>
             </div>
 
             <div className="relative w-full md:w-96">
