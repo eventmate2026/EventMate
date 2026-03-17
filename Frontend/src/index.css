@@ -29,6 +29,14 @@ body {
     var(--ev-bg-light);
   color: var(--ev-text-light);
   overflow-x: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+:where(input, textarea, select, [contenteditable="true"], [contenteditable=""]) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 #root {

@@ -10,7 +10,7 @@ import {
   Sun
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
@@ -19,6 +19,7 @@ import SummaryApi from "../api/SummaryApi";
 const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false);
   const [isAdminUsersMenuOpen, setIsAdminUsersMenuOpen] = useState(false);
   const [roleUnreadCount, setRoleUnreadCount] = useState(0);
   const adminUsersMenuCloseTimeoutRef = useRef(null);
@@ -70,6 +71,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   };
   const currentProfilePath = roleProfilePath[user?.role] || "/profile";
   const currentNotificationsPath = roleNotificationsPath[user?.role] || "";
+  const hideNavExtras = location.pathname.startsWith("/profile/customization");
   const handleProfileClick = () => {
     setIsUserMenuOpen(false);
     navigate(currentProfilePath);
@@ -77,9 +79,13 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const handleCoordinatorProfileMenu = () => {
     setIsUserMenuOpen((prev) => !prev);
   };
-  const handleMobileProfileClick = () => {
-    handleProfileClick();
+  const toggleMobileProfileMenu = () => {
+    setIsUserMenuOpen(false);
     setIsMobileMenuOpen(false);
+    setIsMobileProfileOpen((prev) => !prev);
+  };
+  const handleMobileProfileClick = () => {
+    toggleMobileProfileMenu();
   };
 
   const studentRouteMap = {
@@ -174,6 +180,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const closeMenus = () => {
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
+    setIsMobileProfileOpen(false);
     closeAdminUsersMenuImmediately();
   };
 
@@ -261,6 +268,20 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const chromeTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.35, ease: [0.22, 1, 0.36, 1] };
+  const mobileProfilePanelMotion = prefersReducedMotion
+    ? {
+        initial: false,
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: 0 },
+      }
+    : {
+        initial: { opacity: 0, y: -10, scale: 0.98 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -6, scale: 0.98 },
+      };
+  const mobileProfilePanelTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
 
   return (
     <>
@@ -606,21 +627,23 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="hidden sm:ml-6 sm:flex sm:items-center gap-4">
             {isAdmin ? (
               <>
-                <Link
-                  to="/admin-dashboard/notifications"
-                  className="relative p-2 rounded-full text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300 transition"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-5 w-5" />
-                  {roleUnreadCount > 0 && (
-                    <>
-                      <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-indigo-500 animate-admin-ping" />
-                      <span className="absolute -top-1.5 -right-1.5 min-w-[18px] rounded-full bg-indigo-600 px-1 text-[10px] font-bold text-white text-center">
-                        {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
-                      </span>
-                    </>
-                  )}
-                </Link>
+                {!hideNavExtras && (
+                  <Link
+                    to="/admin-dashboard/notifications"
+                    className="relative p-2 rounded-full text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300 transition"
+                    aria-label="Notifications"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {roleUnreadCount > 0 && (
+                      <>
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-indigo-500 animate-admin-ping" />
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] rounded-full bg-indigo-600 px-1 text-[10px] font-bold text-white text-center">
+                          {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
+                        </span>
+                      </>
+                    )}
+                  </Link>
+                )}
                 <button
                   type="button"
                   aria-label="Toggle theme"
@@ -655,22 +678,24 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </>
             ) : isOrganizer ? (
               <>
-                <Link
-                  to="/organizer-dashboard/notifications"
-                  className={`relative p-2 rounded-full transition ${
-                    location.pathname.startsWith("/organizer-dashboard/notifications")
-                      ? "text-indigo-600 dark:text-indigo-300"
-                      : "text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300"
-                  }`}
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-5 w-5" />
-                  {roleUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1">
-                      {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
-                    </span>
-                  )}
-                </Link>
+                {!hideNavExtras && (
+                  <Link
+                    to="/organizer-dashboard/notifications"
+                    className={`relative p-2 rounded-full transition ${
+                      location.pathname.startsWith("/organizer-dashboard/notifications")
+                        ? "text-indigo-600 dark:text-indigo-300"
+                        : "text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300"
+                    }`}
+                    aria-label="Notifications"
+                  >
+                    <Bell className="h-5 w-5" />
+                    {roleUnreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1">
+                        {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
+                      </span>
+                    )}
+                  </Link>
+                )}
                 <button
                   type="button"
                   aria-label="Toggle theme"
@@ -704,7 +729,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </>
             ) : isAuthenticated ? (
               <>
-                {!isCoordinator && (
+                {!isCoordinator && !hideNavExtras && (
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <Search className="h-4 w-4 text-gray-400 group-focus-within:text-purple-600 dark:text-gray-500 dark:group-focus-within:text-indigo-300 transition-colors" />
@@ -717,30 +742,31 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   </div>
                 )}
 
-                {isCoordinator || isOrganizer ? (
-                  <Link
-                    to={isCoordinator ? "/coordinator-dashboard/notifications" : "/organizer-dashboard/notifications"}
-                    className={`p-1 rounded-full focus:outline-none relative ${
-                      (isCoordinator && location.pathname.startsWith("/coordinator-dashboard/notifications")) ||
-                      (isOrganizer && location.pathname.startsWith("/organizer-dashboard/notifications"))
-                        ? "text-indigo-600 dark:text-indigo-300"
-                        : "text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
-                    }`}
-                    aria-label="Notifications"
-                  >
-                    <Bell className="h-6 w-6" />
-                    {roleUnreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1">
-                        {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
-                      </span>
-                    )}
-                  </Link>
-                ) : (
-                  <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-indigo-300 focus:outline-none relative">
-                    <Bell className="h-6 w-6" />
-                    <span className="absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900"></span>
-                  </button>
-                )}
+                {!hideNavExtras &&
+                  (isCoordinator || isOrganizer ? (
+                    <Link
+                      to={isCoordinator ? "/coordinator-dashboard/notifications" : "/organizer-dashboard/notifications"}
+                      className={`p-1 rounded-full focus:outline-none relative ${
+                        (isCoordinator && location.pathname.startsWith("/coordinator-dashboard/notifications")) ||
+                        (isOrganizer && location.pathname.startsWith("/organizer-dashboard/notifications"))
+                          ? "text-indigo-600 dark:text-indigo-300"
+                          : "text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
+                      }`}
+                      aria-label="Notifications"
+                    >
+                      <Bell className="h-6 w-6" />
+                      {roleUnreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold leading-[18px] text-center px-1">
+                          {roleUnreadCount > 99 ? "99+" : roleUnreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  ) : (
+                    <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 dark:text-gray-300 dark:hover:text-indigo-300 focus:outline-none relative">
+                      <Bell className="h-6 w-6" />
+                      <span className="absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900"></span>
+                    </button>
+                  ))}
 
                 <button
                   type="button"
@@ -855,7 +881,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 </button>
               </div>
             )}
-            {isAuthenticated && !isPublic && currentNotificationsPath && (
+            {isAuthenticated && !isPublic && currentNotificationsPath && !hideNavExtras && (
               <Link
                 to={currentNotificationsPath}
                 onClick={closeMenus}
@@ -873,21 +899,80 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
             {isAuthenticated && !isPublic && (
               <button
                 type="button"
-                onClick={handleMobileProfileClick}
-                aria-label="Open profile"
-                className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                aria-label="Toggle theme"
+                onClick={() => {
+                  setIsMobileProfileOpen(false);
+                  toggleTheme();
+                }}
+                className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
               >
-                <AvatarWithFrame
-                  src={avatarUrl}
-                  alt="Profile"
-                  className="h-9 w-9"
-                  coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
-                  fallback={<span>{avatarInitials || "U"}</span>}
-                />
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
+            {isAuthenticated && !isPublic && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={handleMobileProfileClick}
+                  aria-label="Open profile menu"
+                  aria-expanded={isMobileProfileOpen}
+                  aria-haspopup="menu"
+                  className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  <AvatarWithFrame
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="h-9 w-9"
+                    coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
+                    fallback={<span>{avatarInitials || "U"}</span>}
+                  />
+                </button>
+                <AnimatePresence>
+                  {isMobileProfileOpen && (
+                    <motion.div
+                      initial={mobileProfilePanelMotion.initial}
+                      animate={mobileProfilePanelMotion.animate}
+                      exit={mobileProfilePanelMotion.exit}
+                      transition={mobileProfilePanelTransition}
+                      role="menu"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                    >
+                      <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-300 truncate">
+                          {user?.email || "student@college.com"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileProfileOpen(false);
+                          navigate(currentProfilePath);
+                        }}
+                        className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                      >
+                        Your Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onLogout?.();
+                          setIsMobileProfileOpen(false);
+                        }}
+                        className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15 flex items-center gap-2"
+                      >
+                        <LogOut size={16} /> Sign out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => {
+                setIsMobileProfileOpen(false);
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+              }}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
               {isMobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}

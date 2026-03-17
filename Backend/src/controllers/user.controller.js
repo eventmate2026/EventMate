@@ -17,8 +17,30 @@ export const getProfileController = asyncHandler(async (req, res) => {
 
 // ---------------- UPDATE PROFILE ----------------
 export const updateProfileController = asyncHandler(async (req, res) => {
-  delete req.body.role; // role cannot be changed
-  const user = await User.findByIdAndUpdate(req.user._id, req.body, { new: true });
+  const update = { ...req.body };
+  delete update.role; // role cannot be changed
+  delete update.email; // email cannot be changed by user
+  const unset = {};
+
+  if (Object.prototype.hasOwnProperty.call(update, "mobileNumber")) {
+    const digits = String(update.mobileNumber || "").replace(/\D/g, "");
+    if (digits) {
+      update.mobileNumber = digits;
+    } else {
+      delete update.mobileNumber;
+      unset.mobileNumber = "";
+    }
+  }
+
+  const updateDoc = {};
+  if (Object.keys(update).length) updateDoc.$set = update;
+  if (Object.keys(unset).length) updateDoc.$unset = unset;
+
+  const user = await User.findByIdAndUpdate(req.user._id, updateDoc, {
+    new: true,
+    runValidators: true,
+    context: "query",
+  });
   res.json({ success: true, message: "Profile updated", user });
 });
 

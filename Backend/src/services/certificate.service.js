@@ -827,7 +827,7 @@ const issueCertificateForParticipant = async ({
     recipientId: registration.registeredBy,
     recipientName: participantName,
     recipientRole: "STUDENT",
-    title: "Certificate Issued! ðŸŽ“",
+    title: "Certificate Issued!",
     message: emailDeliveryFailed
       ? `Your certificate for ${event.title} is ready. Download it from your dashboard.`
       : `Your certificate for ${event.title} is ready. Check your email!`,

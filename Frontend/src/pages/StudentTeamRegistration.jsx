@@ -227,7 +227,7 @@ export default function StudentTeamRegistration() {
                   {registration.status === "Confirmed"
                     ? "Registration confirmed. QR codes are available in My Events."
                     : registration.status === "PendingPayment"
-                      ? "Team accepted. Complete payment to finish registration."
+                      ? "Team accepted. Registration is being finalized. Check back for your QR codes soon."
                       : registration.anyRejected
                         ? "A team member rejected the invitation. You cannot continue."
                         : registration.allAccepted

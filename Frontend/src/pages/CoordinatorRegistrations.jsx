@@ -35,6 +35,9 @@ const parseRegistrationRows = (payload) => {
   return [];
 };
 
+const isConfirmedRegistration = (registration) =>
+  String(registration?.status || "").trim() === "Confirmed";
+
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "Pending").trim() || "Pending";
@@ -113,7 +116,10 @@ const toParticipantRows = (registration) => {
 };
 
 const parseParticipantRows = (payload) =>
-  parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
+  parseRegistrationRows(payload)
+    .filter((registration) => isConfirmedRegistration(registration))
+    .flatMap((registration) => toParticipantRows(registration))
+    .filter((row) => row.hasQr);
 
 const parseDate = (value) => {
   const date = new Date(value || 0);
@@ -336,12 +342,12 @@ export default function CoordinatorRegistrations() {
   }, [registrationRows]);
 
   return (
-    <section className="eventmate-page min-h-screen bg-slate-100/80 px-4 py-8 sm:px-6">
+    <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-6xl">
         <button
           type="button"
           onClick={() => navigate("/coordinator-dashboard")}
-          className="inline-flex rounded-md p-1 text-slate-600 hover:bg-white/70 hover:text-slate-900"
+          className="inline-flex rounded-md p-1 text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           aria-label="Back"
         >
           <ArrowLeft size={17} />
@@ -349,10 +355,10 @@ export default function CoordinatorRegistrations() {
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Registered Students</h1>
-            <p className="mt-1 text-sm text-slate-500">View registrations for your assigned events.</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Registered Students</h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">View registrations for your assigned events.</p>
             {selectedEvent && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-300">
                 <span className="inline-flex items-center gap-1">
                   <CalendarDays size={12} />
                   {formatDate(selectedEvent?.schedule?.startDate)} | {formatTime(selectedEvent?.schedule?.startTime)} -{" "}
@@ -371,8 +377,8 @@ export default function CoordinatorRegistrations() {
             )}
           </div>
           {assignedEvents.length > 0 && (
-            <label className="eventmate-panel w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 sm:w-auto">
-              <span className="mr-2 font-semibold text-slate-700">Event</span>
+            <label className="eventmate-panel w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 sm:w-auto">
+              <span className="mr-2 font-semibold text-slate-700 dark:text-slate-200">Event</span>
               <select
                 value={normalizeId(selectedEvent?._id)}
                 onChange={(event) => {
@@ -380,7 +386,7 @@ export default function CoordinatorRegistrations() {
                   setSelectedEventId(nextId);
                   navigate(`/coordinator-dashboard/event/${encodeURIComponent(nextId)}/registrations`);
                 }}
-                className="mt-2 w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 sm:mt-0 sm:w-auto"
+                className="mt-2 w-full rounded border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-2 py-1 text-xs text-slate-900 dark:text-slate-100 sm:mt-0 sm:w-auto"
               >
                 {assignedEvents.map((event) => (
                   <option key={normalizeId(event?._id)} value={normalizeId(event?._id)}>
@@ -393,31 +399,31 @@ export default function CoordinatorRegistrations() {
         </div>
 
         {error && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">{error}</p>
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">{error}</p>
         )}
 
         {loading ? (
-          <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+          <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-500 dark:text-slate-300">
             Loading assigned events...
           </section>
         ) : assignedEvents.length === 0 ? (
-          <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+          <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-500 dark:text-slate-300">
             No assigned events found for this coordinator account.
           </section>
         ) : selectedEvent ? (
           <>
-            <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 bg-white p-5">
+            <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Event</p>
-                  <h2 className="text-lg font-bold text-slate-900">{selectedEvent?.title || "Selected Event"}</h2>
-                  <p className="text-xs text-slate-500">Live list of registrations for this event.</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Event</p>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">{selectedEvent?.title || "Selected Event"}</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-300">Live list of registrations for this event.</p>
                 </div>
                 <button
                   type="button"
                   onClick={loadRegistrations}
                   disabled={registrationLoading}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-70"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 disabled:opacity-70"
                 >
                   {registrationLoading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCcw size={13} />}
                   Refresh
@@ -425,21 +431,21 @@ export default function CoordinatorRegistrations() {
               </div>
 
               <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Total Registrations</p>
-                  <p className="mt-0.5 text-sm font-semibold text-slate-900">{registrationStats.totalParticipants}</p>
+                <article className="eventmate-kpi rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Total Registrations</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{registrationStats.totalParticipants}</p>
                 </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Attended</p>
-                  <p className="mt-0.5 text-sm font-semibold text-emerald-700">{registrationStats.attended}</p>
+                <article className="eventmate-kpi rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Attended</p>
+                  <p className="mt-0.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{registrationStats.attended}</p>
                 </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Pending</p>
-                  <p className="mt-0.5 text-sm font-semibold text-amber-700">{registrationStats.pending}</p>
+                <article className="eventmate-kpi rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Pending</p>
+                  <p className="mt-0.5 text-sm font-semibold text-amber-700 dark:text-amber-300">{registrationStats.pending}</p>
                 </article>
-                <article className="eventmate-kpi rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] text-slate-500">Not Attended</p>
-                  <p className="mt-0.5 text-sm font-semibold text-rose-700">{registrationStats.notAttended}</p>
+                <article className="eventmate-kpi rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-2">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Not Attended</p>
+                  <p className="mt-0.5 text-sm font-semibold text-rose-700 dark:text-rose-300">{registrationStats.notAttended}</p>
                 </article>
               </section>
 
@@ -449,39 +455,39 @@ export default function CoordinatorRegistrations() {
                   value={registrationQuery}
                   onChange={(event) => setRegistrationQuery(event.target.value)}
                   placeholder="Search by name, email, or team..."
-                  className="w-full rounded-md border border-slate-200 bg-white px-9 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-400"
+                  className="w-full rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-9 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 focus:border-indigo-400"
                 />
               </label>
 
               {registrationLoading ? (
-                <p className="mt-4 inline-flex items-center gap-2 text-sm text-slate-500">
+                <p className="mt-4 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
                   <Loader2 size={14} className="animate-spin" />
                   Loading registrations...
                 </p>
               ) : registrationError ? (
-                <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
                   {registrationError}
                 </p>
               ) : registrationRows.length === 0 ? (
-                <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <p className="mt-4 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3 text-sm text-slate-600 dark:text-slate-300">
                   No registrations found for this event yet.
                 </p>
               ) : (
                 <>
                   {visibleRegistrationRows.length === 0 ? (
-                    <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    <p className="mt-4 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 px-3 py-3 text-sm text-slate-600 dark:text-slate-300">
                       No participants match the current search.
                     </p>
                   ) : (
                     <>
                       <div className="mt-4 space-y-3 sm:hidden">
                         {visibleRegistrationRows.map((row) => (
-                          <article key={`${row.registrationId}-${row.id}`} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <article key={`${row.registrationId}-${row.id}`} className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-3">
                             <div className="flex items-start gap-2.5">
                               <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-900">{row.participantName}</p>
-                                <p className="mt-0.5 text-xs text-slate-500 break-words">{row.participantEmail || "-"}</p>
+                                <p className="font-semibold text-slate-900 dark:text-white">{row.participantName}</p>
+                                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-300 break-words">{row.participantEmail || "-"}</p>
                                 <span
                                   className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}
                                 >
@@ -489,30 +495,30 @@ export default function CoordinatorRegistrations() {
                                 </span>
                               </div>
                             </div>
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300">
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Branch &amp; Year</p>
-                                <p className="mt-0.5 text-sm text-slate-800">
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Branch &amp; Year</p>
+                                <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">
                                   {row.department || "-"} {row.year ? `• ${row.year}` : ""}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Team</p>
-                                <p className="mt-0.5 text-sm text-slate-800">{row.teamName || "Individual"}</p>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Team</p>
+                                <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">{row.teamName || "Individual"}</p>
                               </div>
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Reg. Date</p>
-                                <p className="mt-0.5 text-sm text-slate-800">{formatDateTime(row.registeredAt)}</p>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Reg. Date</p>
+                                <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">{formatDateTime(row.registeredAt)}</p>
                               </div>
                               <div>
-                                <p className="text-[11px] uppercase tracking-wide text-slate-400">Attendance</p>
+                                <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">Attendance</p>
                                 {row.attendanceMarked ? (
                                   <div>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                                       <CheckCircle2 size={11} />
                                       Checked In
                                     </span>
-                                    <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.attendanceMarkedAt)}</p>
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(row.attendanceMarkedAt)}</p>
                                   </div>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
@@ -526,10 +532,10 @@ export default function CoordinatorRegistrations() {
                         ))}
                       </div>
 
-                      <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 sm:block">
+                      <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 sm:block">
                         <table className="min-w-full text-sm">
-                          <thead className="bg-slate-100/80">
-                            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                          <thead className="bg-slate-100/80 dark:bg-white/5">
+                            <tr className="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
                               <th className="px-3 py-2.5 font-semibold">Student Name</th>
                               <th className="px-3 py-2.5 font-semibold">Branch &amp; Year</th>
                               <th className="px-3 py-2.5 font-semibold">Team</th>
@@ -537,15 +543,15 @@ export default function CoordinatorRegistrations() {
                               <th className="px-3 py-2.5 font-semibold">Attendance Status</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-200 bg-white">
+                          <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40">
                             {visibleRegistrationRows.map((row) => (
                               <tr key={`${row.registrationId}-${row.id}`} className="align-top">
                                 <td className="px-3 py-3">
                                   <div className="flex items-start gap-2.5">
                                     <UserCircle2 size={22} className="text-slate-400 mt-0.5 shrink-0" />
                                     <div>
-                                      <p className="font-semibold text-slate-900">{row.participantName}</p>
-                                      <p className="mt-0.5 text-xs text-slate-500">{row.participantEmail || "-"}</p>
+                                      <p className="font-semibold text-slate-900 dark:text-white">{row.participantName}</p>
+                                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-300">{row.participantEmail || "-"}</p>
                                       <span
                                         className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.registrationStatus)}`}
                                       >
@@ -555,12 +561,12 @@ export default function CoordinatorRegistrations() {
                                   </div>
                                 </td>
                                 <td className="px-3 py-3">
-                                  <p className="text-slate-800">{row.department || "-"}</p>
-                                  <p className="mt-0.5 text-xs text-slate-500">{row.year || "-"}</p>
+                                  <p className="text-slate-800 dark:text-slate-100">{row.department || "-"}</p>
+                                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-300">{row.year || "-"}</p>
                                 </td>
-                                <td className="px-3 py-3 text-slate-700">{row.teamName || "Individual"}</td>
+                                <td className="px-3 py-3 text-slate-700 dark:text-slate-200">{row.teamName || "Individual"}</td>
                                 <td className="px-3 py-3">
-                                  <span className="text-xs text-slate-600">{formatDateTime(row.registeredAt)}</span>
+                                  <span className="text-xs text-slate-600 dark:text-slate-300">{formatDateTime(row.registeredAt)}</span>
                                 </td>
                                 <td className="px-3 py-3">
                                   {row.attendanceMarked ? (
@@ -569,7 +575,7 @@ export default function CoordinatorRegistrations() {
                                         <CheckCircle2 size={11} />
                                         Checked In
                                       </span>
-                                      <p className="mt-1 text-xs text-slate-500">{formatDateTime(row.attendanceMarkedAt)}</p>
+                                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{formatDateTime(row.attendanceMarkedAt)}</p>
                                     </div>
                                   ) : (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
@@ -584,7 +590,7 @@ export default function CoordinatorRegistrations() {
                         </table>
                       </div>
 
-                      <p className="mt-3 text-xs text-slate-500">
+                      <p className="mt-3 text-xs text-slate-500 dark:text-slate-300">
                         Showing {visibleRegistrationRows.length} of {registrationRows.length} participants.
                       </p>
                     </>

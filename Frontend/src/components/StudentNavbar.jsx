@@ -7,6 +7,7 @@ import {
   Moon,
   Sun
 } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
@@ -19,6 +20,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
   const socketRef = useRef(null);
@@ -27,9 +29,24 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const avatarUrl = user?.avatar || "";
   const avatarText = displayName.charAt(0).toUpperCase();
   const isDark = theme === "dark";
+  const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
     "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
     "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+  const mobileProfilePanelMotion = prefersReducedMotion
+    ? {
+        initial: false,
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: 0 },
+      }
+    : {
+        initial: { opacity: 0, y: -10, scale: 0.98 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -6, scale: 0.98 },
+      };
+  const mobileProfilePanelTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
 
   if (!isStudent) {
     return null;
@@ -110,12 +127,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     navigate(pageToPath[pageName] || "/student-dashboard");
     setIsMobileMenuOpen(false);
     setIsUserMenuOpen(false);
+    setIsMobileProfileOpen(false);
     window.scrollTo(0, 0);
   };
-  const handleMobileProfileClick = () => {
-    navigate("/profile");
-    setIsMobileMenuOpen(false);
+  const toggleMobileProfileMenu = () => {
     setIsUserMenuOpen(false);
+    setIsMobileMenuOpen(false);
+    setIsMobileProfileOpen((prev) => !prev);
+  };
+  const handleMobileProfileClick = () => {
+    toggleMobileProfileMenu();
   };
 
   const isActivePage = (pageName) => activePage === pageName;
@@ -271,14 +292,71 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             </button>
             <button
               type="button"
-              onClick={handleMobileProfileClick}
-              aria-label="Open profile"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              aria-label="Toggle theme"
+              onClick={() => {
+                setIsMobileProfileOpen(false);
+                toggleTheme();
+              }}
+              className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
             >
-              {renderAvatar("h-8 w-8", "text-sm")}
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleMobileProfileClick}
+                aria-label="Open profile menu"
+                aria-expanded={isMobileProfileOpen}
+                aria-haspopup="menu"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                {renderAvatar("h-8 w-8", "text-sm")}
+              </button>
+              <AnimatePresence>
+                {isMobileProfileOpen && (
+                  <motion.div
+                    initial={mobileProfilePanelMotion.initial}
+                    animate={mobileProfilePanelMotion.animate}
+                    exit={mobileProfilePanelMotion.exit}
+                    transition={mobileProfilePanelTransition}
+                    role="menu"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                  >
+                    <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300 truncate">
+                        {user?.email || "student@college.com"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileProfileOpen(false);
+                        navigate("/profile");
+                      }}
+                      className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Your Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLogout();
+                        setIsMobileProfileOpen(false);
+                      }}
+                      className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15 flex items-center gap-2"
+                    >
+                      <LogOut size={16} /> Sign out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => {
+                setIsMobileProfileOpen(false);
+                setIsMobileMenuOpen(!isMobileMenuOpen);
+              }}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
               <span className="sr-only">Open main menu</span>

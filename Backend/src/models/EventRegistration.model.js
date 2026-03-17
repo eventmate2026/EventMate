@@ -185,15 +185,10 @@ EventRegistrationSchema.pre("save", async function () {
       );
   }
 
-  /* ===== PAYMENT METHOD ===== */
-  if (event.registration?.fee > 0) {
-    this.payment.method = "PHONEPE_QR";
-    this.payment.amount = event.registration.fee;
-    this.payment.paymentStatus = "Pending";
-  } else {
-    this.payment.method = "FREE";
-    this.payment.paymentStatus = "NotRequired";
-  }
+  /* ===== PAYMENT (DISPLAY ONLY) ===== */
+  this.payment.method = "FREE";
+  this.payment.amount = Number(event.registration?.fee || 0);
+  this.payment.paymentStatus = "NotRequired";
 });
 
 /* ================= UNIQUE INDEX ================= */

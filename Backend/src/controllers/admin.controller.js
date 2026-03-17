@@ -41,7 +41,28 @@ export const getAllUsersController = asyncHandler(async (req, res) => {
 
 // ---------------- UPDATE USER ----------------
 export const updateUserController = asyncHandler(async (req, res) => {
-  const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const update = { ...req.body };
+  const unset = {};
+
+  if (Object.prototype.hasOwnProperty.call(update, "mobileNumber")) {
+    const digits = String(update.mobileNumber || "").replace(/\D/g, "");
+    if (digits) {
+      update.mobileNumber = digits;
+    } else {
+      delete update.mobileNumber;
+      unset.mobileNumber = "";
+    }
+  }
+
+  const updateDoc = {};
+  if (Object.keys(update).length) updateDoc.$set = update;
+  if (Object.keys(unset).length) updateDoc.$unset = unset;
+
+  const user = await User.findByIdAndUpdate(req.params.id, updateDoc, {
+    new: true,
+    runValidators: true,
+    context: "query",
+  });
   res.json({ success: true, message: "User updated", user });
 });
 

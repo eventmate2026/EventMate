@@ -408,6 +408,8 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   const visibilityScope = String(event?.visibility?.scope || "COLLEGE").toUpperCase();
   const requester = await User.findById(userId);
   if (!requester) throw new Error("User not found");
+  const requesterEmail = normalizeEmail(requester?.email);
+  if (!requesterEmail) throw new Error("Your account email is required to register");
 
   if (isTeam && String(requester?.role || "").toUpperCase() === "STUDENT_COORDINATOR") {
     throw new Error("Coordinators cannot participate in team events");
@@ -454,9 +456,13 @@ export const initiateRegistration = async (eventId, userId, payload) => {
     assignedCoordinators.map((coordinator) => normalizeEmail(coordinator?.email)).filter(Boolean)
   );
   const leaderEmail = normalizeEmail(teamLeader?.email);
+  if (leaderEmail && leaderEmail !== requesterEmail) {
+    throw new Error("Please use your account email for registration");
+  }
+  const effectiveLeaderEmail = requesterEmail;
   const memberEmails = normalizedTeamMembers.map((member) => normalizeEmail(member?.email)).filter(Boolean);
-  const participantEmails = [leaderEmail, ...memberEmails].filter(Boolean);
-  if (leaderEmail && coordinatorEmails.has(leaderEmail)) {
+  const participantEmails = [effectiveLeaderEmail, ...memberEmails].filter(Boolean);
+  if (effectiveLeaderEmail && coordinatorEmails.has(effectiveLeaderEmail)) {
     throw new Error("Coordinators cannot register for their own event");
   }
 
@@ -529,17 +535,16 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   if (existing)
     throw new Error("You already have an active registration for this event");
 
-  const isPaid = event.registration?.fee > 0;
-
   let initialStatus;
   if (!isTeam) {
-    initialStatus = isPaid ? "PendingPayment" : "Confirmed";
+    initialStatus = "Confirmed";
   } else {
     initialStatus = "PendingMemberVerification";
   }
 
   const sanitizedTeamLeader = {
     ...(teamLeader || {}),
+    email: requester.email,
     emailVerified: isTeam ? true : Boolean(teamLeader?.emailVerified)
   };
   const sanitizedTeamMembers = isTeam
@@ -648,13 +653,10 @@ export const verifyMember = async (token) => {
   if (allVerified) {
     registration.allMembersVerified = true;
     const event = await Event.findById(registration.event);
-    const isPaid = event?.registration?.fee > 0;
-    registration.status = isPaid ? "PendingPayment" : "Confirmed";
+    if (!event) throw new Error("Event not found");
+    registration.status = "Confirmed";
     await registration.save();
-
-    if (!isPaid) {
-      await generateQRsForRegistration(registration, event);
-    }
+    await generateQRsForRegistration(registration, event);
   } else {
     await registration.save();
   }
@@ -833,14 +835,14 @@ export const respondToTeamInvitation = async (token, action) => {
   let autoConfirmed = false;
   if (allAccepted && !anyRejected && String(registration.status || "") === "PendingMemberVerification") {
     event = await Event.findById(registration.event);
-    const isPaid = event?.registration?.fee > 0;
-    registration.status = isPaid ? "PendingPayment" : "Confirmed";
+    if (!event) throw new Error("Event not found");
+    registration.status = "Confirmed";
     autoConfirmed = true;
   }
 
   await registration.save();
 
-  if (autoConfirmed && registration.status === "Confirmed" && event) {
+  if (autoConfirmed && event) {
     await generateQRsForRegistration(registration, event);
   }
 
@@ -896,10 +898,17 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
     };
   }
 
-  if (registration.status === "PendingPayment") {
+  if (
+    registration.status === "PendingPayment" ||
+    registration.status === "PendingPaymentVerification"
+  ) {
+    registration.status = "Confirmed";
+    registration.allMembersVerified = true;
+    await registration.save();
+    await generateQRsForRegistration(registration, event);
     return {
       status: registration.status,
-      message: "Team accepted. Payment is pending."
+      message: "Team accepted. Registration confirmed and QR codes have been sent."
     };
   }
 
@@ -922,19 +931,13 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
   if (!allAccepted) throw new Error("Waiting for all team members to accept");
 
   registration.allMembersVerified = true;
-  const isPaid = event?.registration?.fee > 0;
-  registration.status = isPaid ? "PendingPayment" : "Confirmed";
+  registration.status = "Confirmed";
   await registration.save();
-
-  if (!isPaid) {
-    await generateQRsForRegistration(registration, event);
-  }
+  await generateQRsForRegistration(registration, event);
 
   return {
     status: registration.status,
-    message: isPaid
-      ? "Team accepted. Proceed to payment to complete registration."
-      : "Team accepted. Registration confirmed and QR codes have been sent."
+    message: "Team accepted. Registration confirmed and QR codes have been sent."
   };
 };
 

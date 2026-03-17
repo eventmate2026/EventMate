@@ -627,7 +627,7 @@ export default function OrganizerEventViewList() {
                       <th className="px-3 py-2.5 font-semibold">Registered</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40">
+                  <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40 select-none">
                     {filteredRows.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">

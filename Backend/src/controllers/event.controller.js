@@ -597,18 +597,20 @@ export const completeEvent = async (req, res, next) => {
     }
 
     const now = new Date();
-    if (now < eventEndDateTime) {
+    const eventStartDateTime = buildEventEndDateTime(
+      event.schedule?.startDate,
+      event.schedule?.startTime
+    );
+    if (!eventStartDateTime) {
       return res.status(400).json({
         success: false,
-        message: "Event has not ended yet"
+        message: "Event start time is missing or invalid"
       });
     }
-
-    const manualWindowEndsAt = new Date(eventEndDateTime.getTime() + COMPLETION_GRACE_MS);
-    if (now > manualWindowEndsAt) {
+    if (now < eventStartDateTime) {
       return res.status(400).json({
         success: false,
-        message: "Manual completion window has passed; event will be auto-completed"
+        message: "Event has not started yet"
       });
     }
 

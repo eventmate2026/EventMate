@@ -17,6 +17,28 @@ const clampNumber = (value, min, max, fallback) => {
   return Math.min(max, Math.max(min, numeric));
 };
 
+const MOBILE_REGEX = /^[6-9]\d{9}$/;
+
+const normalizeMobileDigits = (value) =>
+  String(value || "").replace(/\D/g, "");
+
+const getValidMobileNumber = (value) => {
+  const digits = normalizeMobileDigits(value);
+  return MOBILE_REGEX.test(digits) ? digits : "";
+};
+
+const coerceUserMobileNumber = (user) => {
+  if (!user) return;
+  const next = getValidMobileNumber(user.mobileNumber);
+  user.mobileNumber = next || undefined;
+};
+
+const persistAuthUser = async (user) => {
+  if (!user) return;
+  coerceUserMobileNumber(user);
+  await user.save({ validateBeforeSave: false });
+};
+
 const buildAuthUser = (user) => {
   if (!user) return null;
   return {
@@ -24,7 +46,7 @@ const buildAuthUser = (user) => {
     fullName: user.fullName,
     email: user.email,
     role: user.role,
-    mobileNumber: user.mobileNumber || "",
+    mobileNumber: getValidMobileNumber(user.mobileNumber),
     collegeName: user.collegeName || "",
     educationLevel: user.educationLevel || "",
     academicProfile: user.academicProfile || {},
@@ -70,7 +92,7 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
   user.emailVerified = true;
   user.otp = null;
   user.otpExpiry = null;
-  await user.save();
+  await persistAuthUser(user);
 
   res.json({ success: true, message: "Email verified successfully" });
 });
@@ -124,7 +146,7 @@ export const loginController = asyncHandler(async (req, res) => {
       user.failedLoginAttempts = 0;
     }
 
-    await user.save();
+    await persistAuthUser(user);
 
     if (lockoutUntil) {
       const retryAfterSeconds = Math.max(1, Math.ceil(lockoutMinutes * 60));
@@ -153,7 +175,7 @@ export const loginController = asyncHandler(async (req, res) => {
 
   user.refreshToken = refreshToken;
   user.lastLoginAt = new Date();
-  await user.save();
+  await persistAuthUser(user);
 
   sendPendingTeamInvitesForUser(user).catch((error) => {
     console.error("Pending team invite check failed:", error.message);
@@ -176,7 +198,7 @@ export const logoutController = asyncHandler(async (req, res) => {
   const user = await User.findById(userId).select("+refreshToken");
   if (user) {
     user.refreshToken = null;
-    await user.save();
+    await persistAuthUser(user);
   }
 
   res.json({ success: true, message: "Logged out successfully" });
@@ -205,7 +227,7 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
     const newRefreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
 
     user.refreshToken = newRefreshToken;
-    await user.save();
+    await persistAuthUser(user);
 
     res.json({
       success: true,

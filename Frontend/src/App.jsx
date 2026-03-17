@@ -8,7 +8,6 @@ import { getStoredToken, getStoredUser, subscribeAuthUpdates } from "./lib/auth"
 import { logoutUser } from "./lib/logout";
 
 import Landing from "./pages/Landing";
-import Hackathon from "./pages/Hackathon";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -18,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Profile from "./pages/Profile";
 import ProfileCustomization from "./pages/ProfileCustomization";
 import NotFound from "./pages/NotFound";
+import DeveloperTeam from "./pages/DeveloperTeam";
 
 const AdminDashboard = lazy(() =>
   import("./pages/AdminDashboard").catch(() => ({
@@ -515,7 +515,6 @@ export default function App() {
       <Routes>
         <Route element={<MainLayout />}>
           <Route path="/" element={<Landing />} />
-        <Route path="/hackathon" element={<Hackathon />} />
         <Route
           path="/events/:eventId"
           element={
@@ -526,6 +525,7 @@ export default function App() {
         />
         <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/developers" element={<DeveloperTeam />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/verify-registration" element={<VerifyRegistration />} />
           <Route path="/team-invite" element={<TeamInvite />} />

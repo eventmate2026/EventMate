@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Plus, ShieldCheck, UploadCloud, UserCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { storeAuth } from "../lib/auth";
@@ -8,6 +9,7 @@ import { resolveUserDepartment } from "../lib/userDepartment";
 
 const yearOptions = ["1st", "2nd", "3rd", "4th"];
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
+const MOBILE_NUMBER_REGEX = /^[6-9]\d{9}$/;
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -32,6 +34,11 @@ const normalizeDepartment = (value) => {
   return "";
 };
 
+const sanitizeMobileNumber = (value) =>
+  String(value || "")
+    .replace(/\D/g, "")
+    .slice(0, 10);
+
 const emptyForm = {
   fullName: "",
   mobileNumber: "",
@@ -45,7 +52,7 @@ const emptyForm = {
 
 const userToForm = (user) => ({
   fullName: user?.fullName || "",
-  mobileNumber: user?.mobileNumber || "",
+  mobileNumber: sanitizeMobileNumber(user?.mobileNumber || ""),
   collegeName: user?.collegeName || "",
   academicBranch: normalizeDepartment(user?.academicProfile?.branch),
   academicYear: user?.academicProfile?.year || "",
@@ -55,6 +62,7 @@ const userToForm = (user) => ({
 });
 
 export default function Profile() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
   const [avatarFile, setAvatarFile] = useState(null);
@@ -74,6 +82,19 @@ export default function Profile() {
   const hideAcademicYear = educationLevel === "10th" || educationLevel === "12th";
   const academicYearOptions =
     educationLevel === "Diploma" ? yearOptions.slice(0, 3) : yearOptions;
+  const roleHomePath = {
+    MAIN_ADMIN: "/admin-dashboard",
+    ORGANIZER: "/organizer-dashboard",
+    STUDENT_COORDINATOR: "/coordinator-dashboard",
+    STUDENT: "/student-dashboard",
+  };
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate(roleHomePath[role] || "/");
+  };
 
   const roleBadgeClass = useMemo(() => {
     if (isAdmin) return "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200";
@@ -114,6 +135,10 @@ export default function Profile() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+    if (name === "mobileNumber") {
+      setFormData((prev) => ({ ...prev, mobileNumber: sanitizeMobileNumber(value) }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -137,9 +162,17 @@ export default function Profile() {
     try {
       const academicDepartment = normalizeDepartment(formData.academicBranch);
       const professionalDepartment = normalizeDepartment(formData.professionalDepartment);
+      const mobileNumber = sanitizeMobileNumber(formData.mobileNumber);
+
+      if (mobileNumber && !MOBILE_NUMBER_REGEX.test(mobileNumber)) {
+        setMessage({ type: "error", text: "Mobile number must be a valid 10-digit number." });
+        setLoading((prev) => ({ ...prev, save: false }));
+        return;
+      }
+
       const payload = {
         fullName: formData.fullName.trim(),
-        mobileNumber: formData.mobileNumber.trim() || undefined,
+        mobileNumber: mobileNumber || undefined,
         collegeName: formData.collegeName.trim() || undefined,
         educationLevel: formData.educationLevel || undefined,
       };
@@ -270,6 +303,13 @@ export default function Profile() {
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
+              <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+              >
+                Back
+              </button>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Profile Settings</h1>
               <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
                 Manage your account details, role-specific profile info, and avatar.
@@ -383,6 +423,11 @@ export default function Profile() {
                   <label className="block">
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number</span>
                     <input
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[6-9][0-9]{9}"
+                      maxLength={10}
+                      autoComplete="tel"
                       name="mobileNumber"
                       value={formData.mobileNumber}
                       onChange={handleChange}
@@ -412,7 +457,7 @@ export default function Profile() {
                             type="button"
                             onClick={() => handleEducationLevelSelect(level)}
                             aria-pressed={isSelected}
-                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            className={`rounded-xl border px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition ${
                               isSelected
                                 ? "border-indigo-600 bg-indigo-600 text-white"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"

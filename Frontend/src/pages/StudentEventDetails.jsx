@@ -267,6 +267,7 @@ export default function StudentEventDetails({ mode = "details" }) {
     );
   }, [lockedDepartment]);
 
+
   useEffect(() => {
     if (!allowedRegistrationTypes.includes(registrationType)) {
       const next = allowedRegistrationTypes[0] || "INDIVIDUAL";
@@ -318,6 +319,15 @@ export default function StudentEventDetails({ mode = "details" }) {
   );
 
   useEffect(() => {
+    if (!normalizedUserEmail) return;
+    setLeaderProfile((prev) =>
+      normalizeEmail(prev.email) === normalizedUserEmail
+        ? prev
+        : { ...prev, email: user?.email || "" }
+    );
+  }, [normalizedUserEmail, user?.email]);
+
+  useEffect(() => {
     if (!isDepartmentEvent) return;
     setTeamMembers((prev) =>
       prev.map((member) =>
@@ -329,7 +339,7 @@ export default function StudentEventDetails({ mode = "details" }) {
   }, [isDepartmentEvent, eventVisibilityDepartment]);
 
   const updateLeaderField = (field, value) => {
-    if (field === "branch") return;
+    if (field === "branch" || field === "email") return;
     setLeaderProfile((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -356,6 +366,10 @@ export default function StudentEventDetails({ mode = "details" }) {
   const validateRegistration = () => {
     const leaderError = validateProfile(leaderProfile, isTeamRegistration ? "Team leader" : "Participant");
     if (leaderError) return leaderError;
+    if (!normalizedUserEmail) return "Your account email is missing. Please log in again.";
+    if (normalizeEmail(leaderProfile.email) !== normalizedUserEmail) {
+      return "Please use your account email for registration.";
+    }
 
     if (isTeamRegistration) {
       const leaderEmail = normalizeEmail(leaderProfile.email);
@@ -436,6 +450,7 @@ export default function StudentEventDetails({ mode = "details" }) {
           teamName: isTeamRegistration ? String(teamName || "").trim() : undefined,
           teamLeader: profileToParticipant({
             ...leaderProfile,
+            email: user?.email || leaderProfile.email,
             branch: lockedDepartment || leaderProfile.branch,
           }),
           teamMembers: isTeamRegistration ? teamMembers.map(profileToParticipant) : [],
@@ -683,7 +698,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <input placeholder="Full Name *" value={leaderProfile.fullName} onChange={(eventValue) => updateLeaderField("fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input type="email" placeholder="Email Address *" value={leaderProfile.email} onChange={(eventValue) => updateLeaderField("email", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input type="email" placeholder="Email Address *" value={leaderProfile.email} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200" />
                       <input placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input

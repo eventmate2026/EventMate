@@ -459,7 +459,7 @@ export default function StudentDashboard() {
                   <p className="text-xs uppercase tracking-[0.2em] text-indigo-100/80">Live Campus Pulse</p>
                   <h3 className="mt-2 text-2xl font-semibold">{liveGreeting}, {userFirstName}</h3>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs whitespace-nowrap shrink-0">
                   <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
                   Live
                 </div>
