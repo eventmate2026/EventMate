@@ -20,7 +20,7 @@ const createAdmin = async () => {
 
     const admin = await User.create({
       fullName: "Super Admin",
-      email: "admin@eventmate.com",
+      email: "eventmate2026@gmail.com",
       password: hashedPassword,
       role: "MAIN_ADMIN",
       emailVerified: true
