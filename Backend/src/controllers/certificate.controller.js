@@ -45,6 +45,51 @@ const sanitizeFileName = (value, fallback) => {
   return safe || fallback;
 };
 
+const clampCertificatePercent = (value) => Math.min(100, Math.max(0, Number(value) || 0));
+const AUTO_SIGNATURE_Y_OFFSET = 12.4;
+const DEFAULT_SIGNATURE_WIDTH = 130;
+const normalizeDemoCertificateType = (value) =>
+  String(value || "").trim().toLowerCase() === "winner" ? "winner" : "participation";
+const normalizeDemoWinnerPosition = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "1" || normalized === "1st" || normalized === "first") return "1st";
+  if (normalized === "2" || normalized === "2nd" || normalized === "second") return "2nd";
+  if (normalized === "3" || normalized === "3rd" || normalized === "third") return "3rd";
+  return null;
+};
+
+const autoArrangeCertificateSignatures = (customizationValue) => {
+  const normalized = normalizeCertificateCustomization(customizationValue);
+  const layout = normalized.layout || {};
+  const nextLayout = {
+    ...layout
+  };
+  const signatureLabelPairs = [
+    { signatureKey: "organizerSignature", labelKey: "coordinatorLabel" },
+    { signatureKey: "hodSignature", labelKey: "hodLabel" },
+    { signatureKey: "principalSignature", labelKey: "principalLabel" }
+  ];
+
+  for (const { signatureKey, labelKey } of signatureLabelPairs) {
+    const labelNode = layout[labelKey];
+    const signatureNode = layout[signatureKey];
+    if (!labelNode || !signatureNode) continue;
+
+    nextLayout[signatureKey] = {
+      ...signatureNode,
+      x: clampCertificatePercent(labelNode.x),
+      y: clampCertificatePercent(labelNode.y - AUTO_SIGNATURE_Y_OFFSET),
+      width: Math.max(Number(signatureNode.width) || 0, DEFAULT_SIGNATURE_WIDTH),
+      anchor: labelNode.anchor
+    };
+  }
+
+  return {
+    ...normalized,
+    layout: nextLayout
+  };
+};
+
 /* ================================================
    GET MY CERTIFICATES
    Student views their own certificates
@@ -275,6 +320,208 @@ export const uploadEventCertificateBackground = async (req, res, next) => {
 };
 
 /* ================================================
+   UPLOAD EVENT CERTIFICATE LOGO
+================================================ */
+export const uploadEventCertificateLogo = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const isAdmin = req.user.role === "MAIN_ADMIN";
+    const isOwner = event.createdBy.toString() === req.user._id.toString();
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to customize certificates for this event"
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Logo image file is required"
+      });
+    }
+
+    const uploaded = await uploadImageCloudinary(req.file, {
+      folder: "eventmate/certificate-logos",
+      format: "png"
+    });
+
+    const customization = normalizeCertificateCustomization({
+      ...(event?.certificate?.customization || {}),
+      logoUrl: uploaded.url
+    });
+
+    if (!event.certificate || typeof event.certificate !== "object") {
+      event.certificate = { isEnabled: true, customization };
+    } else {
+      event.certificate.isEnabled = true;
+      event.certificate.customization = customization;
+    }
+
+    await event.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Certificate logo updated",
+      data: {
+        eventId: event._id,
+        logoUrl: customization.logoUrl,
+        customization
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ================================================
+   UPLOAD EVENT CERTIFICATE ACCREDITATION LOGO
+================================================ */
+export const uploadEventCertificateAccreditationLogo = async (req, res, next) => {
+  try {
+    const { eventId } = req.params;
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const isAdmin = req.user.role === "MAIN_ADMIN";
+    const isOwner = event.createdBy.toString() === req.user._id.toString();
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to customize certificates for this event"
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Accreditation logo image file is required"
+      });
+    }
+
+    const uploaded = await uploadImageCloudinary(req.file, {
+      folder: "eventmate/certificate-accreditation-logos",
+      format: "png"
+    });
+
+    const customization = normalizeCertificateCustomization({
+      ...(event?.certificate?.customization || {}),
+      accreditationLogoUrl: uploaded.url
+    });
+
+    if (!event.certificate || typeof event.certificate !== "object") {
+      event.certificate = { isEnabled: true, customization };
+    } else {
+      event.certificate.isEnabled = true;
+      event.certificate.customization = customization;
+    }
+
+    await event.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Accreditation logo updated",
+      data: {
+        eventId: event._id,
+        accreditationLogoUrl: customization.accreditationLogoUrl,
+        customization
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ================================================
+   UPLOAD EVENT CERTIFICATE SIGNATURE
+================================================ */
+export const uploadEventCertificateSignature = async (req, res, next) => {
+  try {
+    const { eventId, role } = req.params;
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    if (!event) {
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
+
+    const isAdmin = req.user.role === "MAIN_ADMIN";
+    const isOwner = event.createdBy.toString() === req.user._id.toString();
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to customize certificates for this event"
+      });
+    }
+
+    const normalizedRole = String(role || "").trim().toLowerCase();
+    const roleFieldMap = {
+      organizer: "organizerSignatureUrl",
+      hod: "hodSignatureUrl",
+      principal: "principalSignatureUrl"
+    };
+    const signatureField = roleFieldMap[normalizedRole];
+    if (!signatureField) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid signature role. Use organizer, hod, or principal."
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Signature image file is required"
+      });
+    }
+
+    if (req.file.mimetype !== "image/png") {
+      return res.status(400).json({
+        success: false,
+        message: "Signature must be a PNG file"
+      });
+    }
+
+    const uploaded = await uploadImageCloudinary(req.file, {
+      folder: "eventmate/certificate-signatures",
+      format: "png"
+    });
+
+    const customization = autoArrangeCertificateSignatures({
+      ...(event?.certificate?.customization || {}),
+      [signatureField]: uploaded.url
+    });
+
+    if (!event.certificate || typeof event.certificate !== "object") {
+      event.certificate = { isEnabled: true, customization };
+    } else {
+      event.certificate.isEnabled = true;
+      event.certificate.customization = customization;
+    }
+
+    await event.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Certificate signature updated and auto-arranged",
+      data: {
+        eventId: event._id,
+        role: normalizedRole,
+        signatureUrl: customization[signatureField],
+        customization
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/* ================================================
    VERIFY CERTIFICATE (PUBLIC)
 ================================================ */
 export const verifyCertificate = async (req, res, next) => {
@@ -425,12 +672,21 @@ export const downloadDemoCertificate = async (req, res, next) => {
     }
 
     const participantName = req.user.fullName || req.user.name || "Organizer";
-    const pdfBuffer = await generateDemoCertificateBuffer(event, participantName);
+    const certificateType = normalizeDemoCertificateType(req.query?.type);
+    const position =
+      certificateType === "winner"
+        ? normalizeDemoWinnerPosition(req.query?.position) || "1st"
+        : null;
+    const pdfBuffer = await generateDemoCertificateBuffer(event, participantName, {
+      certificateType,
+      position
+    });
     const safeTitle = sanitizeFileName(event.title, "event");
+    const filePrefix = certificateType === "winner" ? "winner_certificate" : "demo_certificate";
 
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=\"demo_certificate_${safeTitle}.pdf\"`,
+      "Content-Disposition": `attachment; filename=\"${filePrefix}_${safeTitle}.pdf\"`,
       "Content-Length": pdfBuffer.length
     });
 

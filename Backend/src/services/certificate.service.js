@@ -18,6 +18,16 @@ const __dirname = path.dirname(__filename);
 export const buildCertificateEmailSlug = (email) =>
   String(email || "").trim().toLowerCase().replace(/[@.]/g, "_");
 
+const formatCertificateDate = (value) => {
+  const parsed = new Date(value || 0);
+  if (Number.isNaN(parsed.getTime())) return "TBA";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(parsed);
+};
+
 const normalizeVerificationCode = (value) =>
   String(value || "")
     .trim()
@@ -70,32 +80,108 @@ const createCertificateAuditLog = async (payload) => {
   }
 };
 
+const CERTIFICATE_HEADER = {
+  trust: "Sarvodaya Mahila Mandal's",
+  campus: "Balaji Ward, Chandrapur (M.S.)",
+  approvals: "Approved by AICTE, New Delhi, Govt. of Maharashtra DTE, Mumbai & Affiliated to MSBTE",
+  estd: "ESTD : 1985"
+};
+const VERIFICATION_BADGE_WIDTH = 260;
+const VERIFICATION_BADGE_HEIGHT = 24;
+const SIGNATURE_DISPLAY_MAX_HEIGHT = 34;
+const DEMO_WINNER_POSITION = "1st";
+const DEFAULT_SIGNATURE_WIDTH = 130;
+const LEGACY_SIGNATURE_WIDTH = 90;
+
 const createDefaultCertificateLayout = () => ({
-  logo: { x: 50, y: 8, width: 120, anchor: "center" },
-  issuerName: { x: 50, y: 20, anchor: "center" },
-  title: { x: 50, y: 25, anchor: "center" },
-  introText: { x: 50, y: 34, anchor: "center" },
-  participantName: { x: 50, y: 38, anchor: "center" },
-  actionText: { x: 50, y: 46, anchor: "center" },
-  eventName: { x: 50, y: 50, anchor: "center" },
-  dateVenue: { x: 50, y: 55, anchor: "center" },
-  coordinatorLabel: { x: 9, y: 87, anchor: "left" },
-  principalLabel: { x: 91, y: 87, anchor: "right" },
-  footerText: { x: 50, y: 93, anchor: "center" }
+  logo: { x: 5.5, y: 8.5, width: 60, anchor: "left" },
+  accreditationLogo: { x: 94.5, y: 6.5, width: 70, anchor: "right" },
+  estd: { x: 79.5, y: 6, anchor: "center" },
+  trust: { x: 50, y: 6, anchor: "center" },
+  campus: { x: 50, y: 18, anchor: "center" },
+  approvals: { x: 50, y: 21.5, anchor: "center" },
+  issuerName: { x: 50, y: 13, anchor: "center" },
+  title: { x: 50, y: 30, anchor: "center" },
+  introText: { x: 50, y: 42.5, anchor: "center" },
+  participantName: { x: 50, y: 50.5, anchor: "center" },
+  actionText: { x: 50, y: 58.5, anchor: "center" },
+  eventName: { x: 50, y: 64.5, anchor: "center" },
+  dateVenue: { x: 50, y: 71, anchor: "center" },
+  organizerSignature: { x: 12, y: 82, width: DEFAULT_SIGNATURE_WIDTH, anchor: "left" },
+  hodSignature: { x: 50, y: 82, width: DEFAULT_SIGNATURE_WIDTH, anchor: "center" },
+  principalSignature: { x: 88, y: 82, width: DEFAULT_SIGNATURE_WIDTH, anchor: "right" },
+  coordinatorLabel: { x: 12, y: 90, anchor: "left" },
+  hodLabel: { x: 50, y: 90, anchor: "center" },
+  principalLabel: { x: 88, y: 90, anchor: "right" },
+  footerText: { x: 50, y: 75, anchor: "center" },
+  verificationCode: {
+    x: 96,
+    y: 92,
+    width: VERIFICATION_BADGE_WIDTH,
+    height: VERIFICATION_BADGE_HEIGHT,
+    anchor: "right"
+  }
+});
+
+const LEGACY_DEFAULT_BODY_LAYOUT = Object.freeze({
+  introText: { x: 12, y: 43, anchor: "left" },
+  participantName: { x: 12, y: 50, anchor: "left" },
+  actionText: { x: 12, y: 58, anchor: "left" },
+  eventName: { x: 12, y: 63, anchor: "left" },
+  dateVenue: { x: 12, y: 70, anchor: "left" }
+});
+
+const LEGACY_DEFAULT_SIGNATURE_LAYOUT = Object.freeze({
+  organizerSignature: { x: 12, y: 82, width: LEGACY_SIGNATURE_WIDTH, anchor: "left" },
+  hodSignature: { x: 50, y: 82, width: LEGACY_SIGNATURE_WIDTH, anchor: "center" },
+  principalSignature: { x: 88, y: 82, width: LEGACY_SIGNATURE_WIDTH, anchor: "right" }
+});
+
+const createDefaultCertificateStyles = () => ({
+  issuerName: { fontSize: 24, color: "#b91c1c" },
+  title: { fontSize: 20, color: "#ffffff" },
+  introText: { fontSize: 12, color: "#334155" },
+  participantName: { fontSize: 22, color: "#0f172a" },
+  actionText: { fontSize: 12, color: "#334155" },
+  eventName: { fontSize: 16, color: "#0f172a" },
+  dateVenue: { fontSize: 11, color: "#475569" },
+  organizerName: { fontSize: 10, color: "#334155" },
+  organizerDepartment: { fontSize: 9, color: "#64748b" },
+  hodName: { fontSize: 10, color: "#334155" },
+  hodDepartment: { fontSize: 9, color: "#64748b" },
+  principalName: { fontSize: 10, color: "#334155" },
+  principalDepartment: { fontSize: 9, color: "#64748b" },
+  coordinatorLabel: { fontSize: 11, color: "#b91c1c" },
+  hodLabel: { fontSize: 11, color: "#b91c1c" },
+  principalLabel: { fontSize: 11, color: "#b91c1c" },
+  footerText: { fontSize: 11, color: "#1f2937" }
 });
 
 const createDefaultCertificateCustomization = () => ({
-  issuerName: "BAJAJ CHANDRAPUR POLYTECHNIC, CHANDRAPUR",
-  participationTitle: "Certificate of Participation",
+  issuerName: "BAJAJ CHANDRAPUR POLYTECHNIC",
+  participationTitle: "Certificate",
   winnerTitle: "Certificate of Excellence",
-  introText: "This is to certify that",
-  participationActionText: "has successfully participated in",
-  winnerActionText: "has achieved {position} Place in",
-  footerText: "Issued by EventMate - Bajaj Chandrapur Polytechnic, Chandrapur",
-  coordinatorLabel: "Coordinator",
+  introText: "This is to certify that Mr./Miss",
+  participationActionText: "Participated in the Event",
+  winnerActionText: "Secured {position} Position in",
+  footerText: "We appreciate his/her enthusiasm and wish him/her all the best for future.",
+  coordinatorLabel: "Organizer",
+  hodLabel: "HOD",
   principalLabel: "Principal",
+  organizerName: "",
+  organizerDepartment: "",
+  hodName: "",
+  hodDepartment: "",
+  principalName: "",
+  principalDepartment: "",
+  organizerSignatureUrl: "",
+  hodSignatureUrl: "",
+  principalSignatureUrl: "",
+  accreditationLogoUrl: "",
+  logoUrl: "",
   backgroundImageUrl: "",
-  layout: createDefaultCertificateLayout()
+  layout: createDefaultCertificateLayout(),
+  styles: createDefaultCertificateStyles()
 });
 
 export const DEFAULT_CERTIFICATE_CUSTOMIZATION = Object.freeze(
@@ -111,17 +197,44 @@ const CERTIFICATE_CUSTOMIZATION_LIMITS = Object.freeze({
   winnerActionText: 180,
   footerText: 180,
   coordinatorLabel: 50,
+  hodLabel: 50,
   principalLabel: 50,
-  backgroundImageUrl: 800
+  organizerName: 80,
+  organizerDepartment: 80,
+  hodName: 80,
+  hodDepartment: 80,
+  principalName: 80,
+  principalDepartment: 80,
+  backgroundImageUrl: 800,
+  accreditationLogoUrl: 800,
+  logoUrl: 800,
+  organizerSignatureUrl: 800,
+  hodSignatureUrl: 800,
+  principalSignatureUrl: 800
 });
 
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const sanitizeFontSize = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clampNumber(numeric, 8, 40);
+};
 
 const sanitizeCustomizationField = (value, fallback, maxLength) => {
   const normalized = String(value ?? "").trim();
   if (!normalized) return fallback;
   if (!Number.isFinite(maxLength) || maxLength <= 0) return normalized;
   return normalized.slice(0, maxLength);
+};
+
+const sanitizeColor = (value, fallback) => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return fallback;
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(normalized)) {
+    return normalized.toLowerCase();
+  }
+  return fallback;
 };
 
 const sanitizePercent = (value, fallback) => {
@@ -144,7 +257,25 @@ const sanitizeLogoWidth = (value, fallback) => {
   return clampNumber(numeric, 60, 320);
 };
 
-const sanitizeBackgroundImageUrl = (value) => {
+const sanitizeSignatureWidth = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clampNumber(numeric, 40, 200);
+};
+
+const sanitizeVerificationBadgeWidth = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clampNumber(numeric, 180, 420);
+};
+
+const sanitizeVerificationBadgeHeight = (value, fallback) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return clampNumber(numeric, 22, 52);
+};
+
+const sanitizeImageUrl = (value) => {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "";
   if (!/^https?:\/\//i.test(normalized)) return "";
@@ -157,23 +288,128 @@ const normalizeLayoutNode = (layoutNode, fallbackNode) => ({
   anchor: sanitizeAnchor(layoutNode?.anchor, fallbackNode.anchor)
 });
 
+const matchesLayoutNode = (layoutNode, targetNode) =>
+  Number(layoutNode?.x) === targetNode.x &&
+  Number(layoutNode?.y) === targetNode.y &&
+  String(layoutNode?.anchor || "").trim().toLowerCase() === targetNode.anchor;
+
+const matchesSignatureLayoutNode = (layoutNode, targetNode) =>
+  matchesLayoutNode(layoutNode, targetNode) && Number(layoutNode?.width) === targetNode.width;
+
+const normalizeStyleNode = (styleNode, fallbackNode) => ({
+  fontSize: sanitizeFontSize(styleNode?.fontSize, fallbackNode.fontSize),
+  color: sanitizeColor(styleNode?.color, fallbackNode.color)
+});
+
 const normalizeCertificateLayout = (layout = {}) => {
   const fallback = createDefaultCertificateLayout();
+  const shouldUpgradeLegacyBodyDefaults =
+    Object.keys(LEGACY_DEFAULT_BODY_LAYOUT).length > 0 &&
+    Object.entries(LEGACY_DEFAULT_BODY_LAYOUT).every(([fieldKey, legacyNode]) =>
+      matchesLayoutNode(layout?.[fieldKey], legacyNode)
+    );
+  const shouldUpgradeLegacySignatureDefaults =
+    Object.keys(LEGACY_DEFAULT_SIGNATURE_LAYOUT).length > 0 &&
+    Object.entries(LEGACY_DEFAULT_SIGNATURE_LAYOUT).every(([fieldKey, legacyNode]) =>
+      matchesSignatureLayoutNode(layout?.[fieldKey], legacyNode)
+    );
   return {
     logo: {
       ...normalizeLayoutNode(layout?.logo, fallback.logo),
       width: sanitizeLogoWidth(layout?.logo?.width, fallback.logo.width)
     },
+    accreditationLogo: {
+      ...normalizeLayoutNode(layout?.accreditationLogo, fallback.accreditationLogo),
+      width: sanitizeLogoWidth(
+        layout?.accreditationLogo?.width,
+        fallback.accreditationLogo.width
+      )
+    },
+    estd: normalizeLayoutNode(layout?.estd, fallback.estd),
+    trust: normalizeLayoutNode(layout?.trust, fallback.trust),
+    campus: normalizeLayoutNode(layout?.campus, fallback.campus),
+    approvals: normalizeLayoutNode(layout?.approvals, fallback.approvals),
     issuerName: normalizeLayoutNode(layout?.issuerName, fallback.issuerName),
     title: normalizeLayoutNode(layout?.title, fallback.title),
-    introText: normalizeLayoutNode(layout?.introText, fallback.introText),
-    participantName: normalizeLayoutNode(layout?.participantName, fallback.participantName),
-    actionText: normalizeLayoutNode(layout?.actionText, fallback.actionText),
-    eventName: normalizeLayoutNode(layout?.eventName, fallback.eventName),
-    dateVenue: normalizeLayoutNode(layout?.dateVenue, fallback.dateVenue),
+    introText: normalizeLayoutNode(
+      shouldUpgradeLegacyBodyDefaults ? fallback.introText : layout?.introText,
+      fallback.introText
+    ),
+    participantName: normalizeLayoutNode(
+      shouldUpgradeLegacyBodyDefaults ? fallback.participantName : layout?.participantName,
+      fallback.participantName
+    ),
+    actionText: normalizeLayoutNode(
+      shouldUpgradeLegacyBodyDefaults ? fallback.actionText : layout?.actionText,
+      fallback.actionText
+    ),
+    eventName: normalizeLayoutNode(
+      shouldUpgradeLegacyBodyDefaults ? fallback.eventName : layout?.eventName,
+      fallback.eventName
+    ),
+    dateVenue: normalizeLayoutNode(
+      shouldUpgradeLegacyBodyDefaults ? fallback.dateVenue : layout?.dateVenue,
+      fallback.dateVenue
+    ),
+    organizerSignature: {
+      ...normalizeLayoutNode(layout?.organizerSignature, fallback.organizerSignature),
+      width: sanitizeSignatureWidth(
+        shouldUpgradeLegacySignatureDefaults ? undefined : layout?.organizerSignature?.width,
+        fallback.organizerSignature.width
+      )
+    },
+    hodSignature: {
+      ...normalizeLayoutNode(layout?.hodSignature, fallback.hodSignature),
+      width: sanitizeSignatureWidth(
+        shouldUpgradeLegacySignatureDefaults ? undefined : layout?.hodSignature?.width,
+        fallback.hodSignature.width
+      )
+    },
+    principalSignature: {
+      ...normalizeLayoutNode(layout?.principalSignature, fallback.principalSignature),
+      width: sanitizeSignatureWidth(
+        shouldUpgradeLegacySignatureDefaults ? undefined : layout?.principalSignature?.width,
+        fallback.principalSignature.width
+      )
+    },
     coordinatorLabel: normalizeLayoutNode(layout?.coordinatorLabel, fallback.coordinatorLabel),
+    hodLabel: normalizeLayoutNode(layout?.hodLabel, fallback.hodLabel),
     principalLabel: normalizeLayoutNode(layout?.principalLabel, fallback.principalLabel),
-    footerText: normalizeLayoutNode(layout?.footerText, fallback.footerText)
+    footerText: normalizeLayoutNode(layout?.footerText, fallback.footerText),
+    verificationCode: {
+      ...normalizeLayoutNode(layout?.verificationCode, fallback.verificationCode),
+      width: sanitizeVerificationBadgeWidth(
+        layout?.verificationCode?.width,
+        fallback.verificationCode.width
+      ),
+      height: sanitizeVerificationBadgeHeight(
+        layout?.verificationCode?.height,
+        fallback.verificationCode.height
+      )
+    }
+  };
+};
+
+const normalizeCertificateStyles = (styles = {}) => {
+  const fallback = createDefaultCertificateStyles();
+  return {
+    issuerName: normalizeStyleNode(styles?.issuerName, fallback.issuerName),
+    title: normalizeStyleNode(styles?.title, fallback.title),
+    introText: normalizeStyleNode(styles?.introText, fallback.introText),
+    participantName: normalizeStyleNode(styles?.participantName, fallback.participantName),
+    actionText: normalizeStyleNode(styles?.actionText, fallback.actionText),
+    eventName: normalizeStyleNode(styles?.eventName, fallback.eventName),
+    dateVenue: normalizeStyleNode(styles?.dateVenue, fallback.dateVenue),
+    organizerName: normalizeStyleNode(styles?.organizerName, fallback.organizerName),
+    organizerDepartment: normalizeStyleNode(styles?.organizerDepartment, fallback.organizerDepartment),
+    hodName: normalizeStyleNode(styles?.hodName, fallback.hodName),
+    hodDepartment: normalizeStyleNode(styles?.hodDepartment, fallback.hodDepartment),
+    principalName: normalizeStyleNode(styles?.principalName, fallback.principalName),
+    principalDepartment: normalizeStyleNode(styles?.principalDepartment, fallback.principalDepartment),
+    coordinatorLabel: normalizeStyleNode(styles?.coordinatorLabel, fallback.coordinatorLabel),
+    hodLabel: normalizeStyleNode(styles?.hodLabel, fallback.hodLabel),
+    principalLabel: normalizeStyleNode(styles?.principalLabel, fallback.principalLabel),
+    footerText: normalizeStyleNode(styles?.footerText, fallback.footerText)
   };
 };
 
@@ -222,19 +458,60 @@ export const normalizeCertificateCustomization = (customization = {}) => {
       DEFAULT_CERTIFICATE_CUSTOMIZATION.coordinatorLabel,
       CERTIFICATE_CUSTOMIZATION_LIMITS.coordinatorLabel
     ),
+    hodLabel: sanitizeCustomizationField(
+      safeCustomization.hodLabel,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.hodLabel,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.hodLabel
+    ),
     principalLabel: sanitizeCustomizationField(
       safeCustomization.principalLabel,
       DEFAULT_CERTIFICATE_CUSTOMIZATION.principalLabel,
       CERTIFICATE_CUSTOMIZATION_LIMITS.principalLabel
     ),
-    backgroundImageUrl: sanitizeBackgroundImageUrl(safeCustomization.backgroundImageUrl),
-    layout: normalizeCertificateLayout(safeCustomization.layout)
+    organizerName: sanitizeCustomizationField(
+      safeCustomization.organizerName,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.organizerName,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.organizerName
+    ),
+    organizerDepartment: sanitizeCustomizationField(
+      safeCustomization.organizerDepartment,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.organizerDepartment,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.organizerDepartment
+    ),
+    hodName: sanitizeCustomizationField(
+      safeCustomization.hodName,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.hodName,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.hodName
+    ),
+    hodDepartment: sanitizeCustomizationField(
+      safeCustomization.hodDepartment,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.hodDepartment,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.hodDepartment
+    ),
+    principalName: sanitizeCustomizationField(
+      safeCustomization.principalName,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.principalName,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.principalName
+    ),
+    principalDepartment: sanitizeCustomizationField(
+      safeCustomization.principalDepartment,
+      DEFAULT_CERTIFICATE_CUSTOMIZATION.principalDepartment,
+      CERTIFICATE_CUSTOMIZATION_LIMITS.principalDepartment
+    ),
+    organizerSignatureUrl: sanitizeImageUrl(safeCustomization.organizerSignatureUrl),
+    hodSignatureUrl: sanitizeImageUrl(safeCustomization.hodSignatureUrl),
+    principalSignatureUrl: sanitizeImageUrl(safeCustomization.principalSignatureUrl),
+    accreditationLogoUrl: sanitizeImageUrl(safeCustomization.accreditationLogoUrl),
+    logoUrl: sanitizeImageUrl(safeCustomization.logoUrl),
+    backgroundImageUrl: sanitizeImageUrl(safeCustomization.backgroundImageUrl),
+    layout: normalizeCertificateLayout(safeCustomization.layout),
+    styles: normalizeCertificateStyles(safeCustomization.styles)
   };
 };
 
 const buildWinnerActionText = (template, position) => {
   const safePosition = String(position || "Winning").trim() || "Winning";
-  if (!template.includes("{position}")) {
+  if (!/\{position\}/i.test(template)) {
     return `${template} ${safePosition}`.trim();
   }
   return template.replace(/\{position\}/gi, safePosition);
@@ -311,7 +588,11 @@ export const isEventWinnerRankingComplete = async (eventId) => {
 };
 
 // Logo path stored in backend root
-const LOGO_PATH = path.join(__dirname, "../../logo.png");
+const LOGO_PATH = path.join(__dirname, "../../../Frontend/src/assets/logo.png");
+const ACCREDITATION_LOGO_PATH = path.join(
+  __dirname,
+  "../../../Frontend/src/assets/nba-accreditation.png"
+);
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -319,11 +600,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const resolveBackgroundImageBuffer = async (backgroundImageUrl) => {
-  if (!backgroundImageUrl) return null;
+const resolveImageBuffer = async (imageUrl) => {
+  if (!imageUrl) return null;
 
   try {
-    const response = await fetch(backgroundImageUrl);
+    const response = await fetch(imageUrl);
     if (!response.ok) return null;
 
     const contentType = String(response.headers.get("content-type") || "").toLowerCase();
@@ -344,6 +625,11 @@ const computeAnchoredX = ({ x, width, anchor, pageWidth }) => {
   return clampNumber(x, 0, pageWidth - width);
 };
 
+const offsetLayoutNode = (node, offsetY) => ({
+  ...node,
+  y: clampNumber(Number(node?.y || 0) + offsetY, 0, 100)
+});
+
 const drawAnchoredText = (
   doc,
   {
@@ -356,7 +642,9 @@ const drawAnchoredText = (
     color,
     maxWidth,
     lineBreak = false,
-    characterSpacing = 0
+    characterSpacing = 0,
+    singleLine = false,
+    minFontSize = 8
   }
 ) => {
   if (!text) return;
@@ -365,7 +653,38 @@ const drawAnchoredText = (
   const y = (layoutNode.y / 100) * pageHeight;
   const width = clampNumber(Number(maxWidth || pageWidth * 0.8), 40, pageWidth);
 
-  doc.fontSize(fontSize).fillColor(color).font(font);
+  doc.fillColor(color).font(font);
+
+  let resolvedFontSize = fontSize;
+  doc.fontSize(resolvedFontSize);
+
+  if (singleLine && !String(text).includes("\n")) {
+    let measuredSingleLineWidth =
+      Number(doc.widthOfString(text, { characterSpacing })) || 0;
+
+    while (measuredSingleLineWidth > width && resolvedFontSize > minFontSize) {
+      resolvedFontSize = Math.max(minFontSize, resolvedFontSize - 0.5);
+      doc.fontSize(resolvedFontSize);
+      measuredSingleLineWidth =
+        Number(doc.widthOfString(text, { characterSpacing })) || 0;
+      if (resolvedFontSize === minFontSize) break;
+    }
+
+    const drawX = computeAnchoredX({
+      x,
+      width: Math.min(measuredSingleLineWidth, width),
+      anchor: layoutNode.anchor,
+      pageWidth
+    });
+
+    doc.text(text, drawX, y, {
+      lineBreak,
+      characterSpacing
+    });
+    return;
+  }
+
+  doc.fontSize(resolvedFontSize);
 
   const measuredWidth = Math.min(
     Number(doc.widthOfString(text, { characterSpacing })) || 0,
@@ -406,6 +725,7 @@ const generateCertificatePDF = async (data) => {
 
   const resolvedCustomization = normalizeCertificateCustomization(customization);
   const layout = resolvedCustomization.layout;
+  const styles = resolvedCustomization.styles || createDefaultCertificateStyles();
   const isWinner = certificateType === "winner";
   const typeLabel = isWinner
     ? resolvedCustomization.winnerTitle
@@ -414,8 +734,21 @@ const generateCertificatePDF = async (data) => {
     ? buildWinnerActionText(resolvedCustomization.winnerActionText, position)
     : resolvedCustomization.participationActionText;
 
-  const backgroundBuffer = await resolveBackgroundImageBuffer(
+  const backgroundBuffer = await resolveImageBuffer(
     resolvedCustomization.backgroundImageUrl
+  );
+  const logoBuffer = await resolveImageBuffer(resolvedCustomization.logoUrl);
+  const accreditationLogoBuffer = await resolveImageBuffer(
+    resolvedCustomization.accreditationLogoUrl
+  );
+  const organizerSignatureBuffer = await resolveImageBuffer(
+    resolvedCustomization.organizerSignatureUrl
+  );
+  const hodSignatureBuffer = await resolveImageBuffer(
+    resolvedCustomization.hodSignatureUrl
+  );
+  const principalSignatureBuffer = await resolveImageBuffer(
+    resolvedCustomization.principalSignatureUrl
   );
 
   return new Promise((resolve, reject) => {
@@ -443,10 +776,123 @@ const generateCertificatePDF = async (data) => {
       }
     }
 
-    doc.rect(20, 20, W - 40, H - 40).lineWidth(3).stroke("#7C3AED");
-    doc.rect(28, 28, W - 56, H - 56).lineWidth(1).stroke("#EC4899");
-    doc.rect(20, 20, W - 40, 6).fill("#7C3AED");
-    doc.rect(20, H - 26, W - 40, 6).fill("#EC4899");
+    const showTemplateDecor = !backgroundBuffer;
+    if (showTemplateDecor) {
+      doc.rect(0, 0, W, H).fill("#f8fafc");
+      doc.rect(0, 0, W, H * 0.26).fill("#e5ecf6");
+      doc.rect(0, 0, W, H * 0.12).fill("#d9e4f2");
+
+      const sideBandWidth = W * 0.012;
+      doc.save();
+      doc.opacity(0.6);
+      doc.rect(0, 0, sideBandWidth, H).fill("#f2c14e");
+      doc.rect(W - sideBandWidth, 0, sideBandWidth, H).fill("#f2c14e");
+      doc.restore();
+
+      doc.rect(16, 16, W - 32, H - 32).lineWidth(1.2).stroke("#94a3b8");
+      doc.save();
+      doc.opacity(0.7);
+      doc.rect(24, 24, W - 48, H - 48).lineWidth(0.8).stroke("#f59e0b");
+      doc.restore();
+
+      drawAnchoredText(doc, {
+        text: CERTIFICATE_HEADER.trust,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: layout.trust,
+        fontSize: 10,
+        font: "Helvetica-Bold",
+        color: "#475569",
+        maxWidth: W * 0.9,
+        characterSpacing: 2.2
+      });
+
+      drawAnchoredText(doc, {
+        text: CERTIFICATE_HEADER.campus,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: layout.campus,
+        fontSize: 11,
+        font: "Helvetica-Bold",
+        color: "#334155",
+        maxWidth: W * 0.9
+      });
+
+      drawAnchoredText(doc, {
+        text: CERTIFICATE_HEADER.approvals,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: layout.approvals,
+        fontSize: 9,
+        font: "Helvetica",
+        color: "#64748b",
+        maxWidth: W * 0.9
+      });
+
+      drawAnchoredText(doc, {
+        text: CERTIFICATE_HEADER.estd,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: layout.estd,
+        fontSize: 8,
+        font: "Helvetica-Bold",
+        color: "#475569",
+        maxWidth: W * 0.2
+      });
+
+      doc.save();
+      doc.opacity(0.45);
+      doc.lineWidth(0.6).stroke("#94a3b8");
+      doc.moveTo(W * 0.12, H * 0.25).lineTo(W * 0.88, H * 0.25).stroke();
+      doc.restore();
+
+      doc.save();
+      doc.opacity(0.05);
+      const wmRadius = Math.min(W, H) * 0.15;
+      const wmX = W / 2;
+      const wmY = H * 0.52;
+      doc.circle(wmX, wmY, wmRadius).lineWidth(2).stroke("#64748b");
+      doc.circle(wmX, wmY, wmRadius * 0.75).lineWidth(1).stroke("#64748b");
+      for (let i = 0; i < 16; i += 1) {
+        const angle = (i * Math.PI) / 8;
+        const x1 = wmX + Math.cos(angle) * wmRadius * 0.35;
+        const y1 = wmY + Math.sin(angle) * wmRadius * 0.35;
+        const x2 = wmX + Math.cos(angle) * wmRadius * 0.9;
+        const y2 = wmY + Math.sin(angle) * wmRadius * 0.9;
+        doc.moveTo(x1, y1).lineTo(x2, y2).lineWidth(1).stroke("#64748b");
+      }
+      doc.restore();
+
+      doc.save();
+      doc.opacity(0.14);
+      doc
+        .moveTo(0, H - 90)
+        .lineTo(W * 0.08, H - 105)
+        .lineTo(W * 0.18, H - 95)
+        .lineTo(W * 0.3, H - 115)
+        .lineTo(W * 0.42, H - 95)
+        .lineTo(W * 0.56, H - 110)
+        .lineTo(W * 0.7, H - 95)
+        .lineTo(W * 0.82, H - 110)
+        .lineTo(W, H - 100)
+        .lineTo(W, H)
+        .lineTo(0, H)
+        .closePath()
+        .fill("#64748b");
+      for (let i = 0; i < 18; i += 1) {
+        const cx = 40 + i * 60;
+        doc.circle(cx, H - 20, 12).fill("#64748b");
+      }
+      doc.restore();
+
+      doc.save();
+      doc.opacity(0.55);
+      doc.lineWidth(0.6).stroke("#94a3b8");
+      doc.moveTo(W * 0.08, H * 0.84).lineTo(W * 0.28, H * 0.84).stroke();
+      doc.moveTo(W * 0.4, H * 0.84).lineTo(W * 0.6, H * 0.84).stroke();
+      doc.moveTo(W * 0.72, H * 0.84).lineTo(W * 0.92, H * 0.84).stroke();
+      doc.restore();
+    }
 
     const logoCenterX = (layout.logo.x / 100) * W;
     const logoTopY = (layout.logo.y / 100) * H;
@@ -458,42 +904,167 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W
     });
 
-    try {
-      doc.image(LOGO_PATH, logoX, logoTopY, { width: logoWidth });
-    } catch {
-      drawAnchoredText(doc, {
-        text: "EventMate",
-        pageWidth: W,
-        pageHeight: H,
-        layoutNode: { ...layout.logo, y: layout.logo.y + 2 },
-        fontSize: 20,
-        font: "Helvetica-Bold",
-        color: "#7C3AED",
-        maxWidth: 220
-      });
+    let logoRendered = false;
+    if (logoBuffer) {
+      try {
+        doc.image(logoBuffer, logoX, logoTopY, { width: logoWidth });
+        logoRendered = true;
+      } catch {
+        logoRendered = false;
+      }
+    }
+    if (!logoRendered) {
+      try {
+        doc.image(LOGO_PATH, logoX, logoTopY, { width: logoWidth });
+        logoRendered = true;
+      } catch {
+        logoRendered = false;
+      }
     }
 
+    if (!logoRendered) {
+      const centerX = logoX + logoWidth / 2;
+      const centerY = logoTopY + logoWidth / 2;
+      doc.save();
+      doc.circle(centerX, centerY, logoWidth / 2).lineWidth(2).stroke("#b45309");
+      doc.circle(centerX, centerY, logoWidth / 2 - 6).lineWidth(1).stroke("#f59e0b");
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .fillColor("#b45309")
+        .text("BCP", centerX - logoWidth / 4, centerY - 5, {
+          width: logoWidth / 2,
+          align: "center"
+        });
+      doc.restore();
+    }
+    if (layout.accreditationLogo?.width) {
+      const accreditationWidth = layout.accreditationLogo.width;
+      const accreditationX = computeAnchoredX({
+        x: (layout.accreditationLogo.x / 100) * W,
+        width: accreditationWidth,
+        anchor: layout.accreditationLogo.anchor,
+        pageWidth: W
+      });
+      const accreditationY = clampNumber(
+        (layout.accreditationLogo.y / 100) * H,
+        0,
+        Math.max(H - accreditationWidth, 0)
+      );
+      let accreditationLogoRendered = false;
+      if (accreditationLogoBuffer) {
+        try {
+          doc.image(accreditationLogoBuffer, accreditationX, accreditationY, {
+            width: accreditationWidth
+          });
+          accreditationLogoRendered = true;
+        } catch {
+          accreditationLogoRendered = false;
+        }
+      }
+      if (!accreditationLogoRendered) {
+        try {
+          doc.image(ACCREDITATION_LOGO_PATH, accreditationX, accreditationY, {
+            width: accreditationWidth
+          });
+        } catch {
+          // Ignore missing or invalid accreditation logo assets.
+        }
+      }
+    }
+
+    const ribbonWidth = W * 0.46;
+    const ribbonHeight = H * 0.09;
+    const ribbonX = computeAnchoredX({
+      x: (layout.title.x / 100) * W,
+      width: ribbonWidth,
+      anchor: layout.title.anchor,
+      pageWidth: W
+    });
+    const ribbonY = (layout.title.y / 100) * H;
+
+    doc.save();
+    doc.fillColor("#9F1239");
+    doc.roundedRect(ribbonX, ribbonY, ribbonWidth, ribbonHeight, 8).fill();
+    doc.polygon(
+      [ribbonX - ribbonHeight * 0.6, ribbonY + ribbonHeight / 2],
+      [ribbonX, ribbonY + ribbonHeight * 0.1],
+      [ribbonX, ribbonY + ribbonHeight * 0.9]
+    ).fill("#7F1D1D");
+    doc.polygon(
+      [ribbonX + ribbonWidth + ribbonHeight * 0.6, ribbonY + ribbonHeight / 2],
+      [ribbonX + ribbonWidth, ribbonY + ribbonHeight * 0.1],
+      [ribbonX + ribbonWidth, ribbonY + ribbonHeight * 0.9]
+    ).fill("#7F1D1D");
+    doc.fillColor("#BE123C").rect(ribbonX, ribbonY, ribbonWidth, ribbonHeight * 0.4).fill();
+    doc.restore();
+
+    const drawSignatureImage = (buffer, layoutNode) => {
+      if (!buffer || !layoutNode?.width) return;
+      const width = layoutNode.width;
+      const x = computeAnchoredX({
+        x: (layoutNode.x / 100) * W,
+        width,
+        anchor: layoutNode.anchor,
+        pageWidth: W
+      });
+      const y = (layoutNode.y / 100) * H;
+      try {
+        doc.image(buffer, x, y, {
+          fit: [width, SIGNATURE_DISPLAY_MAX_HEIGHT],
+          align:
+            layoutNode.anchor === "right"
+              ? "right"
+              : layoutNode.anchor === "center"
+                ? "center"
+                : "left",
+          valign: "bottom"
+        });
+      } catch {
+        // Ignore invalid signature images.
+      }
+    };
+
+    drawSignatureImage(organizerSignatureBuffer, layout.organizerSignature);
+    drawSignatureImage(hodSignatureBuffer, layout.hodSignature);
+      drawSignatureImage(principalSignatureBuffer, layout.principalSignature);
+
+    const displayIssuerName = String(resolvedCustomization.issuerName || "").toUpperCase();
+
     drawAnchoredText(doc, {
-      text: resolvedCustomization.issuerName,
+      text: displayIssuerName,
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.issuerName,
-      fontSize: 9,
-      font: "Helvetica",
-      color: "#9ca3af",
+      fontSize: styles.issuerName.fontSize,
+      font: "Helvetica-Bold",
+      color: styles.issuerName.color,
       maxWidth: W * 0.92,
-      characterSpacing: 1.2
+      characterSpacing: 1.4,
+      lineBreak: false,
+      singleLine: true,
+      minFontSize: 18
     });
+
+    const resolvedTitleSize =
+      typeLabel.length > 22
+        ? Math.max(styles.title.fontSize - 2, 12)
+        : styles.title.fontSize;
 
     drawAnchoredText(doc, {
       text: typeLabel,
       pageWidth: W,
       pageHeight: H,
-      layoutNode: layout.title,
-      fontSize: 24,
+      layoutNode: {
+        ...layout.title,
+        y: (ribbonY + Math.max((ribbonHeight - resolvedTitleSize) / 2 - 1, 0)) / H * 100
+      },
+      fontSize: resolvedTitleSize,
       font: "Helvetica-Bold",
-      color: "#111827",
-      maxWidth: W * 0.8
+      color: styles.title.color,
+      maxWidth: ribbonWidth * 0.82,
+      singleLine: true,
+      minFontSize: 14
     });
 
     drawAnchoredText(doc, {
@@ -501,10 +1072,10 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.introText,
-      fontSize: 12,
-      font: "Helvetica",
-      color: "#6b7280",
-      maxWidth: W * 0.82
+      fontSize: styles.introText.fontSize,
+      font: "Times-Italic",
+      color: styles.introText.color,
+      maxWidth: W * 0.8
     });
 
     drawAnchoredText(doc, {
@@ -512,10 +1083,12 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.participantName,
-      fontSize: 34,
-      font: "Helvetica-Bold",
-      color: "#7C3AED",
-      maxWidth: W * 0.86
+      fontSize: styles.participantName.fontSize,
+      font: "Times-Bold",
+      color: styles.participantName.color,
+      maxWidth: W * 0.82,
+      singleLine: true,
+      minFontSize: 16
     });
 
     drawAnchoredText(doc, {
@@ -523,10 +1096,10 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.actionText,
-      fontSize: 12,
-      font: "Helvetica",
-      color: "#6b7280",
-      maxWidth: W * 0.82
+      fontSize: styles.actionText.fontSize,
+      font: "Times-Italic",
+      color: styles.actionText.color,
+      maxWidth: W * 0.8
     });
 
     drawAnchoredText(doc, {
@@ -534,32 +1107,136 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.eventName,
-      fontSize: 22,
-      font: "Helvetica-Bold",
-      color: "#111827",
-      maxWidth: W * 0.86
+      fontSize: styles.eventName.fontSize,
+      font: "Times-Bold",
+      color: styles.eventName.color,
+      maxWidth: W * 0.84,
+      lineBreak: true
     });
 
+    const organizerLine = `Organized by ${resolvedCustomization.issuerName}, Chandrapur.`;
+    const metaText = `${organizerLine}\nDate : ${eventDate}`;
+
     drawAnchoredText(doc, {
-      text: `${eventDate} - ${venue}`,
+      text: metaText,
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.dateVenue,
-      fontSize: 10,
-      font: "Helvetica",
-      color: "#9ca3af",
-      maxWidth: W * 0.82
+      fontSize: styles.dateVenue.fontSize,
+      font: "Times-Italic",
+      color: styles.dateVenue.color,
+      maxWidth: W * 0.82,
+      lineBreak: true
     });
+
+    const organizerNameNode = offsetLayoutNode(layout.coordinatorLabel, -3.2);
+    const organizerDeptNode = offsetLayoutNode(layout.coordinatorLabel, -1.6);
+    const hodNameNode = offsetLayoutNode(layout.hodLabel, -3.2);
+    const hodDeptNode = offsetLayoutNode(layout.hodLabel, -1.6);
+    const principalNameNode = offsetLayoutNode(layout.principalLabel, -3.2);
+    const principalDeptNode = offsetLayoutNode(layout.principalLabel, -1.6);
+
+    if (resolvedCustomization.organizerName) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.organizerName,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: organizerNameNode,
+        fontSize: styles.organizerName.fontSize,
+        font: "Helvetica-Bold",
+        color: styles.organizerName.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
+    if (resolvedCustomization.organizerDepartment) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.organizerDepartment,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: organizerDeptNode,
+        fontSize: styles.organizerDepartment.fontSize,
+        font: "Helvetica",
+        color: styles.organizerDepartment.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
+    if (resolvedCustomization.hodName) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.hodName,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: hodNameNode,
+        fontSize: styles.hodName.fontSize,
+        font: "Helvetica-Bold",
+        color: styles.hodName.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
+    if (resolvedCustomization.hodDepartment) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.hodDepartment,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: hodDeptNode,
+        fontSize: styles.hodDepartment.fontSize,
+        font: "Helvetica",
+        color: styles.hodDepartment.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
+    if (resolvedCustomization.principalName) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.principalName,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: principalNameNode,
+        fontSize: styles.principalName.fontSize,
+        font: "Helvetica-Bold",
+        color: styles.principalName.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
+    if (resolvedCustomization.principalDepartment) {
+      drawAnchoredText(doc, {
+        text: resolvedCustomization.principalDepartment,
+        pageWidth: W,
+        pageHeight: H,
+        layoutNode: principalDeptNode,
+        fontSize: styles.principalDepartment.fontSize,
+        font: "Helvetica",
+        color: styles.principalDepartment.color,
+        maxWidth: W * 0.28,
+        singleLine: true
+      });
+    }
 
     drawAnchoredText(doc, {
       text: resolvedCustomization.coordinatorLabel,
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.coordinatorLabel,
-      fontSize: 11,
-      font: "Helvetica",
-      color: "#4b5563",
-      maxWidth: W * 0.28
+      fontSize: styles.coordinatorLabel.fontSize,
+      font: "Helvetica-Bold",
+      color: styles.coordinatorLabel.color,
+      maxWidth: W * 0.3,
+      singleLine: true
+    });
+
+    drawAnchoredText(doc, {
+      text: resolvedCustomization.hodLabel,
+      pageWidth: W,
+      pageHeight: H,
+      layoutNode: layout.hodLabel,
+      fontSize: styles.hodLabel.fontSize,
+      font: "Helvetica-Bold",
+      color: styles.hodLabel.color,
+      maxWidth: W * 0.4,
+      singleLine: true
     });
 
     drawAnchoredText(doc, {
@@ -567,10 +1244,11 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.principalLabel,
-      fontSize: 11,
-      font: "Helvetica",
-      color: "#4b5563",
-      maxWidth: W * 0.28
+      fontSize: styles.principalLabel.fontSize,
+      font: "Helvetica-Bold",
+      color: styles.principalLabel.color,
+      maxWidth: W * 0.3,
+      singleLine: true
     });
 
     drawAnchoredText(doc, {
@@ -578,48 +1256,84 @@ const generateCertificatePDF = async (data) => {
       pageWidth: W,
       pageHeight: H,
       layoutNode: layout.footerText,
-      fontSize: 9,
-      font: "Helvetica",
-      color: "#9ca3af",
+      fontSize: styles.footerText.fontSize,
+      font: "Times-Italic",
+      color: styles.footerText.color,
       maxWidth: W * 0.95
     });
 
     if (verificationCode) {
+      const badgeWidth = layout.verificationCode.width;
+      const badgeHeight = layout.verificationCode.height;
+      const badgeX = computeAnchoredX({
+        x: (layout.verificationCode.x / 100) * W,
+        width: badgeWidth,
+        anchor: layout.verificationCode.anchor,
+        pageWidth: W
+      });
+      const badgeY = clampNumber((layout.verificationCode.y / 100) * H, 0, H - badgeHeight);
+      const badgePaddingX = Math.min(12, badgeWidth * 0.05);
+      const labelWidth = clampNumber(badgeWidth * 0.34, 72, 110);
+      const codeX = badgeX + badgePaddingX + labelWidth + 8;
+      const textY = badgeY + Math.max((badgeHeight - 8) / 2 - 1, 4);
+
+      doc.save();
+      doc
+        .roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 6)
+        .fill("#fef3c7");
+      doc.lineWidth(0.8).strokeColor("#f59e0b").roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 6).stroke();
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .fillColor("#92400e")
+        .text("Verification Code", badgeX + badgePaddingX, textY, {
+          width: labelWidth,
+          lineBreak: false
+        });
       doc
         .font("Helvetica")
         .fontSize(8)
-        .fillColor("#6b7280")
-        .text(`Verification Code: ${verificationCode}`, W - 300, H - 34, {
-          width: 260,
-          align: "right"
+        .fillColor("#92400e")
+        .text(`: ${verificationCode}`, codeX, textY, {
+          width: Math.max(badgeX + badgeWidth - codeX - badgePaddingX, 40),
+          lineBreak: false
         });
+      doc.restore();
     }
 
     doc.end();
   });
 };
 
-export const generateDemoCertificateBuffer = async (event, participantName) => {
+export const generateDemoCertificateBuffer = async (event, participantName, options = {}) => {
   if (!event) {
     throw new Error("Event not found");
   }
 
   const displayName = String(participantName || "Organizer").trim() || "Organizer";
   const eventDate = event.schedule?.startDate
-    ? new Date(event.schedule.startDate).toDateString()
+    ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
   const customization = normalizeCertificateCustomization(event?.certificate?.customization);
+  const certificateType = normalizeCertificateType(options?.certificateType) || "participation";
+  const position =
+    certificateType === "winner"
+      ? normalizeWinnerPosition(options?.position) || DEMO_WINNER_POSITION
+      : null;
+
+  const demoYear = new Date().getFullYear();
+  const demoVerificationCode = `EM-DEMO-${demoYear}-ABCD`;
 
   return generateCertificatePDF({
     participantName: displayName,
     eventName: event.title || "Event",
     eventDate,
     venue,
-    certificateType: "participation",
-    position: null,
+    certificateType,
+    position,
     customization,
-    verificationCode: null
+    verificationCode: demoVerificationCode
   });
 };
 
@@ -746,7 +1460,7 @@ const issueCertificateForParticipant = async ({
   const resolvedType = normalizeCertificateType(certificateType) || "participation";
   const resolvedPosition = resolvedType === "winner" ? position || null : null;
   const eventDate = event.schedule?.startDate
-    ? new Date(event.schedule.startDate).toDateString()
+    ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
   const backendBaseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;

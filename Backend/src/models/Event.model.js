@@ -138,12 +138,12 @@ const EventSchema = new mongoose.Schema(
         issuerName: {
           type: String,
           trim: true,
-          default: "BAJAJ CHANDRAPUR POLYTECHNIC, CHANDRAPUR"
+          default: "BAJAJ CHANDRAPUR POLYTECHNIC"
         },
         participationTitle: {
           type: String,
           trim: true,
-          default: "Certificate of Participation"
+          default: "Certificate"
         },
         winnerTitle: {
           type: String,
@@ -153,94 +153,214 @@ const EventSchema = new mongoose.Schema(
         introText: {
           type: String,
           trim: true,
-          default: "This is to certify that"
+          default: "This is to certify that Mr./Miss"
         },
         participationActionText: {
           type: String,
           trim: true,
-          default: "has successfully participated in"
+          default: "Participated in the Event"
         },
         winnerActionText: {
           type: String,
           trim: true,
-          default: "has achieved {position} Place in"
+          default: "Secured {position} Position in"
         },
         footerText: {
           type: String,
           trim: true,
-          default: "Issued by EventMate - Bajaj Chandrapur Polytechnic, Chandrapur"
+          default: "We appreciate his/her enthusiasm and wish him/her all the best for future."
         },
         coordinatorLabel: {
           type: String,
           trim: true,
-          default: "Coordinator"
+          default: "Organizer"
+        },
+        hodLabel: {
+          type: String,
+          trim: true,
+          default: "HOD"
         },
         principalLabel: {
           type: String,
           trim: true,
           default: "Principal"
         },
+        organizerName: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        organizerDepartment: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        hodName: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        hodDepartment: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        principalName: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        principalDepartment: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        organizerSignatureUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        hodSignatureUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        principalSignatureUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        accreditationLogoUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        logoUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
         backgroundImageUrl: {
           type: String,
           trim: true,
           default: ""
         },
+        styles: {
+          type: mongoose.Schema.Types.Mixed,
+          default: {}
+        },
         layout: {
           logo: {
+            x: { type: Number, default: 5.5 },
+            y: { type: Number, default: 8.5 },
+            width: { type: Number, default: 60 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "left" }
+          },
+          accreditationLogo: {
+            x: { type: Number, default: 94.5 },
+            y: { type: Number, default: 6.5 },
+            width: { type: Number, default: 70 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "right" }
+          },
+          estd: {
+            x: { type: Number, default: 79.5 },
+            y: { type: Number, default: 6 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
+          trust: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 8 },
-            width: { type: Number, default: 120 },
+            y: { type: Number, default: 6 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
+          campus: {
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 18 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
+          approvals: {
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 21.5 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           issuerName: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 20 },
+            y: { type: Number, default: 13 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           title: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 25 },
+            y: { type: Number, default: 30 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           introText: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 34 },
+            y: { type: Number, default: 42.5 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           participantName: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 38 },
+            y: { type: Number, default: 50.5 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           actionText: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 46 },
+            y: { type: Number, default: 58.5 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           eventName: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 50 },
+            y: { type: Number, default: 64.5 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
           dateVenue: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 55 },
+            y: { type: Number, default: 71 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
           },
-          coordinatorLabel: {
-            x: { type: Number, default: 9 },
-            y: { type: Number, default: 87 },
+          organizerSignature: {
+            x: { type: Number, default: 12 },
+            y: { type: Number, default: 82 },
+            width: { type: Number, default: 130 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "left" }
           },
+          hodSignature: {
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 82 },
+            width: { type: Number, default: 130 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
+          principalSignature: {
+            x: { type: Number, default: 88 },
+            y: { type: Number, default: 82 },
+            width: { type: Number, default: 130 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "right" }
+          },
+          coordinatorLabel: {
+            x: { type: Number, default: 12 },
+            y: { type: Number, default: 90 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "left" }
+          },
+          hodLabel: {
+            x: { type: Number, default: 50 },
+            y: { type: Number, default: 90 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
           principalLabel: {
-            x: { type: Number, default: 91 },
-            y: { type: Number, default: 87 },
+            x: { type: Number, default: 88 },
+            y: { type: Number, default: 90 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "right" }
           },
           footerText: {
             x: { type: Number, default: 50 },
-            y: { type: Number, default: 93 },
+            y: { type: Number, default: 75 },
             anchor: { type: String, enum: ["left", "center", "right"], default: "center" }
+          },
+          verificationCode: {
+            x: { type: Number, default: 96 },
+            y: { type: Number, default: 92 },
+            width: { type: Number, default: 260 },
+            height: { type: Number, default: 24 },
+            anchor: { type: String, enum: ["left", "center", "right"], default: "right" }
           }
         }
       },

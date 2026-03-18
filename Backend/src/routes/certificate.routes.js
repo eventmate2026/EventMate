@@ -11,6 +11,9 @@ import {
   verifyCertificate,
   updateEventCertificateCustomization,
   uploadEventCertificateBackground,
+  uploadEventCertificateLogo,
+  uploadEventCertificateAccreditationLogo,
+  uploadEventCertificateSignature,
   downloadDemoCertificate
 } from "../controllers/certificate.controller.js";
 
@@ -45,6 +48,32 @@ router.patch(
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   upload.single("background"),
   uploadEventCertificateBackground
+);
+
+// Organizer/Admin updates certificate logo image for an event
+router.patch(
+  "/:eventId/logo",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  upload.single("logo"),
+  uploadEventCertificateLogo
+);
+
+router.patch(
+  "/:eventId/accreditation-logo",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  upload.single("accreditationLogo"),
+  uploadEventCertificateAccreditationLogo
+);
+
+// Organizer/Admin updates certificate signature image for an event
+router.patch(
+  "/:eventId/signature/:role",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  upload.single("signature"),
+  uploadEventCertificateSignature
 );
 
 // Organizer/Admin downloads a demo certificate
