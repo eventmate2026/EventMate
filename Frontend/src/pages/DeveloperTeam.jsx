@@ -9,6 +9,7 @@ const TEAM_MEMBERS = [
     role: "Leader & UI/UX Designer",
     emoji: "🎨",
     githubUrl: "https://github.com/adityaj143",
+    email: "adityajambhulkar513@gmail.com",
     bio: "Visionary leader who shapes product direction and crafts pixel-perfect experiences from idea to interface.",
     skills: ["UI/UX", "Figma", "React", "Leadership"],
     gradient: "from-amber-500 via-orange-500 to-yellow-400",
@@ -22,6 +23,7 @@ const TEAM_MEMBERS = [
     role: "Frontend Developer",
     emoji: "⚡",
     githubUrl: "https://github.com/DakshatNagrale",
+    email: "dakshatnagrale296@gmail.com",
     bio: "Brings designs to life with blazing-fast React components, smooth animations and responsive layouts.",
     skills: ["React", "Tailwind", "Framer Motion", "Vite"],
     gradient: "from-indigo-500 via-purple-500 to-blue-400",
@@ -34,6 +36,7 @@ const TEAM_MEMBERS = [
     role: "Backend Developer",
     emoji: "🔧",
     githubUrl: "https://github.com/off-abhi-1287",
+    email: "abhinayborkar1287@gmail.com",
     bio: "Architects robust APIs and server-side logic that powers every feature silently and reliably.",
     skills: ["Node.js", "Express", "MongoDB", "REST API"],
     gradient: "from-emerald-500 via-teal-500 to-cyan-500",
@@ -46,6 +49,7 @@ const TEAM_MEMBERS = [
     role: "Database Administrator",
     emoji: "🗄️",
     githubUrl: "https://github.com/off-saksham-2007",
+    email: "sakshamkhaire2007@gmail.com",
     bio: "Designs and maintains the data architecture, ensuring every byte is stored, secured and fast.",
     skills: ["MongoDB", "Mongoose", "Schema Design", "Indexing"],
     gradient: "from-pink-500 via-rose-500 to-red-400",
@@ -321,21 +325,40 @@ function MemberCard({ member, index, reduceMotion }) {
           </div>
 
           {/* Links */}
-          <div className="flex items-center gap-3 mt-auto">
-            <a
-              href={member.githubUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={`flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white hover:border-white/30 hover:bg-white/10 transition-all duration-200`}
-            >
-              {/* GitHub icon */}
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
-                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
-              {formatHandle(member.githubUrl)}
-            </a>
-            {/* Status dot */}
-            <div className="ml-auto flex items-center gap-1.5 text-xs text-emerald-400">
+          <div className="mt-auto space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={member.githubUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-white transition-all duration-200 hover:border-white/30 hover:bg-white/10"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                  <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+                </svg>
+                {formatHandle(member.githubUrl)}
+              </a>
+              <a
+                href={`mailto:${member.email}`}
+                className="flex min-w-0 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition-all duration-200 hover:border-white/30 hover:bg-white/10"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-3.5 w-3.5 flex-shrink-0"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.75 7.5 12 13.5l8.25-6M4.5 6.75h15A1.5 1.5 0 0 1 21 8.25v7.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 15.75v-7.5a1.5 1.5 0 0 1 1.5-1.5Z"
+                  />
+                </svg>
+                <span className="truncate">{member.email}</span>
+              </a>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Active
             </div>
