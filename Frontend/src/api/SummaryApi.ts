@@ -265,6 +265,18 @@ const SummaryApi = {
     url: "/api/certificates/:eventId/background",
     method: "patch",
   },
+  upload_event_certificate_logo: {
+    url: "/api/certificates/:eventId/logo",
+    method: "patch",
+  },
+  upload_event_certificate_accreditation_logo: {
+    url: "/api/certificates/:eventId/accreditation-logo",
+    method: "patch",
+  },
+  upload_event_certificate_signature: {
+    url: "/api/certificates/:eventId/signature/:role",
+    method: "patch",
+  },
 
   download_demo_certificate: {
     url: "/api/certificates/:eventId/demo",

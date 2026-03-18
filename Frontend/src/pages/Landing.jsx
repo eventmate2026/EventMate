@@ -33,6 +33,47 @@ const fallbackImages = {
 const EVENTS_CACHE_KEY = "eventmate:public-events-cache";
 const EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const toLocalDate = (value) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
+const isUpcomingEvent = (event) => {
+  const workflowStatus = String(event?.status || "").trim().toLowerCase();
+  if (workflowStatus === "completed" || workflowStatus === "cancelled" || workflowStatus === "canceled") {
+    return false;
+  }
+
+  const startDate = toLocalDate(event?.schedule?.startDate || event?.startDate || event?.createdAt);
+  const endDate = toLocalDate(event?.schedule?.endDate || event?.endDate || event?.schedule?.startDate || event?.startDate || event?.createdAt);
+  const now = toLocalDate(new Date());
+
+  if (endDate && now && now > endDate) return false;
+  return true;
+};
+
+const filterUpcomingEvents = (items) =>
+  Array.isArray(items) ? items.filter((event) => isUpcomingEvent(event)) : [];
+
 const readEventsCache = () => {
   if (typeof window === "undefined") return null;
   try {
@@ -93,6 +134,9 @@ const mapDbEvent = (event) => {
     category,
     image: event?.posterUrl || fallbackImages[category] || fallbackImages.Workshop,
     link: "#",
+    startDate: event?.schedule?.startDate || event?.createdAt || null,
+    endDate: event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || null,
+    status: event?.status || "Published",
   };
 };
 
@@ -134,10 +178,11 @@ export default function Landing() {
   useEffect(() => {
     let isMounted = true;
     const cachedEvents = readEventsCache();
-    const hasCachedEvents = Array.isArray(cachedEvents) && cachedEvents.length > 0;
+    const upcomingCachedEvents = filterUpcomingEvents(cachedEvents);
+    const hasCachedEvents = Array.isArray(upcomingCachedEvents) && upcomingCachedEvents.length > 0;
 
     if (hasCachedEvents) {
-      setEvents(cachedEvents);
+      setEvents(upcomingCachedEvents);
       setIsLoadingEvents(false);
       setEventsError(null);
     }
@@ -155,7 +200,7 @@ export default function Landing() {
         });
 
         if (isMounted) {
-          const mapped = extractEventList(response.data)
+          const mapped = filterUpcomingEvents(extractEventList(response.data))
             .sort((a, b) => getEventRecencyTimestamp(b) - getEventRecencyTimestamp(a))
             .map(mapDbEvent);
           setEvents(mapped);
@@ -484,7 +529,11 @@ export default function Landing() {
             </div>
           ) : filteredEvents.length === 0 ? (
             <div className="col-span-3 flex flex-col items-center justify-center py-24 bg-gray-50 dark:bg-white/5 rounded-3xl border border-dashed border-gray-300 dark:border-white/10">
-              <p className="text-xl text-gray-500 dark:text-gray-400">No events found matching your search.</p>
+              <p className="text-xl text-gray-500 dark:text-gray-400">
+                {events.length === 0 && !searchQuery
+                  ? "No upcoming events right now."
+                  : "No events found matching your search."}
+              </p>
             </div>
           ) : (
             displayedEvents.map((event) => (

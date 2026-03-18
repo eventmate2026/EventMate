@@ -395,52 +395,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             >
               Contact us
             </button>
-            <button
-              onClick={() => handleNavClick("notifications")}
-              className={mobileLinkClass("notifications")}
-            >
-              Notifications
-            </button>
           </div>
           
-          <div className="pt-4 pb-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={() => {
-                navigate("/profile");
-                setIsMobileMenuOpen(false);
-                setIsUserMenuOpen(false);
-              }}
-              className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
-              aria-label="Open profile"
-            >
-              <div className="flex-shrink-0">
-                {renderAvatar("h-10 w-10", "text-base")}
-              </div>
-              <div className="ml-3">
-                <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
-                <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
-              </div>
-            </button>
-            <div className="mt-3 space-y-1">
-              <button
-                type="button"
-                onClick={toggleTheme}
-                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-700 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-500/25 flex items-center gap-2"
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} Toggle theme
-              </button>
-              <button
-                onClick={() => {
-                  onLogout();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800 flex items-center gap-2"
-              >
-                <LogOut size={18} /> Sign out
-              </button>
-            </div>
-          </div>
+          <div className="pt-4 pb-4 border-t border-gray-200" />
         </div>
       )}
     </nav>
