@@ -4,6 +4,7 @@ import authMiddleware from "../middleware/auth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 
 import { getProfileController, updateProfileController, uploadAvatarController, forgotPasswordController, resetPasswordController,
+  revokeProfileSessionController,
   createOrganizer,
   createCoordinator,
   promoteCoordinator
@@ -18,6 +19,7 @@ router.use(authMiddleware);
 
 router.get("/profile", getProfileController);
 router.put("/profile", updateProfileController);
+router.delete("/profile/sessions/:sessionId", revokeProfileSessionController);
 router.post("/avatar", upload.single("avatar"), uploadAvatarController);
 
 router.post(

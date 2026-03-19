@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 
@@ -15,6 +16,8 @@ export default function ForgotPassword() {
   const [message, setMessage] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const getErrorMessage = (error, fallback) => {
     const apiMessage = error.response?.data?.message;
@@ -146,26 +149,46 @@ export default function ForgotPassword() {
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
-                <input
-                  name="newPassword"
-                  type="password"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  placeholder="Minimum 8 characters"
-                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
-                />
+                <div className="relative mt-1">
+                  <input
+                    name="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={formData.newPassword}
+                    onChange={handleChange}
+                    placeholder="Minimum 8 characters"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                    onClick={() => setShowNewPassword((prev) => !prev)}
+                  >
+                    {showNewPassword ? <FaRegEye className="eventmate-icon" /> : <FaRegEyeSlash className="eventmate-icon" />}
+                  </button>
+                </div>
                 {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
-                <input
-                  name="confirmPassword"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Re-enter new password"
-                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
-                />
+                <div className="relative mt-1">
+                  <input
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Re-enter new password"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  >
+                    {showConfirmPassword ? <FaRegEye className="eventmate-icon" /> : <FaRegEyeSlash className="eventmate-icon" />}
+                  </button>
+                </div>
                 {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
               </div>
             </>

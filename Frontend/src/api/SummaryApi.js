@@ -45,6 +45,11 @@ const SummaryApi = {
     method: "put",
   },
 
+  revoke_profile_session: {
+    url: "/api/user/profile/sessions/:sessionId",
+    method: "delete",
+  },
+
   upload_avatar: {
     url: "/api/user/avatar",
     method: "post",

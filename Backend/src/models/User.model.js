@@ -1,5 +1,19 @@
 import mongoose from "mongoose";
 
+const RefreshSessionSchema = new mongoose.Schema(
+  {
+    sessionId: { type: String, required: true, trim: true },
+    refreshToken: { type: String, required: true, trim: true },
+    userAgent: { type: String, default: null },
+    ipAddress: { type: String, default: null },
+    timezone: { type: String, default: null },
+    deviceLabel: { type: String, default: null },
+    createdAt: { type: Date, default: Date.now },
+    lastActiveAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const UserSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true, trim: true, minlength: 3, maxlength: 100 },
@@ -29,6 +43,8 @@ const UserSchema = new mongoose.Schema(
     failedLoginAttempts: { type: Number, default: 0 },
     lockoutUntil: { type: Date, default: null },
     refreshToken: { type: String, select: false },
+    refreshSessions: { type: [RefreshSessionSchema], default: [], select: false },
+    loginHistory: { type: [Date], default: [], select: false },
     otp: { type: String, select: false },
     otpExpiry: { type: Date, select: false },
 

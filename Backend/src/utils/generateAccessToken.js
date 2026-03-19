@@ -1,4 +1,10 @@
 import jwt from "jsonwebtoken";
 
-export default (id, expiresIn = "1h") =>
-  jwt.sign({ userId: id }, process.env.JWT_SECRET, { expiresIn });
+export default (payloadOrUserId, expiresIn = "1h") => {
+  const payload =
+    payloadOrUserId && typeof payloadOrUserId === "object"
+      ? payloadOrUserId
+      : { userId: payloadOrUserId };
+
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn });
+};

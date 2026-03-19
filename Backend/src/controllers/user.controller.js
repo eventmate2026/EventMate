@@ -6,15 +6,39 @@ import sendEmail from "../config/sendEmail.js";
 import forgotPasswordTemplate from "../utils/forgotPasswordTemplate.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
+import { countRecentLogins } from "../utils/loginHistory.js";
+import {
+  removeRefreshSession,
+  serializeActiveSessions,
+} from "../utils/sessionTracker.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
 
 const resolveDepartment = (user) =>
   String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
 
+const sanitizeProfileUser = (user, currentSessionId = null, req = null) => {
+  if (!user) return null;
+  const plainUser = user.toObject ? user.toObject() : { ...user };
+  delete plainUser.password;
+  delete plainUser.refreshToken;
+  delete plainUser.refreshSessions;
+  delete plainUser.loginHistory;
+  delete plainUser.otp;
+  delete plainUser.otpExpiry;
+  return {
+    ...plainUser,
+    loginCount30d: countRecentLogins(user, 30),
+    activeSessions: serializeActiveSessions(user, currentSessionId, req),
+  };
+};
+
 // ---------------- PROFILE ----------------
 export const getProfileController = asyncHandler(async (req, res) => {
-  res.json({ success: true, user: req.user });
+  const user = await User.findById(req.user._id).select(
+    "+refreshToken +refreshSessions +loginHistory"
+  );
+  res.json({ success: true, user: sanitizeProfileUser(user, req.authSessionId, req) });
 });
 
 // ---------------- UPDATE PROFILE ----------------
@@ -52,6 +76,35 @@ export const uploadAvatarController = asyncHandler(async (req, res) => {
   req.user.avatar = result.url;
   await req.user.save();
   res.json({ success: true, message: "Avatar uploaded", avatar: result.url });
+});
+
+export const revokeProfileSessionController = asyncHandler(async (req, res) => {
+  const sessionId = String(req.params?.sessionId || "").trim();
+  if (!sessionId) {
+    return res.status(400).json({ success: false, message: "Session id is required" });
+  }
+
+  const user = await User.findById(req.user._id).select("+refreshSessions");
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  const removed = removeRefreshSession(user, sessionId);
+  if (!removed) {
+    return res.status(404).json({ success: false, message: "Session not found" });
+  }
+
+  await user.save({ validateBeforeSave: false });
+
+  res.json({
+    success: true,
+    message:
+      sessionId === req.authSessionId
+        ? "Current session terminated. Please log in again."
+        : "Session terminated successfully.",
+    activeSessions: serializeActiveSessions(user, req.authSessionId, req),
+    currentSessionRevoked: sessionId === req.authSessionId,
+  });
 });
 
 // ---------------- FORGOT PASSWORD ----------------

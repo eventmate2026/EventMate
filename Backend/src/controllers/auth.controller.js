@@ -10,6 +10,14 @@ import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 import { validateRegister } from "../validators/auth.validator.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
 import { sendPendingTeamInvitesForUser } from "../services/registration.service.js";
+import {
+  createRefreshSessionRecord,
+  ensureRefreshSessions,
+  removeRefreshSession,
+  touchRefreshSession,
+  upsertRefreshSession,
+} from "../utils/sessionTracker.js";
+import { countRecentLogins, recordLoginHistoryEntry } from "../utils/loginHistory.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
 
@@ -55,8 +63,22 @@ const buildAuthUser = (user) => {
     educationLevel: user.educationLevel || "",
     academicProfile: user.academicProfile || {},
     professionalProfile: user.professionalProfile || {},
-    avatar: user.avatar || null
+    avatar: user.avatar || null,
+    lastLoginAt: user.lastLoginAt || null,
+    loginCount30d: countRecentLogins(user, 30),
   };
+};
+
+const AUTH_SELECT_FIELDS = "+password +refreshToken +refreshSessions +loginHistory";
+
+const findSessionByRefreshToken = (user, token) => {
+  const submittedToken = String(token || "").trim();
+  if (!submittedToken) return null;
+  return (
+    ensureRefreshSessions(user).find(
+      (session) => String(session.refreshToken || "").trim() === submittedToken
+    ) || null
+  );
 };
 
 const buildVerificationOtpPayload = () => ({
@@ -209,7 +231,7 @@ export const loginController = asyncHandler(async (req, res) => {
   if (!email || !password)
     return res.status(400).json({ success: false, message: "Email and password required" });
 
-  const user = await User.findOne({ email }).select("+password +refreshToken");
+  const user = await User.findOne({ email }).select(AUTH_SELECT_FIELDS);
   if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
   const settings = await getSecuritySettings();
@@ -276,11 +298,16 @@ export const loginController = asyncHandler(async (req, res) => {
   const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
   const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
-  const accessToken = generateAccessToken(user._id, `${accessMinutes}m`);
-  const refreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
+  const sessionRecord = createRefreshSessionRecord(req, "", undefined);
+  const tokenPayload = { userId: user._id, sessionId: sessionRecord.sessionId };
+  const accessToken = generateAccessToken(tokenPayload, `${accessMinutes}m`);
+  const refreshToken = generateRefreshToken(tokenPayload, `${refreshDays}d`);
 
-  user.refreshToken = refreshToken;
+  sessionRecord.refreshToken = refreshToken;
+  upsertRefreshSession(user, sessionRecord);
+  user.refreshToken = null;
   user.lastLoginAt = new Date();
+  recordLoginHistoryEntry(user, user.lastLoginAt);
   await persistAuthUser(user);
 
   sendPendingTeamInvitesForUser(user).catch((error) => {
@@ -301,9 +328,12 @@ export const logoutController = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
   if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-  const user = await User.findById(userId).select("+refreshToken");
+  const user = await User.findById(userId).select(AUTH_SELECT_FIELDS);
   if (user) {
-    user.refreshToken = null;
+    const removedCurrentSession = removeRefreshSession(user, req.authSessionId);
+    if (!removedCurrentSession) {
+      user.refreshToken = null;
+    }
     await persistAuthUser(user);
   }
 
@@ -318,9 +348,24 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(decoded.userId).select("+refreshToken");
+    const user = await User.findById(decoded.userId).select(AUTH_SELECT_FIELDS);
 
-    if (!user || user.refreshToken?.trim() !== refreshToken?.trim()) {
+    if (!user) {
+      return res.status(403).json({ success: false, message: "Invalid refresh token" });
+    }
+
+    let session = findSessionByRefreshToken(user, refreshToken);
+    if (!session && user.refreshToken?.trim() === refreshToken?.trim()) {
+      const migratedSession = createRefreshSessionRecord(
+        req,
+        refreshToken,
+        decoded.sessionId || undefined
+      );
+      session = upsertRefreshSession(user, migratedSession);
+      user.refreshToken = null;
+    }
+
+    if (!session) {
       return res.status(403).json({ success: false, message: "Invalid refresh token" });
     }
 
@@ -328,11 +373,12 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
     const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
     const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
-    // Generate new tokens
-    const newAccessToken = generateAccessToken(user._id, `${accessMinutes}m`);
-    const newRefreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
+    const tokenPayload = { userId: user._id, sessionId: session.sessionId };
+    const newAccessToken = generateAccessToken(tokenPayload, `${accessMinutes}m`);
+    const newRefreshToken = generateRefreshToken(tokenPayload, `${refreshDays}d`);
 
-    user.refreshToken = newRefreshToken;
+    touchRefreshSession(user, session.sessionId, req, { refreshToken: newRefreshToken });
+    user.refreshToken = null;
     await persistAuthUser(user);
 
     res.json({

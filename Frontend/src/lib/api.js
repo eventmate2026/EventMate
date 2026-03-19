@@ -45,11 +45,18 @@ const resolveAdapter = (config) => {
 
 api.interceptors.request.use((config) => {
   const token = getStoredToken();
+  config.headers = config.headers || {};
   if (token && !config.skipAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (config.skipAuth && config.headers?.Authorization) {
     delete config.headers.Authorization;
+  }
+
+  const timezone =
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
+  if (timezone) {
+    config.headers["X-Client-Timezone"] = timezone;
   }
 
   if (shouldCacheRequest(config)) {

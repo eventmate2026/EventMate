@@ -35,32 +35,33 @@ export default function AdminProfile() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(null);
   const [forcingLogout, setForcingLogout] = useState(false);
+  const [terminatingSessionId, setTerminatingSessionId] = useState(null);
 
   const displayName = profile?.fullName || "Admin";
   const department = profile?.professionalProfile?.department || "Department of IT";
   const title = profile?.professionalProfile?.occupation || "Lead System Administrator";
   const avatarUrl = profile?.avatar || DEFAULT_AVATAR;
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      setError("");
-      setNotice(null);
-      try {
-        const response = await api({ ...SummaryApi.get_profile, cacheTTL: 45000 });
-        const nextUser = response.data?.user || null;
-        if (nextUser) {
-          setProfile(nextUser);
-          storeAuth({ user: nextUser });
-        }
-      } catch (err) {
-        setError(err?.response?.data?.message || "Unable to load profile details.");
-      } finally {
-        setLoading(false);
+  const loadProfile = async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
+    setError("");
+    try {
+      const response = await api({ ...SummaryApi.get_profile, cacheTTL: 45000, skipCache: true });
+      const nextUser = response.data?.user || null;
+      if (nextUser) {
+        setProfile(nextUser);
+        storeAuth({ user: nextUser });
       }
-    };
+    } catch (err) {
+      setError(err?.response?.data?.message || "Unable to load profile details.");
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
+  };
 
-    loadProfile();
+  useEffect(() => {
+    setNotice(null);
+    void loadProfile();
   }, []);
 
   const formatDateTime = (value) => {
@@ -79,29 +80,9 @@ export default function AdminProfile() {
   const lastLoginLabel = useMemo(() => formatDateTime(profile?.lastLoginAt), [profile?.lastLoginAt]);
 
   const sessions = useMemo(() => {
-    const timezone =
-      typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Local timezone";
-    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const platform = typeof navigator !== "undefined" ? navigator.platform || "" : "";
-    const deviceLabel = userAgent
-      ? `${userAgent.includes("Chrome") ? "Chrome" : userAgent.includes("Safari") ? "Safari" : "Browser"} on ${
-          platform || "Unknown Device"
-        }`
-      : "Current device";
-
-    return [
-      {
-        id: "session-current",
-        device: deviceLabel,
-        app: "Current Session",
-        ip: "Current network",
-        location: timezone,
-        lastActive: profile?.lastLoginAt ? formatDateTime(profile.lastLoginAt) : "Active now",
-        status: "active",
-        managed: true
-      }
-    ];
-  }, [profile?.lastLoginAt]);
+    if (!Array.isArray(profile?.activeSessions)) return [];
+    return profile.activeSessions;
+  }, [profile?.activeSessions]);
 
   const securityScore = useMemo(() => {
     let score = 100;
@@ -123,11 +104,14 @@ export default function AdminProfile() {
   }, [profile]);
 
   const loginsLast30 = useMemo(() => {
+    const loginCount = Number(profile?.loginCount30d);
+    if (Number.isFinite(loginCount) && loginCount >= 0) return loginCount;
+
     const lastLogin = profile?.lastLoginAt ? new Date(profile.lastLoginAt).getTime() : 0;
     if (!lastLogin) return 0;
     const daysSince = Math.floor((Date.now() - lastLogin) / (1000 * 60 * 60 * 24));
     return daysSince <= 30 ? 1 : 0;
-  }, [profile]);
+  }, [profile?.lastLoginAt, profile?.loginCount30d]);
 
   const stats = useMemo(
     () => [
@@ -177,6 +161,45 @@ export default function AdminProfile() {
       });
     } finally {
       setForcingLogout(false);
+    }
+  };
+
+  const handleTerminateSession = async (sessionId) => {
+    const confirmed = window.confirm("Terminate this session?");
+    if (!confirmed) return;
+
+    setTerminatingSessionId(sessionId);
+    setNotice(null);
+
+    try {
+      const response = await api({
+        ...SummaryApi.revoke_profile_session,
+        url: SummaryApi.revoke_profile_session.url.replace(":sessionId", sessionId),
+      });
+
+      setNotice({
+        type: "success",
+        text: response.data?.message || "Session terminated successfully.",
+      });
+
+      if (response.data?.currentSessionRevoked) {
+        await logoutUser();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      if (Array.isArray(response.data?.activeSessions)) {
+        setProfile((prev) => (prev ? { ...prev, activeSessions: response.data.activeSessions } : prev));
+      } else {
+        await loadProfile({ showSpinner: false });
+      }
+    } catch (err) {
+      setNotice({
+        type: "error",
+        text: err?.response?.data?.message || "Unable to terminate this session right now.",
+      });
+    } finally {
+      setTerminatingSessionId(null);
     }
   };
 
@@ -330,26 +353,28 @@ export default function AdminProfile() {
                       <td className="py-3">
                         <span
                           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            session.status === "active"
+                            session.current
                               ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
                               : "bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-slate-300"
                           }`}
                         >
-                          {session.status === "active" ? <CheckCircle2 size={12} /> : <ShieldCheck size={12} />}
-                          {session.lastActive}
+                          {session.current ? <CheckCircle2 size={12} /> : <ShieldCheck size={12} />}
+                          {formatDateTime(session.lastActiveAt)}
                         </span>
                       </td>
                       <td className="py-3 text-right">
-                        {session.managed ? (
+                        {!session.canTerminate ? (
                           <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-                            Managed
+                            Current
                           </span>
                         ) : (
                           <button
                             type="button"
+                            disabled={terminatingSessionId === session.id}
+                            onClick={() => handleTerminateSession(session.id)}
                             className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300"
                           >
-                            Terminate
+                            {terminatingSessionId === session.id ? "Terminating..." : "Terminate"}
                           </button>
                         )}
                       </td>
@@ -358,6 +383,11 @@ export default function AdminProfile() {
                 })}
               </tbody>
             </table>
+            {sessions.length === 0 && (
+              <p className="pt-4 text-sm text-slate-500 dark:text-slate-300">
+                No active sessions found.
+              </p>
+            )}
           </div>
         </section>
 

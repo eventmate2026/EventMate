@@ -28,6 +28,7 @@ export default function VerifyEmail() {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const hasVerificationEmail = Boolean(formData.email);
 
   useEffect(() => {
     const nextEmail = resolvePresetEmail();
@@ -40,7 +41,7 @@ export default function VerifyEmail() {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: name === "email" ? value.trim().toLowerCase() : value.trim(),
+      [name]: value.trim(),
     }));
   };
 
@@ -48,8 +49,13 @@ export default function VerifyEmail() {
     e.preventDefault();
     setMessage(null);
 
-    if (!formData.email || !formData.otp) {
-      setMessage({ type: "error", text: "Email and OTP are required." });
+    if (!hasVerificationEmail) {
+      setMessage({ type: "error", text: "Verification email not found. Please sign up or log in again." });
+      return;
+    }
+
+    if (!formData.otp) {
+      setMessage({ type: "error", text: "OTP is required." });
       return;
     }
 
@@ -73,8 +79,8 @@ export default function VerifyEmail() {
   };
 
   const handleResendOtp = async () => {
-    if (!formData.email) {
-      setMessage({ type: "error", text: "Enter your email to resend the OTP." });
+    if (!hasVerificationEmail) {
+      setMessage({ type: "error", text: "Verification email not found. Please sign up or log in again." });
       return;
     }
 
@@ -114,14 +120,14 @@ export default function VerifyEmail() {
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
-            <input
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="you@college.edu"
-              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
-            />
+            <div className="mt-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
+              {formData.email || "No verification email found"}
+            </div>
+            {!hasVerificationEmail && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-300">
+                Go back to signup or login and request a fresh OTP first.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
@@ -150,7 +156,7 @@ export default function VerifyEmail() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || !hasVerificationEmail}
             className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-70"
           >
             {isLoading ? "Verifying..." : "Verify Email"}
@@ -159,7 +165,7 @@ export default function VerifyEmail() {
           <button
             type="button"
             onClick={handleResendOtp}
-            disabled={isResending || isLoading}
+            disabled={isResending || isLoading || !hasVerificationEmail}
             className="w-full py-3 rounded-xl border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 transition disabled:opacity-70 dark:border-indigo-400/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
           >
             {isResending ? "Sending OTP..." : "Resend OTP"}
