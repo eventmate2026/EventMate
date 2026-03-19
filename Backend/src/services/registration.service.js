@@ -6,6 +6,7 @@ import TeamInvitation from "../models/TeamInvitation.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
+import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
 
@@ -77,7 +78,7 @@ const formatEventDate = (event) => {
 };
 
 const buildTeamInviteLink = (token, action) => {
-  const baseUrl = String(process.env.FRONTEND_URL || "").trim().replace(/\/$/, "");
+  const baseUrl = getPrimaryFrontendUrl();
   return `${baseUrl}/team-invite?token=${token}&action=${action}`;
 };
 
@@ -275,7 +276,7 @@ const sendTeamLeaderPendingEmail = async ({ registration, event }) => {
 const sendTeamSignupEmail = async ({ invite, event, registration }) => {
   const email = normalizeEmail(invite?.email);
   if (!email) return;
-  const baseUrl = String(process.env.FRONTEND_URL || "").trim().replace(/\/$/, "");
+  const baseUrl = getPrimaryFrontendUrl();
   const signupLink = `${baseUrl}/signup?email=${encodeURIComponent(email)}`;
   const loginLink = `${baseUrl}/login?email=${encodeURIComponent(email)}`;
   const displayName = String(invite?.name || "Participant").trim() || "Participant";
@@ -1379,7 +1380,7 @@ const sendMemberVerificationEmails = async (registration, participants) => {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
     });
 
-    const verifyLink = `${process.env.FRONTEND_URL}/verify-registration?token=${token}`;
+    const verifyLink = `${getPrimaryFrontendUrl()}/verify-registration?token=${token}`;
     const displayName = String(participant?.name || "Participant").trim() || "Participant";
     const roleLabel = participant?.role === "leader" ? "team leader" : "team member";
 

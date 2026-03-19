@@ -18,6 +18,20 @@ const __dirname = path.dirname(__filename);
 export const buildCertificateEmailSlug = (email) =>
   String(email || "").trim().toLowerCase().replace(/[@.]/g, "_");
 
+const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+const getBackendBaseUrl = () => {
+  const backendBaseUrl = normalizeBaseUrl(
+    process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL
+  );
+
+  if (!backendBaseUrl) {
+    throw new Error("BACKEND_URL is required to generate certificate links.");
+  }
+
+  return backendBaseUrl;
+};
+
 const formatCertificateDate = (value) => {
   const parsed = new Date(value || 0);
   if (Number.isNaN(parsed.getTime())) return "TBA";
@@ -1463,7 +1477,7 @@ const issueCertificateForParticipant = async ({
     ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
-  const backendBaseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+  const backendBaseUrl = getBackendBaseUrl();
   const certificateUrl = `${backendBaseUrl}/api/certificates/download/${event._id}/${buildCertificateEmailSlug(participantEmail)}`;
   let certificateRecord = null;
   let verificationCode = null;

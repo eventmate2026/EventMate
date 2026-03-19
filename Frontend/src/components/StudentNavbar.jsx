@@ -14,7 +14,7 @@ import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { io } from "socket.io-client";
-import { API_BASE_URL } from "../lib/backendUrl";
+import { SOCKET_BASE_URL } from "../lib/backendUrl";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const navigate = useNavigate();
@@ -84,25 +84,27 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
     let intervalId = null;
     if (userId) {
-      const socket = io(API_BASE_URL || "http://localhost:5000", {
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 800,
-        timeout: 8000,
-      });
+      if (SOCKET_BASE_URL !== null) {
+        const socket = io(SOCKET_BASE_URL, {
+          transports: ["websocket", "polling"],
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 800,
+          timeout: 8000,
+        });
 
-      socketRef.current = socket;
+        socketRef.current = socket;
 
-      socket.on("connect", () => {
-        socket.emit("join", userId);
-      });
+        socket.on("connect", () => {
+          socket.emit("join", userId);
+        });
 
-      socket.on("notification", () => {
-        if (!mounted) return;
-        setUnreadCount((prev) => prev + 1);
-      });
+        socket.on("notification", () => {
+          if (!mounted) return;
+          setUnreadCount((prev) => prev + 1);
+        });
+      }
 
       intervalId = setInterval(syncUnread, 30000);
     }

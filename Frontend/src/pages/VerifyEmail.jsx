@@ -1,24 +1,47 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../lib/api";
+import {
+  clearPendingVerificationEmail,
+  getPendingVerificationEmail,
+  storePendingVerificationEmail,
+} from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 
 export default function VerifyEmail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const presetEmail = location.state?.email || "";
+  const resolvePresetEmail = () => {
+    const searchEmail = new URLSearchParams(location.search).get("email");
+    return String(location.state?.email || searchEmail || getPendingVerificationEmail() || "")
+      .trim()
+      .toLowerCase();
+  };
+  const presetEmail = resolvePresetEmail();
 
   const [formData, setFormData] = useState({
     email: presetEmail,
     otp: "",
   });
-  const [message, setMessage] = useState(null);
+  const [message, setMessage] = useState(
+    location.state?.message ? { type: "info", text: location.state.message } : null
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+
+  useEffect(() => {
+    const nextEmail = resolvePresetEmail();
+    if (!nextEmail) return;
+    setFormData((prev) => (prev.email ? prev : { ...prev, email: nextEmail }));
+    storePendingVerificationEmail(nextEmail);
+  }, [location.search, location.state]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === "email") return;
-    setFormData((prev) => ({ ...prev, [name]: value.trim() }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "email" ? value.trim().toLowerCase() : value.trim(),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -33,8 +56,12 @@ export default function VerifyEmail() {
     setIsLoading(true);
     try {
       const response = await api({ ...SummaryApi.verify_email, data: formData });
+      clearPendingVerificationEmail();
       setMessage({ type: "success", text: response.data?.message || "Email verified successfully." });
-      setTimeout(() => navigate("/login", { replace: true }), 900);
+      setTimeout(
+        () => navigate(`/login?email=${encodeURIComponent(formData.email)}`, { replace: true }),
+        900
+      );
     } catch (error) {
       setMessage({
         type: "error",
@@ -42,6 +69,34 @@ export default function VerifyEmail() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!formData.email) {
+      setMessage({ type: "error", text: "Enter your email to resend the OTP." });
+      return;
+    }
+
+    setMessage(null);
+    setIsResending(true);
+    try {
+      const response = await api({
+        ...SummaryApi.resend_verification_otp,
+        data: { email: formData.email },
+      });
+      storePendingVerificationEmail(formData.email);
+      setMessage({
+        type: "success",
+        text: response.data?.message || "A new OTP has been sent to your email.",
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Unable to resend OTP right now.",
+      });
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -63,10 +118,9 @@ export default function VerifyEmail() {
               name="email"
               type="email"
               value={formData.email}
-              readOnly
-              aria-readonly="true"
+              onChange={handleChange}
               placeholder="you@college.edu"
-              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-800/60 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40 cursor-not-allowed"
+              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
             />
           </div>
           <div>
@@ -85,6 +139,8 @@ export default function VerifyEmail() {
               className={`text-sm text-center rounded-lg py-2 ${
                 message.type === "success"
                   ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : message.type === "info"
+                    ? "text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-300"
                   : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
               }`}
             >
@@ -98,6 +154,15 @@ export default function VerifyEmail() {
             className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-70"
           >
             {isLoading ? "Verifying..." : "Verify Email"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResendOtp}
+            disabled={isResending || isLoading}
+            className="w-full py-3 rounded-xl border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 transition disabled:opacity-70 dark:border-indigo-400/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+          >
+            {isResending ? "Sending OTP..." : "Resend OTP"}
           </button>
         </form>
 

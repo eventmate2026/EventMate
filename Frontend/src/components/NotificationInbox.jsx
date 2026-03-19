@@ -3,7 +3,7 @@ import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
 import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { API_BASE_URL } from "../lib/backendUrl";
+import { SOCKET_BASE_URL } from "../lib/backendUrl";
 import { getStoredUser } from "../lib/auth";
 
 const parseNotifications = (payload) => {
@@ -105,36 +105,40 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
     const userId = getUserId();
     if (!userId) return undefined;
 
-    const socket = io(API_BASE_URL || "http://localhost:5000", {
-      transports: ["websocket", "polling"],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 800,
-      timeout: 8000,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      socket.emit("join", userId);
-    });
-
-    socket.on("notification", (payload) => {
-      if (!payload?._id) return;
-      setItems((prev) => {
-        const exists = prev.some((item) => String(item?._id || "") === String(payload._id));
-        if (exists) return prev;
-        return [payload, ...prev];
+    if (SOCKET_BASE_URL !== null) {
+      const socket = io(SOCKET_BASE_URL, {
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 800,
+        timeout: 8000,
       });
-    });
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        socket.emit("join", userId);
+      });
+
+      socket.on("notification", (payload) => {
+        if (!payload?._id) return;
+        setItems((prev) => {
+          const exists = prev.some((item) => String(item?._id || "") === String(payload._id));
+          if (exists) return prev;
+          return [payload, ...prev];
+        });
+      });
+    }
 
     pollRef.current = setInterval(fetchNotifications, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      socket.disconnect();
-      socketRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [fetchNotifications]);
 

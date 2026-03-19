@@ -1,20 +1,14 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
 
 export default defineConfig(({ mode }) => {
-  const backendEnvDir = fileURLToPath(new URL("../Backend", import.meta.url));
-  const backendEnv = loadEnv(mode, backendEnvDir, "");
-  const backendPort = String(backendEnv.PORT || "5000").trim() || "5000";
-  const backendApiUrl = String(backendEnv.VITE_API_URL || backendEnv.API_URL || "").trim();
-  const backendTarget = backendApiUrl || `http://localhost:${backendPort}`;
+  const env = loadEnv(mode, process.cwd(), "");
+
+  const backendApiUrl = String(env.VITE_API_URL || "").trim();
 
   return {
     plugins: [react()],
-    define: {
-      "import.meta.env.VITE_BACKEND_PORT": JSON.stringify(backendPort),
-      "import.meta.env.VITE_API_URL": JSON.stringify(backendApiUrl),
-    },
+
     build: {
       rollupOptions: {
         output: {
@@ -28,17 +22,29 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+
     server: {
       host: true,
       port: 5173,
-      proxy: {
-        "/api": {
-          target: backendTarget,
-          changeOrigin: true,
-          secure: false,
-        },
-      },
+
+      // ✅ ONLY for local development
+      proxy: backendApiUrl
+        ? undefined
+        : {
+            "/api": {
+              target: "http://127.0.0.1:5000",
+              changeOrigin: true,
+              secure: false,
+            },
+            "/socket.io": {
+              target: "http://127.0.0.1:5000",
+              changeOrigin: true,
+              secure: false,
+              ws: true,
+            },
+          },
     },
+
     preview: {
       host: true,
       port: 4173,

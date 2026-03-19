@@ -3,6 +3,7 @@ import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import sendEmail from "../config/sendEmail.js";
+import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -17,7 +18,7 @@ cloudinary.config({
 
 const generateAndUploadQR = async (token) => {
   // Only the verification URL — clean and safe when scanned by anyone
-  const verifyUrl = `${process.env.FRONTEND_URL}/attendance/verify?token=${token}`;
+  const verifyUrl = `${getPrimaryFrontendUrl()}/attendance/verify?token=${token}`;
 
   const qrBuffer = await QRCode.toBuffer(verifyUrl, {
     type: "png",

@@ -14,6 +14,11 @@ const SummaryApi = {
     method: "post",
   },
 
+  resend_verification_otp: {
+    url: "/api/auth/resend-verification-otp",
+    method: "post",
+  },
+
   login: {
     url: "/api/auth/login",
     method: "post",

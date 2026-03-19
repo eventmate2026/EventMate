@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import api from "../lib/api";
+import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 
 export default function Signup() {
@@ -72,6 +73,7 @@ export default function Signup() {
         response.data?.message || "Registration successful. Check your email for the OTP.";
       const otp = response.data?.otp;
       setSuccessMessage(otp ? `${apiMessage} OTP: ${otp}` : apiMessage);
+      storePendingVerificationEmail(email);
       setFormData({
         fullName: "",
         email: "",
@@ -80,7 +82,13 @@ export default function Signup() {
         agree: false,
       });
 
-      setTimeout(() => navigate("/verify-email", { state: { email } }), 800);
+      setTimeout(
+        () =>
+          navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
+            state: { email },
+          }),
+        800
+      );
     } catch (error) {
       const apiError =
         error.response?.data?.errors?.[0] ||

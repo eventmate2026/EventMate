@@ -11,6 +11,8 @@ import { validateRegister } from "../validators/auth.validator.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
 import { sendPendingTeamInvitesForUser } from "../services/registration.service.js";
 
+const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
+
 const clampNumber = (value, min, max, fallback) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -21,6 +23,8 @@ const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 const normalizeMobileDigits = (value) =>
   String(value || "").replace(/\D/g, "");
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
 const getValidMobileNumber = (value) => {
   const digits = normalizeMobileDigits(value);
@@ -55,38 +59,140 @@ const buildAuthUser = (user) => {
   };
 };
 
+const buildVerificationOtpPayload = () => ({
+  otp: generateOtp(),
+  otpExpiry: new Date(Date.now() + VERIFICATION_OTP_TTL_MS),
+});
+
+const buildEmailDeliveryError = (
+  message = "We couldn't deliver the verification OTP right now. Please try again."
+) => {
+  const error = new Error(message);
+  error.statusCode = 503;
+  return error;
+};
+
+const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }) => {
+  try {
+    await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+  } catch (error) {
+    const deliveryError = buildEmailDeliveryError(failureMessage);
+    deliveryError.cause = error;
+    throw deliveryError;
+  }
+};
+
+const isSelfRegisteredStudent = (user) =>
+  !user?.createdBy && String(user?.role || "STUDENT").trim().toUpperCase() === "STUDENT";
+
 // ---------------- REGISTER ----------------
 export const registerUserController = asyncHandler(async (req, res) => {
   const { fullName, email, password } = req.body;
   const errors = validateRegister({ fullName, email, password });
   if (errors.length) return res.status(400).json({ success: false, errors });
 
-  const existingUser = await User.findOne({ email });
-  if (existingUser) return res.status(409).json({ success: false, message: "Email already registered" });
-
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedFullName = String(fullName || "").trim();
+  const existingUser = await User.findOne({ email: normalizedEmail });
   const hashedPassword = await bcrypt.hash(password, 10);
-  const otp = generateOtp();
+  const { otp, otpExpiry } = buildVerificationOtpPayload();
+
+  if (existingUser) {
+    if (existingUser.emailVerified) {
+      return res.status(409).json({ success: false, message: "Email already registered" });
+    }
+
+    if (!isSelfRegisteredStudent(existingUser)) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered. Please verify the account or contact admin.",
+      });
+    }
+
+    existingUser.fullName = normalizedFullName;
+    existingUser.email = normalizedEmail;
+    existingUser.password = hashedPassword;
+    existingUser.otp = otp;
+    existingUser.otpExpiry = otpExpiry;
+    await persistAuthUser(existingUser);
+
+    await sendVerificationOtpEmail({
+      email: normalizedEmail,
+      fullName: normalizedFullName,
+      otp,
+      failureMessage:
+        "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Account already exists but isn't verified. A new OTP has been sent to your email.",
+    });
+  }
 
   const user = await User.create({
-    fullName,
-    email,
+    fullName: normalizedFullName,
+    email: normalizedEmail,
     password: hashedPassword,
     otp,
-    otpExpiry: Date.now() + 10 * 60 * 1000, // 10 minutes
+    otpExpiry,
   });
 
-  await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+  try {
+    await sendVerificationOtpEmail({
+      email: normalizedEmail,
+      fullName: normalizedFullName,
+      otp,
+      failureMessage:
+        "We couldn't deliver the verification OTP right now. Please try signing up again in a moment.",
+    });
+  } catch (error) {
+    await User.deleteOne({ _id: user._id });
+    throw error;
+  }
 
   res.status(201).json({ success: true, message: "Registered successfully. OTP sent to email." });
 });
 
+export const resendVerificationOtpController = asyncHandler(async (req, res) => {
+  const normalizedEmail = normalizeEmail(req.body?.email);
+  if (!normalizedEmail) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+
+  if (user.emailVerified) {
+    return res.status(400).json({ success: false, message: "Email is already verified" });
+  }
+
+  const { otp, otpExpiry } = buildVerificationOtpPayload();
+  user.otp = otp;
+  user.otpExpiry = otpExpiry;
+  await persistAuthUser(user);
+
+  await sendVerificationOtpEmail({
+    email: normalizedEmail,
+    fullName: user.fullName || "User",
+    otp,
+    failureMessage:
+      "We couldn't resend the verification OTP right now. Please try again in a moment.",
+  });
+
+  res.json({ success: true, message: "A new OTP has been sent to your email." });
+});
+
 // ---------------- VERIFY EMAIL ----------------
 export const verifyEmailController = asyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
-  const user = await User.findOne({ email }).select("+otp +otpExpiry");
+  const normalizedEmail = normalizeEmail(req.body?.email);
+  const submittedOtp = String(req.body?.otp || "").trim();
+  const user = await User.findOne({ email: normalizedEmail }).select("+otp +otpExpiry");
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-  if (user.otp !== otp || user.otpExpiry < Date.now())
+  if (!submittedOtp || String(user.otp || "") !== submittedOtp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
 
   user.emailVerified = true;

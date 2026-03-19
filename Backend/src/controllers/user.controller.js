@@ -7,6 +7,8 @@ import forgotPasswordTemplate from "../utils/forgotPasswordTemplate.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 
+const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
+
 const resolveDepartment = (user) =>
   String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
 
@@ -54,26 +56,47 @@ export const uploadAvatarController = asyncHandler(async (req, res) => {
 
 // ---------------- FORGOT PASSWORD ----------------
 export const forgotPasswordController = asyncHandler(async (req, res) => {
-  const { email } = req.body;
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required" });
+  }
+
   const user = await User.findOne({ email });
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
   const otp = generateOtp();
   user.otp = otp;
-  user.otpExpiry = Date.now() + 5*60*1000;
+  user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
   await user.save();
 
-  await sendEmail(email, "Reset Password OTP", forgotPasswordTemplate({ name: user.fullName, otp }));
+  try {
+    await sendEmail(email, "Reset Password OTP", forgotPasswordTemplate({ name: user.fullName, otp }));
+  } catch (error) {
+    user.otp = null;
+    user.otpExpiry = null;
+    await user.save({ validateBeforeSave: false });
+    error.statusCode = Number(error.statusCode) || 503;
+    error.message = "We couldn't deliver the password reset OTP right now. Please try again.";
+    throw error;
+  }
+
   res.json({ success: true, message: "OTP sent to email" });
 });
 
 // ---------------- RESET PASSWORD ----------------
 export const resetPasswordController = asyncHandler(async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const otp = String(req.body?.otp || "").trim();
+  const newPassword = req.body?.newPassword;
+
+  if (!email || !otp) {
+    return res.status(400).json({ success: false, message: "Email and OTP are required" });
+  }
+
   const user = await User.findOne({ email }).select("+otp +otpExpiry");
   if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-  if (user.otp.toString() !== otp.toString() || user.otpExpiry < Date.now())
+  if (!user.otp || !user.otpExpiry || String(user.otp) !== otp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
 
   if (!newPassword || newPassword.length < 8)
@@ -177,7 +200,7 @@ export const createCoordinator = async (req, res, next) => {
 
     const requiresVerification = req.user.role === "ORGANIZER";
     const otp = requiresVerification ? generateOtp() : null;
-    const otpExpiry = requiresVerification ? Date.now() + 10 * 60 * 1000 : null;
+    const otpExpiry = requiresVerification ? new Date(Date.now() + VERIFICATION_OTP_TTL_MS) : null;
 
     const coordinator = await User.create({
       fullName,
@@ -192,7 +215,15 @@ export const createCoordinator = async (req, res, next) => {
     });
 
     if (requiresVerification) {
-      await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+      try {
+        await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+      } catch (error) {
+        await User.deleteOne({ _id: coordinator._id });
+        error.statusCode = Number(error.statusCode) || 503;
+        error.message =
+          "Coordinator was not created because the verification OTP could not be delivered.";
+        throw error;
+      }
     }
 
     res.status(201).json({

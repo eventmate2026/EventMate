@@ -12,12 +12,11 @@ npm run dev
 
 The default dev server runs on `http://localhost:5173`.
 
-## Shared Environment File
+## Environment
 
-Frontend now reads environment variables from `../Backend/.env` (same file used by backend).
-
-- Preferred: set `PORT` and `FRONTEND_URL` in `Backend/.env`.
-- Optional override: add `VITE_API_URL` in `Backend/.env` if frontend should call a different backend URL.
+- Local development: leave `VITE_API_URL` unset and the Vite dev server will proxy `/api` and `/socket.io` to the backend using the `PORT` from `Backend/.env`.
+- Production and Vercel: set `VITE_API_URL=https://your-backend.onrender.com`.
+- Render backend: set `BACKEND_URL=https://your-backend.onrender.com` so email and certificate links point to the deployed API.
 
 ## Backend CORS
 

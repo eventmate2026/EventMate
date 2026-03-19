@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import app from "./src/app.js";
 import connectDB from "./src/config/db.js";
+import { createCorsOriginValidator } from "./src/config/clientOrigins.js";
 import startCronJobs from "./src/utils/cronJobs.js";
 import { initSocket } from "./src/services/notification.service.js";
 
@@ -12,11 +13,12 @@ const PORT = process.env.PORT || 5000;
 
 // Create HTTP server from Express app
 const httpServer = createServer(app);
+const corsOriginValidator = createCorsOriginValidator();
 
 // Setup Socket.io on top of HTTP server
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: corsOriginValidator,
     credentials: true
   }
 });

@@ -4,7 +4,16 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { getStoredToken, getStoredUser, subscribeAuthUpdates } from "./lib/auth";
+import api from "./lib/api";
+import SummaryApi from "./api/SummaryApi";
+import {
+  clearAuth,
+  getStoredRefreshToken,
+  getStoredToken,
+  getStoredUser,
+  storeAuth,
+  subscribeAuthUpdates,
+} from "./lib/auth";
 import { logoutUser } from "./lib/logout";
 
 import Landing from "./pages/Landing";
@@ -285,8 +294,92 @@ const routeMotionTransition = {
 const clampPercentage = (value) => Math.max(0, Math.min(100, value));
 
 function ProtectedRoute({ children, requiredRole }) {
-  const user = getStoredUser();
-  const token = getStoredToken();
+  const readAuthSnapshot = () => ({
+    user: getStoredUser(),
+    token: getStoredToken(),
+    refreshToken: getStoredRefreshToken(),
+  });
+
+  const [{ ready, user, token }, setAuthState] = useState(() => {
+    const snapshot = readAuthSnapshot();
+    return {
+      ready: Boolean(snapshot.user && snapshot.token),
+      user: snapshot.user,
+      token: snapshot.token,
+    };
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncAuthState = (nextReady = true) => {
+      if (cancelled) return;
+      const snapshot = readAuthSnapshot();
+      setAuthState({
+        ready: nextReady,
+        user: snapshot.user,
+        token: snapshot.token,
+      });
+    };
+
+    const bootstrapAuth = async () => {
+      let snapshot = readAuthSnapshot();
+
+      try {
+        if (!snapshot.token && snapshot.refreshToken) {
+          const response = await api({
+            ...SummaryApi.refresh_token,
+            data: { refreshToken: snapshot.refreshToken },
+            skipAuth: true,
+          });
+
+          const nextAccessToken = response.data?.accessToken;
+          const nextRefreshToken = response.data?.refreshToken;
+          if (!nextAccessToken) {
+            throw new Error("Missing access token.");
+          }
+
+          storeAuth({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
+          snapshot = readAuthSnapshot();
+        }
+
+        if (snapshot.token && !snapshot.user) {
+          const profileResponse = await api({
+            ...SummaryApi.get_profile,
+            cacheTTL: 0,
+            skipCache: true,
+            skipDedupe: true,
+          });
+          const profileUser = profileResponse.data?.user || null;
+          if (profileUser) {
+            storeAuth({ user: profileUser });
+          }
+        }
+      } catch {
+        clearAuth();
+      } finally {
+        syncAuthState(true);
+      }
+    };
+
+    const unsubscribe = subscribeAuthUpdates(() => syncAuthState(true));
+    const snapshot = readAuthSnapshot();
+
+    if (snapshot.user && snapshot.token) {
+      syncAuthState(true);
+    } else {
+      void bootstrapAuth();
+    }
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  if (!ready) {
+    return <div className="p-8 text-center">Checking session...</div>;
+  }
 
   if (!user || !token) {
     return <Navigate to="/login" replace />;

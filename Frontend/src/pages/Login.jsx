@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa6";
 import { ArrowLeft, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
 import api from "../lib/api";
 import { storeAuth } from "../lib/auth";
+import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 
 const dashboardRoutes = {
@@ -14,6 +15,7 @@ const dashboardRoutes = {
 };
 
 export default function Login() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [data, setData] = useState({
     email: "",
@@ -22,6 +24,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const nextEmail = String(new URLSearchParams(location.search).get("email") || "")
+      .trim()
+      .toLowerCase();
+    if (!nextEmail) return;
+    setData((prev) => ({ ...prev, email: prev.email || nextEmail }));
+  }, [location.search]);
 
   const finalizeLogin = ({ accessToken, refreshToken, role, user }) => {
     const finalAccessToken = accessToken;
@@ -93,6 +103,16 @@ export default function Login() {
         ? "Backend is unreachable. Start the backend server and try again."
         : "Login failed. Please try again.";
       const networkMessage = status ? fallbackMessage : (error.message || fallbackMessage);
+      if (status === 403 && backendMessage === "Verify email first") {
+        const pendingEmail = String(data.email || "").trim().toLowerCase();
+        if (pendingEmail) {
+          storePendingVerificationEmail(pendingEmail);
+          navigate(`/verify-email?email=${encodeURIComponent(pendingEmail)}`, {
+            state: { email: pendingEmail, message: backendMessage },
+          });
+          return;
+        }
+      }
       setErrors({ submit: rateLimitMessage || networkMessage });
     } finally {
       setIsLoading(false);
