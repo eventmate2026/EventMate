@@ -1,29 +1,23 @@
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const sendEmail = async (to, subject, html) => {
-  const emailUsername = String(process.env.EMAIL_USERNAME || "").trim();
-  const emailPassword = String(process.env.EMAIL_PASSWORD || "").trim();
+  try {
+    await sgMail.send({
+      to,
+      from: process.env.EMAIL_USERNAME, // verified sender
+      replyTo: process.env.EMAIL_USERNAME,
+      subject,
+      html,
+    });
+  } catch (error) {
+    console.error("SendGrid Error:", error.response?.body || error);
 
-  if (!emailUsername || !emailPassword) {
-    const error = new Error("Email service is not configured.");
-    error.statusCode = 503;
-    throw error;
+    const err = new Error("Failed to send email");
+    err.statusCode = 503;
+    throw err;
   }
-
-  const transporter = nodemailer.createTransport({
-    service: "gmail", // ✅ IMPORTANT CHANGE
-    auth: {
-      user: emailUsername,
-      pass: emailPassword,
-    },
-  });
-
-  await transporter.sendMail({
-    from: `"EventMate" <${emailUsername}>`,
-    to,
-    subject,
-    html,
-  });
 };
 
 export default sendEmail;
