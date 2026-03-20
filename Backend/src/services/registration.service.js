@@ -1713,7 +1713,7 @@ export const sendPendingTeamInvitesForUser = async (user) => {
 ================================================ */
 
 export const getMyRegistrations = async (userId) => {
-  const user = await User.findById(userId).select("email");
+  const user = await User.findById(userId).select("email").lean();
   const userEmail = normalizeEmail(user?.email);
 
   const registrationQuery = userEmail
@@ -1731,56 +1731,113 @@ export const getMyRegistrations = async (userId) => {
       "event",
       "title category schedule venue status posterUrl certificate isTeamEvent registration organizer"
     )
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   const registrationIds = registrations.map((registration) => registration._id);
   const feedbackRows = registrationIds.length
     ? await Feedback.find({
         registration: { $in: registrationIds }
-      }).select("registration")
+      })
+        .select("registration")
+        .lean()
     : [];
   const feedbackByRegistrationId = new Set(
     feedbackRows.map((feedback) => normalizeId(feedback?.registration))
   );
 
-  const result = await Promise.all(
-    registrations.map(async (reg) => {
-      const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
-      const isTeamLeader =
-        reg?.registeredBy?.toString() === userId.toString() ||
-        (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
-      const qr = lookupEmail
-        ? await ParticipantQR.findOne({
-            registration: reg._id,
-            email: lookupEmail
-          }).select("qrImageUrl role attendanceMarked attendanceMarkedAt")
-        : null;
-      const certificate = lookupEmail
-        ? await Certificate.findOne({
-            eventId: reg?.event?._id || reg?.event,
-            participantEmail: lookupEmail
-          }).select("certificateType position certificateUrl issuedAt verificationCode")
-        : null;
-      const feedbackSubmitted = feedbackByRegistrationId.has(normalizeId(reg?._id));
+  const lookupEmailByRegistrationId = new Map();
+  const lookupEmails = new Set();
+  const eventIds = new Set();
 
-      return {
-        ...reg.toObject(),
-        qr: qr || null,
-        isTeamLeader,
-        feedbackSubmitted,
-        certificate: certificate
-          ? {
-              certificateType: certificate.certificateType,
-              position: certificate.position,
-              participantEmail: certificate.participantEmail,
-              certificateUrl: certificate.certificateUrl,
-              issuedAt: certificate.issuedAt,
-              verificationCode: certificate.verificationCode
-            }
-          : null
-      };
-    })
+  registrations.forEach((reg) => {
+    const registrationId = normalizeId(reg?._id);
+    const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
+    const eventId = normalizeId(reg?.event?._id || reg?.event);
+
+    if (registrationId && lookupEmail) {
+      lookupEmailByRegistrationId.set(registrationId, lookupEmail);
+      lookupEmails.add(lookupEmail);
+    }
+
+    if (eventId) {
+      eventIds.add(eventId);
+    }
+  });
+
+  const [qrRows, certificateRows] = await Promise.all([
+    registrationIds.length && lookupEmails.size
+      ? ParticipantQR.find({
+          registration: { $in: registrationIds },
+          email: { $in: Array.from(lookupEmails) }
+        })
+          .select("registration email qrImageUrl role attendanceMarked attendanceMarkedAt")
+          .lean()
+      : [],
+    eventIds.size && lookupEmails.size
+      ? Certificate.find({
+          eventId: { $in: Array.from(eventIds) },
+          participantEmail: { $in: Array.from(lookupEmails) }
+        })
+          .select("eventId participantEmail certificateType position certificateUrl issuedAt verificationCode")
+          .lean()
+      : []
+  ]);
+
+  const qrByRegistrationKey = new Map(
+    qrRows.map((row) => [
+      `${normalizeId(row?.registration)}::${normalizeEmail(row?.email)}`,
+      row
+    ])
   );
+
+  const certificateByEventAndEmailKey = new Map(
+    certificateRows.map((row) => [
+      `${normalizeId(row?.eventId)}::${normalizeEmail(row?.participantEmail)}`,
+      row
+    ])
+  );
+
+  const result = registrations.map((reg) => {
+    const registrationId = normalizeId(reg?._id);
+    const eventId = normalizeId(reg?.event?._id || reg?.event);
+    const lookupEmail = lookupEmailByRegistrationId.get(registrationId) || "";
+    const isTeamLeader =
+      normalizeId(reg?.registeredBy) === normalizeId(userId) ||
+      (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
+    const qr = lookupEmail
+      ? qrByRegistrationKey.get(`${registrationId}::${lookupEmail}`) || null
+      : null;
+    const certificate =
+      lookupEmail && eventId
+        ? certificateByEventAndEmailKey.get(`${eventId}::${lookupEmail}`) || null
+        : null;
+    const feedbackSubmitted = feedbackByRegistrationId.has(registrationId);
+
+    return {
+      ...reg,
+      qr: qr
+        ? {
+            qrImageUrl: qr.qrImageUrl,
+            role: qr.role,
+            attendanceMarked: qr.attendanceMarked,
+            attendanceMarkedAt: qr.attendanceMarkedAt
+          }
+        : null,
+      isTeamLeader,
+      feedbackSubmitted,
+      certificate: certificate
+        ? {
+            certificateType: certificate.certificateType,
+            position: certificate.position,
+            participantEmail: certificate.participantEmail,
+            certificateUrl: certificate.certificateUrl,
+            issuedAt: certificate.issuedAt,
+            verificationCode: certificate.verificationCode
+          }
+        : null
+    };
+  });
 
   return result;
 };

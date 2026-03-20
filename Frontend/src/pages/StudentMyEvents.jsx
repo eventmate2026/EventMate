@@ -81,26 +81,26 @@ const mapToUiRow = (registration) => {
     paymentRequired &&
     (paymentStatus === "Pending" || paymentRejected || String(registration?.status || "").trim() === "PendingPayment");
   const canManagePayment = paymentRequired && Boolean(registration?.isTeamLeader);
-
-  const primaryLabel = attendanceMarked
-    ? "Attended"
-    : paymentUnderReview
-      ? "Payment Review"
-      : paymentPending
-        ? "Payment Pending"
-    : registrationStatus === "Confirmed"
-      ? "Registered"
-      : registrationStatus;
-
-  const primaryLabelClass = attendanceMarked
-    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-    : paymentUnderReview
-      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
-      : paymentPending
-        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
-    : registrationStatus === "Confirmed"
+  let primaryLabel = registrationStatus === "Confirmed" ? "Registered" : registrationStatus;
+  let primaryLabelClass =
+    registrationStatus === "Confirmed"
       ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
       : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
+
+  if (paymentPending) {
+    primaryLabel = "Payment Pending";
+    primaryLabelClass = "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
+  }
+
+  if (paymentUnderReview) {
+    primaryLabel = "Payment Review";
+    primaryLabelClass = "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300";
+  }
+
+  if (attendanceMarked) {
+    primaryLabel = "Attended";
+    primaryLabelClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
+  }
 
   return {
     ...registration,
@@ -279,7 +279,7 @@ export default function StudentMyEvents() {
     setError(null);
     setWarning(null);
     try {
-      const response = await fetchMyRegistrations({ bypassCache: true });
+      const response = await fetchMyRegistrations({ bypassCache: silent });
       setWarning(response.warning);
       const nextRows = response.rows
         .map(mapToUiRow)
@@ -297,9 +297,15 @@ export default function StudentMyEvents() {
     loadMyEvents();
 
     const refreshOnFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       void loadMyEvents({ silent: true });
     };
     const intervalId = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
       void loadMyEvents({ silent: true });
     }, 15000);
 

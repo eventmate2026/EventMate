@@ -8,11 +8,146 @@ const api = axios.create({
 });
 
 const GET_CACHE_TTL_MS = 60000;
+const NETWORK_RETRY_DELAY_MS = 1200;
+const MAX_AUTO_RETRY_ATTEMPTS = 2;
+const BACKEND_WARM_TTL_MS = 45000;
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 502, 503, 504]);
+const RETRYABLE_NETWORK_ERROR_CODES = new Set(["ECONNABORTED", "ERR_NETWORK"]);
 const responseCache = new Map();
 const pendingGetRequests = new Map();
+let backendWarmupPromise = null;
+let backendWarmedAt = 0;
+
+const pause = (durationMs) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, Math.max(0, Number(durationMs) || 0));
+  });
+
+const getRequestMethod = (config) => String(config?.method || "get").toLowerCase();
+
+const isRetryableMethod = (config) => {
+  const method = getRequestMethod(config);
+  return method === "get" || config?.retryable === true;
+};
+
+const getRetryAttemptCount = (config) => Math.max(0, Number(config?.__retryAttempt || 0));
+
+const getMaxAutoRetryAttempts = (config) => {
+  if (config?.skipRetry) return 0;
+
+  const configured = Number(config?.maxRetries);
+  if (Number.isFinite(configured)) {
+    return Math.max(0, configured);
+  }
+
+  return isRetryableMethod(config) ? MAX_AUTO_RETRY_ATTEMPTS : 0;
+};
+
+const isRetryableStatus = (status) => RETRYABLE_STATUS_CODES.has(Number(status));
+
+const isRetryableNetworkError = (error) => {
+  const code = String(error?.code || "").trim().toUpperCase();
+  const message = String(error?.message || "").trim();
+
+  return (
+    !error?.response &&
+    (RETRYABLE_NETWORK_ERROR_CODES.has(code) ||
+      /network error|failed to fetch|load failed|connection.*closed|socket hang up|timeout/i.test(message))
+  );
+};
+
+const resetDerivedRequestState = (config) => {
+  const nextConfig = {
+    ...config,
+    headers: { ...(config?.headers || {}) },
+  };
+
+  delete nextConfig.adapter;
+  delete nextConfig.__cacheHit;
+  delete nextConfig.__cacheKey;
+  delete nextConfig.__cacheTTL;
+  delete nextConfig.__dedupeHit;
+  delete nextConfig.__dedupeKey;
+
+  return nextConfig;
+};
+
+const resolveWarmupUrl = () => {
+  const base = String(API_BASE_URL || "").trim();
+  if (!base) return "";
+
+  try {
+    return new URL("/", `${base.replace(/\/+$/, "")}/`).toString();
+  } catch {
+    return `${base.replace(/\/+$/, "")}/`;
+  }
+};
+
+export const primeBackendConnection = async ({ force = false } = {}) => {
+  if (typeof window === "undefined" || !API_BASE_URL) {
+    return false;
+  }
+
+  if (!force && backendWarmupPromise) {
+    return backendWarmupPromise;
+  }
+
+  if (!force && backendWarmedAt && Date.now() - backendWarmedAt < BACKEND_WARM_TTL_MS) {
+    return true;
+  }
+
+  const warmupUrl = resolveWarmupUrl();
+  if (!warmupUrl) {
+    return false;
+  }
+
+  backendWarmupPromise = axios
+    .get(warmupUrl, {
+      timeout: 25000,
+      validateStatus: (status) => Number(status) >= 200 && Number(status) < 500,
+    })
+    .then(() => {
+      backendWarmedAt = Date.now();
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => {
+      backendWarmupPromise = null;
+    });
+
+  return backendWarmupPromise;
+};
+
+const retryRequestIfRecoverable = async (error) => {
+  const original = error?.config;
+  if (!original) return null;
+
+  const attemptCount = getRetryAttemptCount(original);
+  const maxAttempts = getMaxAutoRetryAttempts(original);
+  if (attemptCount >= maxAttempts) {
+    return null;
+  }
+
+  const status = Number(error?.response?.status || 0);
+  const shouldRetry = isRetryableStatus(status) || isRetryableNetworkError(error);
+  if (!shouldRetry) {
+    return null;
+  }
+
+  // Wake sleeping backends like Render before retrying the original GET.
+  if (isRetryableNetworkError(error) || status >= 502) {
+    await primeBackendConnection({ force: true });
+  }
+
+  await pause(NETWORK_RETRY_DELAY_MS * (attemptCount + 1));
+
+  const retryConfig = resetDerivedRequestState(original);
+  retryConfig.__retryAttempt = attemptCount + 1;
+  return api(retryConfig);
+};
 
 const shouldCacheRequest = (config) => {
-  const method = String(config?.method || "get").toLowerCase();
+  const method = getRequestMethod(config);
   if (method !== "get") return false;
   if (config?.skipCache) return false;
   if (config?.responseType === "blob" || config?.responseType === "arraybuffer") return false;
@@ -27,7 +162,7 @@ const shouldDedupeRequest = (config) => {
 
 const buildCacheKey = (config) => {
   const token = getStoredToken() || "";
-  const method = String(config?.method || "get").toLowerCase();
+  const method = getRequestMethod(config);
   const url = String(config?.url || "");
   const params = config?.params ? JSON.stringify(config.params) : "";
   return `${token}::${method}::${url}::${params}`;
@@ -126,7 +261,7 @@ const isRefreshRequest = (config) => {
 
 api.interceptors.response.use(
   (response) => {
-    const method = String(response?.config?.method || "get").toLowerCase();
+    const method = getRequestMethod(response?.config);
 
     if (method !== "get") {
       responseCache.clear();
@@ -156,6 +291,15 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const contentType = String(error.response?.headers?.["content-type"] || "").toLowerCase();
 
+    if (original?.__dedupeKey) {
+      pendingGetRequests.delete(original.__dedupeKey);
+    }
+
+    const retryResponse = await retryRequestIfRecoverable(error);
+    if (retryResponse) {
+      return retryResponse;
+    }
+
     if (
       status >= 500 &&
       typeof error.response?.data === "string" &&
@@ -165,10 +309,6 @@ api.interceptors.response.use(
         success: false,
         message: "Backend is unreachable. Start the backend server and try again.",
       };
-    }
-
-    if (original?.__dedupeKey) {
-      pendingGetRequests.delete(original.__dedupeKey);
     }
 
     if (!original || original.skipAuth || original._retry || isRefreshRequest(original) || status !== 401) {

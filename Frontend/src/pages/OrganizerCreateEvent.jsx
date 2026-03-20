@@ -758,7 +758,7 @@ export default function OrganizerCreateEvent() {
                       />
                     </label>
 
-                    <label className="block sm:col-span-2">
+                    <div className="block sm:col-span-2">
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                         Payment QR
                       </span>
@@ -782,7 +782,7 @@ export default function OrganizerCreateEvent() {
                           className="mt-3 h-40 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
                         />
                       ) : null}
-                    </label>
+                    </div>
                   </div>
                 </div>
               )}

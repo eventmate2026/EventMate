@@ -25,13 +25,14 @@ const parseRegistrationRows = (payload) => {
   return [];
 };
 
-const isSuccessfulRegistration = (registration) =>
-  String(registration?.status || "").trim().toLowerCase() === "confirmed";
-
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "Pending").trim() || "Pending";
   const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim() || "NotRequired";
+  const paymentAmount = Number(registration?.payment?.amount || 0) || 0;
+  const paymentTransactionId = String(registration?.payment?.transactionId || "").trim();
+  const paymentScreenshot = String(registration?.payment?.paymentScreenshot || "").trim();
+  const paymentRejectionReason = String(registration?.payment?.rejectionReason || "").trim();
   const teamName = String(registration?.teamName || "").trim();
   const registeredAt = registration?.createdAt || null;
   const winnerPosition = String(registration?.winner?.position || "").trim();
@@ -66,6 +67,10 @@ const toParticipantRows = (registration) => {
         teamName,
         registrationStatus,
         paymentStatus,
+        paymentAmount,
+        paymentTransactionId,
+        paymentScreenshot,
+        paymentRejectionReason,
         registeredAt,
         attendanceMarked: Boolean(qr?.attendanceMarked),
         attendanceMarkedAt: qr?.attendanceMarkedAt || null,
@@ -92,6 +97,10 @@ const toParticipantRows = (registration) => {
       teamName,
       registrationStatus,
       paymentStatus,
+      paymentAmount,
+      paymentTransactionId,
+      paymentScreenshot,
+      paymentRejectionReason,
       registeredAt,
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
@@ -117,6 +126,10 @@ const toParticipantRows = (registration) => {
       teamName,
       registrationStatus,
       paymentStatus,
+      paymentAmount,
+      paymentTransactionId,
+      paymentScreenshot,
+      paymentRejectionReason,
       registeredAt,
       attendanceMarked: false,
       attendanceMarkedAt: null,
@@ -130,9 +143,7 @@ const toParticipantRows = (registration) => {
 };
 
 const parseParticipantRows = (payload) =>
-  parseRegistrationRows(payload)
-    .filter((registration) => isSuccessfulRegistration(registration))
-    .flatMap((registration) => toParticipantRows(registration));
+  parseRegistrationRows(payload).flatMap((registration) => toParticipantRows(registration));
 
 const formatDate = (value) => {
   if (!value) return "Date TBD";
@@ -183,8 +194,11 @@ export default function OrganizerEventViewList() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [winnerNotice, setWinnerNotice] = useState(null);
+  const [paymentNotice, setPaymentNotice] = useState(null);
   const [pendingWinnerUpdates, setPendingWinnerUpdates] = useState({});
   const [savingWinnerChanges, setSavingWinnerChanges] = useState(false);
+  const [paymentReviewDrafts, setPaymentReviewDrafts] = useState({});
+  const [paymentActionByRegistration, setPaymentActionByRegistration] = useState({});
 
   const [query, setQuery] = useState("");
   const [registrationFilter, setRegistrationFilter] = useState("All");
@@ -266,6 +280,7 @@ export default function OrganizerEventViewList() {
         row.branch,
         row.year,
         row.registrationStatus,
+        row.paymentStatus,
       ]
         .map((value) => String(value || "").toLowerCase())
         .join(" ");
@@ -323,6 +338,57 @@ export default function OrganizerEventViewList() {
     () => Object.keys(pendingWinnerUpdates).length,
     [pendingWinnerUpdates]
   );
+
+  const handleReviewPayment = async (registrationId, action) => {
+    const normalizedId = normalizeId(registrationId);
+    if (!normalizedId) return;
+
+    const rejectionReason = String(paymentReviewDrafts[normalizedId] || "").trim();
+    if (action === "reject" && !rejectionReason) {
+      setPaymentNotice({
+        type: "error",
+        text: "Enter a rejection reason before rejecting payment.",
+      });
+      return;
+    }
+
+    setPaymentNotice(null);
+    setPaymentActionByRegistration((prev) => ({ ...prev, [normalizedId]: action }));
+    try {
+      const response = await api({
+        ...SummaryApi.review_registration_payment,
+        url: SummaryApi.review_registration_payment.url.replace(
+          ":registrationId",
+          encodeURIComponent(normalizedId)
+        ),
+        data: {
+          action,
+          rejectionReason,
+        },
+      });
+      setPaymentNotice({
+        type: "success",
+        text: response.data?.message || "Payment review updated successfully.",
+      });
+      setPaymentReviewDrafts((prev) => {
+        const next = { ...prev };
+        delete next[normalizedId];
+        return next;
+      });
+      await load({ silent: true });
+    } catch (reviewError) {
+      setPaymentNotice({
+        type: "error",
+        text: reviewError.response?.data?.message || "Unable to update payment review.",
+      });
+    } finally {
+      setPaymentActionByRegistration((prev) => {
+        const next = { ...prev };
+        delete next[normalizedId];
+        return next;
+      });
+    }
+  };
 
   const handleQueueWinnerAssign = (registrationId, position) => {
     const normalizedId = normalizeId(registrationId);
@@ -550,6 +616,17 @@ export default function OrganizerEventViewList() {
                   {winnerNotice.text}
                 </p>
               )}
+              {paymentNotice && (
+                <p
+                  className={`mb-4 rounded-lg px-3 py-2 text-sm ${
+                    paymentNotice.type === "success"
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
+                      : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
+                  }`}
+                >
+                  {paymentNotice.text}
+                </p>
+              )}
 
               {!canAssignWinners && (
                 <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
@@ -623,6 +700,7 @@ export default function OrganizerEventViewList() {
                       <th className="px-3 py-2.5 font-semibold">Team</th>
                       <th className="px-3 py-2.5 font-semibold">Rank</th>
                       <th className="px-3 py-2.5 font-semibold">Registration</th>
+                      <th className="px-3 py-2.5 font-semibold">Payment Review</th>
                       <th className="px-3 py-2.5 font-semibold">Attendance</th>
                       <th className="px-3 py-2.5 font-semibold">Registered</th>
                     </tr>
@@ -630,7 +708,7 @@ export default function OrganizerEventViewList() {
                   <tbody className="divide-y divide-slate-200 dark:divide-white/10 bg-white dark:bg-gray-900/40 select-none">
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">
+                        <td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-300">
                           No participants found for the current filters.
                         </td>
                       </tr>
@@ -659,6 +737,11 @@ export default function OrganizerEventViewList() {
                           row.attendanceMarked &&
                           !row.isWinner &&
                           !winnerLocked;
+                        const reviewAction = paymentActionByRegistration[winnerKey];
+                        const canReviewPayment =
+                          row.isLeader &&
+                          Number(row.paymentAmount || 0) > 0 &&
+                          row.paymentStatus === "UnderReview";
 
                         return (
                           <tr key={`${row.registrationId}-${row.id}`} className="align-top">
@@ -746,7 +829,79 @@ export default function OrganizerEventViewList() {
                               <span className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${getStatusClass(row.paymentStatus, PAYMENT_STATUS_STYLES)}`}>
                                 Payment: {row.paymentStatus}
                               </span>
+                              {row.paymentAmount > 0 ? (
+                                <p className="text-xs text-slate-500 dark:text-slate-300">
+                                  Amount: Rs {row.paymentAmount}
+                                </p>
+                              ) : null}
+                              {row.paymentTransactionId ? (
+                                <p className="break-all text-xs text-slate-500 dark:text-slate-300">
+                                  Txn: {row.paymentTransactionId}
+                                </p>
+                              ) : null}
+                              {row.paymentScreenshot ? (
+                                <a
+                                  href={row.paymentScreenshot}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300"
+                                >
+                                  View Proof
+                                </a>
+                              ) : null}
+                              {row.paymentRejectionReason ? (
+                                <p className="text-xs text-rose-600 dark:text-rose-300">
+                                  {row.paymentRejectionReason}
+                                </p>
+                              ) : null}
                             </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {canReviewPayment ? (
+                              <div className="flex min-w-[200px] flex-col gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewPayment(row.registrationId, "approve")}
+                                  disabled={Boolean(reviewAction)}
+                                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                  {reviewAction === "approve" ? "Approving..." : "Approve"}
+                                </button>
+                                <input
+                                  value={paymentReviewDrafts[winnerKey] || ""}
+                                  onChange={(event) =>
+                                    setPaymentReviewDrafts((prev) => ({
+                                      ...prev,
+                                      [winnerKey]: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="Reason if rejecting"
+                                  className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleReviewPayment(row.registrationId, "reject")}
+                                  disabled={Boolean(reviewAction)}
+                                  className="rounded-md border border-rose-200 px-3 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-60 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                >
+                                  {reviewAction === "reject" ? "Rejecting..." : "Reject"}
+                                </button>
+                              </div>
+                            ) : row.isLeader && Number(row.paymentAmount || 0) > 0 ? (
+                              <p className="text-xs text-slate-500 dark:text-slate-300">
+                                {row.paymentStatus === "Verified"
+                                  ? "Approved"
+                                  : row.paymentStatus === "Rejected"
+                                    ? "Waiting for resubmission"
+                                    : row.paymentStatus === "Pending"
+                                      ? "Student payment pending"
+                                      : "No action required"}
+                              </p>
+                            ) : (
+                              <span className="text-xs text-slate-400 dark:text-slate-500">
+                                {row.paymentAmount > 0 ? "Leader handles payment" : "Not required"}
+                              </span>
+                            )}
                           </td>
                           <td className="px-3 py-3">
                             {row.attendanceMarked ? (

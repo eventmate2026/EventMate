@@ -1,18 +1,116 @@
 import SummaryApi from "../api/SummaryApi";
 import api from "./api";
+import { getStoredUser } from "./auth";
 
 const REG_CACHE_TTL_MS = 60000;
+const REG_CACHE_STORAGE_KEY = "eventmate:my-registrations-cache";
 let cachedMyRegistrations = null;
 let cachedMyRegistrationsExpiresAt = 0;
 let pendingMyRegistrationsPromise = null;
 let pendingMyRegistrationsRequestId = 0;
 let cacheGeneration = 0;
+let didHydrateMyRegistrationsCache = false;
+
+const getSessionStorage = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+};
+
+const getRegistrationCacheOwnerKey = () => {
+  const user = getStoredUser();
+  return String(user?._id || user?.id || user?.email || "")
+    .trim()
+    .toLowerCase();
+};
+
+const hydrateMyRegistrationsCache = () => {
+  if (didHydrateMyRegistrationsCache) return;
+  didHydrateMyRegistrationsCache = true;
+
+  const storage = getSessionStorage();
+  if (!storage) return;
+
+  try {
+    const raw = storage.getItem(REG_CACHE_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const ownerKey = String(parsed?.ownerKey || "").trim().toLowerCase();
+    const currentOwnerKey = getRegistrationCacheOwnerKey();
+
+    if (ownerKey && currentOwnerKey && ownerKey !== currentOwnerKey) {
+      storage.removeItem(REG_CACHE_STORAGE_KEY);
+      return;
+    }
+
+    if (!parsed?.result || !Array.isArray(parsed.result.rows)) {
+      return;
+    }
+
+    cachedMyRegistrations = parsed.result;
+    cachedMyRegistrationsExpiresAt = Number(parsed?.expiresAt || 0) || 0;
+  } catch {
+    try {
+      storage.removeItem(REG_CACHE_STORAGE_KEY);
+    } catch {
+      // Ignore invalid cache cleanup failures.
+    }
+  }
+};
+
+const persistMyRegistrationsCache = (result, expiresAt) => {
+  const storage = getSessionStorage();
+  if (!storage || !result) return;
+
+  try {
+    storage.setItem(
+      REG_CACHE_STORAGE_KEY,
+      JSON.stringify({
+        ownerKey: getRegistrationCacheOwnerKey(),
+        expiresAt: Number(expiresAt || 0) || 0,
+        result,
+      })
+    );
+  } catch {
+    // Ignore storage write failures and keep fetch results in memory.
+  }
+};
+
+const clearPersistedMyRegistrationsCache = () => {
+  const storage = getSessionStorage();
+  if (!storage) return;
+
+  try {
+    storage.removeItem(REG_CACHE_STORAGE_KEY);
+  } catch {
+    // Ignore storage cleanup failures.
+  }
+};
+
+const isTransientRegistrationFetchError = (error) => {
+  const status = Number(error?.response?.status || 0);
+  const code = String(error?.code || "").trim().toUpperCase();
+  const message = String(error?.message || "").trim();
+
+  return (
+    !status ||
+    status >= 500 ||
+    code === "ERR_NETWORK" ||
+    code === "ECONNABORTED" ||
+    /network error|failed to fetch|load failed|connection.*closed|socket hang up|timeout/i.test(message)
+  );
+};
 
 export const invalidateMyRegistrationsCache = () => {
   cacheGeneration += 1;
   cachedMyRegistrations = null;
   cachedMyRegistrationsExpiresAt = 0;
   pendingMyRegistrationsPromise = null;
+  clearPersistedMyRegistrationsCache();
 };
 
 const toList = (payload) => {
@@ -112,6 +210,7 @@ const normalizeRegistration = (item) => {
 
 export const fetchMyRegistrations = async (options = {}) => {
   const { bypassCache = false } = options;
+  hydrateMyRegistrationsCache();
 
   if (!bypassCache && cachedMyRegistrations && cachedMyRegistrationsExpiresAt > Date.now()) {
     return cachedMyRegistrations;
@@ -137,6 +236,7 @@ export const fetchMyRegistrations = async (options = {}) => {
       if (requestGeneration === cacheGeneration) {
         cachedMyRegistrations = result;
         cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
+        persistMyRegistrationsCache(result, cachedMyRegistrationsExpiresAt);
       }
       return result;
     } catch (error) {
@@ -150,9 +250,20 @@ export const fetchMyRegistrations = async (options = {}) => {
         if (requestGeneration === cacheGeneration) {
           cachedMyRegistrations = result;
           cachedMyRegistrationsExpiresAt = Date.now() + REG_CACHE_TTL_MS;
+          persistMyRegistrationsCache(result, cachedMyRegistrationsExpiresAt);
         }
         return result;
       }
+
+      if (cachedMyRegistrations && isTransientRegistrationFetchError(error)) {
+        return {
+          ...cachedMyRegistrations,
+          warning:
+            cachedMyRegistrations.warning ||
+            "Showing your latest saved registrations while EventMate reconnects.",
+        };
+      }
+
       throw error;
     } finally {
       if (pendingMyRegistrationsRequestId === requestId) {

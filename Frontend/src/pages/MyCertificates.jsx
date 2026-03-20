@@ -267,9 +267,15 @@ export default function MyCertificates() {
     fetchCertificates();
 
     const refreshOnFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       void fetchCertificates({ silent: true });
     };
     const intervalId = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
       void fetchCertificates({ silent: true });
     }, 15000);
 

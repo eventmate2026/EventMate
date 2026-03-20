@@ -287,9 +287,11 @@ const PublicEventDetails = lazy(() =>
 );
 
 const routeMotionVariants = {
-  initial: { opacity: 0, y: 18, scale: 0.996, filter: "blur(6px)" },
-  animate: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
-  exit: { opacity: 0, y: -10, scale: 0.998, filter: "blur(4px)" },
+  // Keep route transitions viewport-safe so fixed UI like navbars and drawers
+  // stay anchored to the window instead of inheriting a transformed parent.
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 const routeMotionTransition = {

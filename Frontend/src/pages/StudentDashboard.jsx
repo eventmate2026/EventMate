@@ -171,7 +171,7 @@ export default function StudentDashboard() {
     try {
       const [publicResponse, registrationInfo] = await Promise.all([
         api({ ...SummaryApi.get_public_events, cacheTTL: 90000 }),
-        fetchMyRegistrations({ bypassCache: true }),
+        fetchMyRegistrations({ bypassCache: silent }),
       ]);
       const registrationRows = Array.isArray(registrationInfo?.rows) ? registrationInfo.rows : [];
       const registeredIds = new Set(registrationRows.map((row) => String(row?.eventId || "").trim()).filter(Boolean));
@@ -214,9 +214,15 @@ export default function StudentDashboard() {
     fetchDashboardEvents();
 
     const refreshOnFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       void fetchDashboardEvents({ silent: true });
     };
     const intervalId = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
       void fetchDashboardEvents({ silent: true });
     }, 15000);
 
@@ -261,6 +267,9 @@ export default function StudentDashboard() {
     fetchCertificateCount();
 
     const intervalId = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
       void fetchCertificateCount();
     }, 15000);
 

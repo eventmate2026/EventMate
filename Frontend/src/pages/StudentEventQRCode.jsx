@@ -69,7 +69,7 @@ export default function StudentEventQRCode() {
       setError(null);
       setWarning(null);
       try {
-        const response = await fetchMyRegistrations({ bypassCache: true });
+        const response = await fetchMyRegistrations();
         if (!isActive || requestIdRef.current !== requestId) return;
         if (response?.supported === false) {
           setError(response?.warning || "Registration history is unavailable right now.");

@@ -37,7 +37,7 @@ export default function StudentLayout() {
   return (
     <div className="eventmate-page min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col transition-colors">
       <StudentNavbar activePage={activePage} user={user} onLogout={handleLogout} />
-      <main className="flex-1">
+      <main className="flex-1 pt-16">
         <Outlet />
       </main>
     </div>
