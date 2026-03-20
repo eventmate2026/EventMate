@@ -12,6 +12,28 @@ const parseNotifications = (payload) => {
   return [];
 };
 
+const sanitizeNotificationCopy = (value, fallback) => {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+
+  return text
+    .replace(/\bbackend notifications\b/gi, "notifications")
+    .replace(/\bsent from backend\b/gi, "sent by EventMate")
+    .replace(/\bfrom backend\b/gi, "from EventMate")
+    .replace(/\bbackend server\b/gi, "service")
+    .replace(/\bbackend\b/gi, "system")
+    .replace(/\bapi\b/gi, "service")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const getSafeNotificationError = (error, fallback) => {
+  const status = Number(error?.response?.status || 0);
+  if (status === 401 || status === 403) return "";
+  if (status >= 500) return "Something went wrong while loading your updates. Please try again.";
+  return fallback;
+};
+
 const formatDateTime = (value) => {
   if (!value) return "N/A";
   const parsed = new Date(value);
@@ -101,14 +123,9 @@ export default function NotificationInbox({
       setItems(rows);
       emitUnreadCount(Number(response?.data?.unreadCount ?? rows.filter((item) => !item?.isRead).length));
     } catch (error) {
-      const status = Number(error?.response?.status || 0);
       setItems([]);
       emitUnreadCount(0);
-      setWarning(
-        status === 401 || status === 403
-          ? ""
-          : error?.response?.data?.message || "Unable to load notifications."
-      );
+      setWarning(getSafeNotificationError(error, "Unable to load your updates right now."));
     } finally {
       setLoading(false);
     }
@@ -147,7 +164,7 @@ export default function NotificationInbox({
         prev.map((item) => (String(item?._id || "") === normalizedId ? { ...item, isRead: true } : item))
       );
     } catch (error) {
-      setWarning(error?.response?.data?.message || "Unable to mark notification as read.");
+      setWarning(getSafeNotificationError(error, "Unable to update this notification right now."));
     }
   };
 
@@ -158,7 +175,7 @@ export default function NotificationInbox({
       await api({ ...SummaryApi.mark_all_notifications_read });
       setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch (error) {
-      setWarning(error?.response?.data?.message || "Unable to mark all notifications as read.");
+      setWarning(getSafeNotificationError(error, "Unable to update your notifications right now."));
     } finally {
       setMarkingAll(false);
     }
@@ -256,14 +273,14 @@ export default function NotificationInbox({
                       <div className="min-w-0">
                         <div className="inline-flex flex-wrap items-center gap-2">
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {item?.title || "Notification"}
+                            {sanitizeNotificationCopy(item?.title, "Notification")}
                           </p>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeBadgeClass(item?.type)}`}>
                             {String(item?.type || "GENERAL")}
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
-                          {String(item?.message || "No message.")}
+                          {sanitizeNotificationCopy(item?.message, "No message available.")}
                         </p>
                         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                           Received: {formatDateTime(item?.createdAt)}

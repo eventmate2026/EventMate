@@ -13,6 +13,28 @@ const parseNotifications = (payload) => {
   return [];
 };
 
+const sanitizeNotificationCopy = (value, fallback) => {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+
+  return text
+    .replace(/\bbackend notifications\b/gi, "notifications")
+    .replace(/\bsent from backend\b/gi, "sent by EventMate")
+    .replace(/\bfrom backend\b/gi, "from EventMate")
+    .replace(/\bbackend server\b/gi, "service")
+    .replace(/\bbackend\b/gi, "system")
+    .replace(/\bapi\b/gi, "service")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const getSafeNotificationError = (error, fallback) => {
+  const status = Number(error?.response?.status || 0);
+  if (status === 401 || status === 403) return "";
+  if (status >= 500) return "Something went wrong while loading updates. Please try again.";
+  return fallback;
+};
+
 const parseContacts = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.contacts)) return payload.contacts;
@@ -180,15 +202,10 @@ export default function AdminNotifications() {
       setContactsMap(nextContactsMap);
       emitUnreadCount(Number(notificationResponse?.data?.unreadCount ?? rows.filter((item) => !item?.isRead).length));
     } catch (error) {
-      const status = Number(error?.response?.status || 0);
       setItems([]);
       setContactsMap({});
       emitUnreadCount(0);
-      setWarning(
-        status === 401 || status === 403
-          ? ""
-          : error?.response?.data?.message || "Unable to load notifications."
-      );
+      setWarning(getSafeNotificationError(error, "Unable to load updates right now."));
     } finally {
       setLoading(false);
     }
@@ -227,7 +244,7 @@ export default function AdminNotifications() {
         prev.map((item) => (normalizeId(item?._id || item?.id) === normalizedId ? { ...item, isRead: true } : item))
       );
     } catch (error) {
-      setWarning(error?.response?.data?.message || "Unable to mark notification as read.");
+      setWarning(getSafeNotificationError(error, "Unable to update this notification right now."));
     }
   };
 
@@ -238,7 +255,7 @@ export default function AdminNotifications() {
       await api({ ...SummaryApi.mark_all_notifications_read });
       setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch (error) {
-      setWarning(error?.response?.data?.message || "Unable to mark all notifications as read.");
+      setWarning(getSafeNotificationError(error, "Unable to update notifications right now."));
     } finally {
       setMarkingAll(false);
     }
@@ -246,11 +263,11 @@ export default function AdminNotifications() {
 
   const resolveBody = (item) => {
     const type = String(item?.type || "").toUpperCase();
-    if (type !== "CONTACT") return String(item?.message || "No message.");
+    if (type !== "CONTACT") return sanitizeNotificationCopy(item?.message, "No message available.");
 
     const refId = normalizeId(item?.refId);
     const contact = contactsMap[refId];
-    if (!contact) return String(item?.message || "No message.");
+    if (!contact) return sanitizeNotificationCopy(item?.message, "No message available.");
 
     const fullName = String(contact?.fullName || "").trim();
     const email = String(contact?.email || "").trim();
@@ -258,10 +275,11 @@ export default function AdminNotifications() {
 
     if (contactMessage) {
       const senderLine = [fullName, email ? `<${email}>` : ""].filter(Boolean).join(" ").trim();
-      return senderLine ? `${senderLine}\n\n${contactMessage}` : contactMessage;
+      const combinedMessage = senderLine ? `${senderLine}\n\n${contactMessage}` : contactMessage;
+      return sanitizeNotificationCopy(combinedMessage, "No message available.");
     }
 
-    return String(item?.message || "No message.");
+    return sanitizeNotificationCopy(item?.message, "No message available.");
   };
 
   const handleBack = () => {
@@ -355,7 +373,9 @@ export default function AdminNotifications() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="inline-flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{item?.title || "Notification"}</p>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {sanitizeNotificationCopy(item?.title, "Notification")}
+                          </p>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeBadgeClass(item?.type)}`}>
                             {String(item?.type || "GENERAL")}
                           </span>
