@@ -111,6 +111,7 @@ const mapDbEvent = (event) => {
     description: event?.description || "Details will be announced soon.",
     date: formatEventDate(event?.schedule?.startDate),
     time: event?.schedule?.startTime || "Time TBD",
+    endTime: event?.schedule?.endTime || "",
     location: event?.venue?.location || "Venue TBD",
     price: fee <= 0 ? "Free" : `Rs ${fee}`,
     category,
