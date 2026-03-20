@@ -300,7 +300,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION (Synced Animation) --- */}
-      <section className="relative z-10 flex min-h-[calc(100svh-4rem)] items-center px-4 pt-20 pb-10 sm:min-h-0 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
+      <section className="relative z-10 flex min-h-[calc(100svh-4rem)] items-center px-4 pt-16 pb-12 sm:min-h-0 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="hero-spotlight hero-spotlight--one" />
           <div className="hero-spotlight hero-spotlight--two" />
@@ -309,7 +309,7 @@ export default function Landing() {
           <div className="hero-beam" />
         </div>
 
-        <div className="max-w-5xl mx-auto text-center">
+        <div className="mx-auto max-w-5xl text-center">
           
           <motion.div
             initial="hidden"
@@ -320,7 +320,7 @@ export default function Landing() {
               {/* Badge */}
               <motion.span
                 variants={textReveal}
-                className="mb-6 inline-block rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-indigo-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 sm:mb-8"
+                className="mb-6 inline-block max-w-full rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 max-[380px]:px-2.5 max-[380px]:text-[10px] sm:mb-8 sm:px-4 sm:text-xs sm:tracking-[0.2em]"
               >
                 Campus Event Management
               </motion.span>
@@ -328,7 +328,7 @@ export default function Landing() {
               {/* Main Title (Word by word effect) */}
               <motion.h1
                 variants={textReveal}
-                className="hero-title mb-6 text-[clamp(3rem,12vw,4.8rem)] font-black leading-[1.05] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40 sm:mb-8 sm:text-5xl md:text-7xl lg:text-8xl"
+                className="hero-title mb-6 text-[clamp(2.7rem,16vw,4.8rem)] font-black leading-[0.98] tracking-[-0.045em] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40 max-[380px]:text-[2.45rem] sm:mb-8 sm:text-5xl sm:leading-[1.02] md:text-7xl lg:text-8xl"
               >
                 Manage Campus Events <br />
                 <motion.span
@@ -342,18 +342,18 @@ export default function Landing() {
               </motion.h1>
 
               {/* Description */}
-              <motion.p variants={textReveal} className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-6 sm:text-lg md:text-xl">
-                The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
-              </motion.p>
+               <motion.p variants={textReveal} className="mx-auto mt-4 max-w-[34rem] text-[0.98rem] leading-8 text-gray-600 dark:text-gray-300 max-[380px]:text-[0.94rem] max-[380px]:leading-7 sm:mt-6 sm:text-lg md:text-xl">
+                 The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
+               </motion.p>
 
               {/* Buttons */}
               <motion.div variants={textReveal} className="mt-8 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
                 <Link
                   to="/signup"
-                  className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 cta-glow"
+                  className="group relative w-full max-w-[18rem] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 p-[2px] cta-glow sm:w-auto sm:max-w-none"
                 >
-                  <div className="relative bg-white dark:bg-[#030712] rounded-full px-8 py-4 group-hover:bg-opacity-0 transition-all duration-300">
-                    <span className="relative z-10 text-gray-900 dark:text-white font-bold text-lg">
+                  <div className="relative rounded-full bg-white px-6 py-3.5 transition-all duration-300 group-hover:bg-opacity-0 dark:bg-[#030712] sm:px-8 sm:py-4">
+                    <span className="relative z-10 text-base font-bold text-gray-900 dark:text-white sm:text-lg">
                       Get Started
                     </span>
                   </div>
