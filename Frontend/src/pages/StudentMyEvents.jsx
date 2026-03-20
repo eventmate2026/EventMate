@@ -6,6 +6,7 @@ import { getStoredUser } from "../lib/auth";
 import { downloadCertificateAsset } from "../lib/certificateDownload";
 import { useToastFeedback } from "../hooks/useToastFeedback";
 import { fetchMyRegistrations } from "../lib/registrationApi";
+import { canSubmitRegistrationFeedback } from "../lib/feedbackEligibility";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -69,12 +70,7 @@ const mapToUiRow = (registration) => {
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
   const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
   const certificateReady = Boolean(registration?.certificate);
-  const canGiveFeedback =
-    attendanceMarked &&
-    phase === "completed" &&
-    Boolean(registration?.eventId) &&
-    !feedbackSubmitted &&
-    Boolean(registration?.isTeamLeader);
+  const canGiveFeedback = canSubmitRegistrationFeedback(registration);
 
   const primaryLabel = attendanceMarked
     ? "Attended"

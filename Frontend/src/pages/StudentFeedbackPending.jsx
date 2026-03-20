@@ -10,7 +10,6 @@ import {
   Star,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { isRegistrationEventCompleted } from "../lib/eventSchedule";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";

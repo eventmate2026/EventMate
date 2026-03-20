@@ -46,6 +46,13 @@ const resolveEventLocation = (eventDoc, item) => {
 const normalizeRegistration = (item) => {
   const qrImageUrl = String(item?.qr?.qrImageUrl || "").trim();
   const eventDoc = item?.event && typeof item.event === "object" ? item.event : {};
+  const eventTitle = String(item?.event?.title || "").trim();
+  const eventId = resolveEventId(item);
+
+  if (!eventId || !eventTitle) {
+    return null;
+  }
+
   const eventLocation = resolveEventLocation(eventDoc, item);
   const eventStartDate = eventDoc?.schedule?.startDate || null;
   const eventEndDate = eventDoc?.schedule?.endDate || eventDoc?.schedule?.startDate || null;
@@ -54,8 +61,8 @@ const normalizeRegistration = (item) => {
   const certificate = item?.certificate && typeof item.certificate === "object" ? item.certificate : null;
   return {
     id: String(item?._id || item?.id || "").trim(),
-    eventId: resolveEventId(item),
-    eventTitle: String(item?.event?.title || "").trim(),
+    eventId,
+    eventTitle,
     eventCategory: String(eventDoc?.category || "").trim(),
     eventStatus: String(eventDoc?.status || "").trim(),
     eventPosterUrl: String(eventDoc?.posterUrl || "").trim(),
@@ -99,11 +106,16 @@ export const fetchMyRegistrations = async (options = {}) => {
   pendingMyRegistrationsPromise = (async () => {
     try {
       const response = await api({ ...SummaryApi.get_my_registered_events, cacheTTL: REG_CACHE_TTL_MS });
-      const rows = toList(response.data).map(normalizeRegistration);
+      const sourceRows = toList(response.data);
+      const rows = sourceRows.map(normalizeRegistration).filter(Boolean);
+      const hiddenInvalidCount = Math.max(0, sourceRows.length - rows.length);
       const result = {
         rows,
         supported: true,
-        warning: null,
+        warning:
+          hiddenInvalidCount > 0
+            ? `${hiddenInvalidCount} registration ${hiddenInvalidCount === 1 ? "entry was" : "entries were"} hidden because the linked event is no longer available.`
+            : null,
       };
       if (requestGeneration === cacheGeneration) {
         cachedMyRegistrations = result;
