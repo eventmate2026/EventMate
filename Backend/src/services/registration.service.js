@@ -10,6 +10,7 @@ import Certificate from "../models/Certificate.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 import { buildEventEndDateTime, buildEventStartDateTime } from "../utils/eventTime.js";
+import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
 import { generateCertificatesForRegistration } from "./certificate.service.js";
@@ -81,6 +82,129 @@ const formatEventDate = (event) => {
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) return "TBA";
   return parsed.toDateString();
+};
+
+const eventRequiresPayment = (event) => Number(event?.registration?.fee || 0) > 0;
+
+const getEventPaymentConfig = (event) => ({
+  method:
+    String(event?.registration?.paymentConfig?.method || "").trim().toUpperCase() === "PHONEPE_QR"
+      ? "PHONEPE_QR"
+      : "FREE",
+  accountName: String(event?.registration?.paymentConfig?.accountName || "").trim(),
+  upiId: String(event?.registration?.paymentConfig?.upiId || "").trim(),
+  qrImageUrl: String(event?.registration?.paymentConfig?.qrImageUrl || "").trim(),
+  instructions: String(event?.registration?.paymentConfig?.instructions || "").trim()
+});
+
+const ensureEventPaymentConfigured = (event) => {
+  if (!eventRequiresPayment(event)) return;
+  const config = getEventPaymentConfig(event);
+  if (!config.accountName || (!config.upiId && !config.qrImageUrl)) {
+    throw new Error("Organizer has not configured payment details for this paid event yet");
+  }
+};
+
+const applyEventPaymentDefaults = (registration, event) => {
+  registration.payment = registration.payment || {};
+  registration.payment.amount = Number(event?.registration?.fee || 0);
+
+  if (!eventRequiresPayment(event)) {
+    registration.payment.method = "FREE";
+    registration.payment.paymentStatus = "NotRequired";
+    registration.payment.rejectionReason = "";
+    return;
+  }
+
+  const config = getEventPaymentConfig(event);
+  registration.payment.method = config.method === "PHONEPE_QR" ? "PHONEPE_QR" : "PHONEPE_QR";
+  if (
+    !registration.payment.paymentStatus ||
+    registration.payment.paymentStatus === "NotRequired"
+  ) {
+    registration.payment.paymentStatus = "Pending";
+  }
+};
+
+const canReviewPaymentForEvent = (event, requester) => {
+  const requesterId = normalizeId(requester?._id);
+  const requesterRole = String(requester?.role || "").trim().toUpperCase();
+  if (!requesterId) return false;
+  if (requesterRole === "MAIN_ADMIN") return true;
+  return normalizeId(event?.createdBy) === requesterId;
+};
+
+const isRegistrationViewer = (registration, requesterId, requesterEmail) => {
+  const normalizedRequesterId = normalizeId(requesterId);
+  const normalizedRequesterEmail = normalizeEmail(requesterEmail);
+  if (!registration) return false;
+
+  if (normalizedRequesterId && normalizeId(registration?.registeredBy) === normalizedRequesterId) {
+    return true;
+  }
+
+  if (!normalizedRequesterEmail) return false;
+  if (normalizeEmail(registration?.teamLeader?.email) === normalizedRequesterEmail) return true;
+
+  return Array.isArray(registration?.teamMembers)
+    ? registration.teamMembers.some(
+        (member) => normalizeEmail(member?.email) === normalizedRequesterEmail
+      )
+    : false;
+};
+
+const finalizeRegistrationConfirmation = async (registration, event, verifiedBy = null) => {
+  applyEventPaymentDefaults(registration, event);
+  registration.status = "Confirmed";
+  registration.allMembersVerified = true;
+
+  if (eventRequiresPayment(event)) {
+    registration.payment.paymentStatus = "Verified";
+    registration.payment.rejectionReason = "";
+    registration.payment.verifiedBy = verifiedBy || registration.payment.verifiedBy || null;
+    registration.payment.verifiedAt = registration.payment.verifiedAt || new Date();
+  } else {
+    registration.payment.verifiedBy = null;
+    registration.payment.verifiedAt = null;
+  }
+
+  await registration.save();
+  await generateQRsForRegistration(registration, event);
+  return registration;
+};
+
+const moveRegistrationToPendingPayment = async (
+  registration,
+  event,
+  { paymentStatus = "Pending", rejectionReason = "" } = {}
+) => {
+  ensureEventPaymentConfigured(event);
+  applyEventPaymentDefaults(registration, event);
+  registration.status = "PendingPayment";
+  registration.allMembersVerified = true;
+  registration.payment.paymentStatus = paymentStatus;
+  registration.payment.rejectionReason = String(rejectionReason || "").trim();
+  registration.payment.verifiedBy = null;
+  registration.payment.verifiedAt = null;
+  await registration.save();
+  return registration;
+};
+
+const advanceRegistrationAfterAcceptance = async (registration, event) => {
+  if (eventRequiresPayment(event)) {
+    await moveRegistrationToPendingPayment(registration, event);
+    return {
+      status: registration.status,
+      message:
+        "All team members accepted. Complete payment to receive the event QR pass."
+    };
+  }
+
+  await finalizeRegistrationConfirmation(registration, event);
+  return {
+    status: registration.status,
+    message: "Registration confirmed. QR codes have been sent."
+  };
 };
 
 const ensureAttendanceWindowOpen = (event) => {

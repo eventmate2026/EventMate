@@ -34,10 +34,69 @@ const parseVisibilityPayload = (raw) => {
   return null;
 };
 
+const parseJsonPayload = (raw, fallback = null) => {
+  if (!raw) return fallback;
+  if (typeof raw === "object") return raw;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+};
+
+const normalizePaymentConfig = (registrationPayload = {}, paymentQrUrl = "") => {
+  const fee = Number(registrationPayload?.fee || 0);
+  if (fee <= 0) {
+    return {
+      method: "FREE",
+      accountName: "",
+      upiId: "",
+      qrImageUrl: "",
+      instructions: ""
+    };
+  }
+
+  const rawConfig = registrationPayload?.paymentConfig || {};
+  const method =
+    String(rawConfig?.method || "").trim().toUpperCase() === "PHONEPE_QR"
+      ? "PHONEPE_QR"
+      : "PHONEPE_QR";
+
+  return {
+    method,
+    accountName: String(rawConfig?.accountName || "").trim(),
+    upiId: String(rawConfig?.upiId || "").trim(),
+    qrImageUrl: String(paymentQrUrl || rawConfig?.qrImageUrl || "").trim(),
+    instructions: String(rawConfig?.instructions || "").trim()
+  };
+};
+
+const validatePaymentConfig = (registrationPayload = {}) => {
+  const fee = Number(registrationPayload?.fee || 0);
+  if (fee <= 0) return null;
+
+  const paymentConfig = registrationPayload?.paymentConfig || {};
+  const accountName = String(paymentConfig?.accountName || "").trim();
+  const upiId = String(paymentConfig?.upiId || "").trim();
+  const qrImageUrl = String(paymentConfig?.qrImageUrl || "").trim();
+
+  if (!accountName) {
+    return "Account name is required for paid events";
+  }
+  if (!upiId && !qrImageUrl) {
+    return "UPI ID or payment QR image is required for paid events";
+  }
+  return null;
+};
+
 export const createEventController = asyncHandler(async (req, res) => {
 
   const posterFile = req.files?.poster?.[0] || req.file;
   const resourceFile = req.files?.resourceFile?.[0];
+  const paymentQrFile = req.files?.paymentQr?.[0];
 
   if (!posterFile) {
     return res.status(400).json({
@@ -97,6 +156,15 @@ export const createEventController = asyncHandler(async (req, res) => {
     };
   }
 
+  let uploadedPaymentQrUrl = "";
+  if (paymentQrFile) {
+    const uploadedPaymentQr = await uploadImageCloudinary(paymentQrFile, {
+      folder: "eventmate/events/payments",
+      resourceType: "image"
+    });
+    uploadedPaymentQrUrl = uploadedPaymentQr.url;
+  }
+
   const visibilityPayload = parseVisibilityPayload(visibility);
   const visibilityScope = String(visibilityPayload?.scope || "").toUpperCase() === "DEPARTMENT"
     ? "DEPARTMENT"
@@ -119,6 +187,23 @@ export const createEventController = asyncHandler(async (req, res) => {
     }
   }
 
+  const registrationPayload = parseJsonPayload(registration, {
+    isOpen: false,
+    fee: 0
+  });
+  registrationPayload.paymentConfig = normalizePaymentConfig(
+    registrationPayload,
+    uploadedPaymentQrUrl
+  );
+
+  const paymentValidationError = validatePaymentConfig(registrationPayload);
+  if (paymentValidationError) {
+    return res.status(400).json({
+      success: false,
+      message: paymentValidationError
+    });
+  }
+
   const event = await Event.create({
     title,
     description,
@@ -136,10 +221,7 @@ export const createEventController = asyncHandler(async (req, res) => {
 
     venue: venue ? JSON.parse(venue) : undefined,
     schedule: schedule ? JSON.parse(schedule) : undefined,
-    registration: registration ? JSON.parse(registration) : {
-      isOpen: false,
-      fee: 0
-    },
+    registration: registrationPayload,
     certificate: certificate ? JSON.parse(certificate) : { isEnabled: false },
     feedback: feedback ? JSON.parse(feedback) : { enabled: false },
 
@@ -361,6 +443,23 @@ export const updateEvent = async (req, res, next) => {
     delete req.body._id;
     delete req.body.__v;
 
+    if (req.body.venue && typeof req.body.venue === "string") {
+      const parsedVenue = parseJsonPayload(req.body.venue);
+      if (parsedVenue) req.body.venue = parsedVenue;
+    }
+    if (req.body.schedule && typeof req.body.schedule === "string") {
+      const parsedSchedule = parseJsonPayload(req.body.schedule);
+      if (parsedSchedule) req.body.schedule = parsedSchedule;
+    }
+    if (req.body.registration && typeof req.body.registration === "string") {
+      const parsedRegistration = parseJsonPayload(req.body.registration);
+      if (parsedRegistration) req.body.registration = parsedRegistration;
+    }
+    if (req.body.feedback && typeof req.body.feedback === "string") {
+      const parsedFeedback = parseJsonPayload(req.body.feedback);
+      if (parsedFeedback) req.body.feedback = parsedFeedback;
+    }
+
     if (req.body.visibility && typeof req.body.visibility === "string") {
       const parsedVisibility = parseVisibilityPayload(req.body.visibility);
       if (parsedVisibility) req.body.visibility = parsedVisibility;
@@ -388,6 +487,39 @@ export const updateEvent = async (req, res, next) => {
           message: "Department is required for department-level events"
         });
       }
+    }
+
+    const paymentQrFile = req.files?.paymentQr?.[0];
+    let uploadedPaymentQrUrl = "";
+    if (paymentQrFile) {
+      const uploadedPaymentQr = await uploadImageCloudinary(paymentQrFile, {
+        folder: "eventmate/events/payments",
+        resourceType: "image"
+      });
+      uploadedPaymentQrUrl = uploadedPaymentQr.url;
+    }
+
+    if (req.body.registration) {
+      const mergedRegistration = {
+        ...(event.registration?.toObject ? event.registration.toObject() : event.registration || {}),
+        ...req.body.registration
+      };
+      mergedRegistration.paymentConfig = normalizePaymentConfig(
+        mergedRegistration,
+        uploadedPaymentQrUrl ||
+          mergedRegistration?.paymentConfig?.qrImageUrl ||
+          event?.registration?.paymentConfig?.qrImageUrl
+      );
+
+      const paymentValidationError = validatePaymentConfig(mergedRegistration);
+      if (paymentValidationError) {
+        return res.status(400).json({
+          success: false,
+          message: paymentValidationError
+        });
+      }
+
+      req.body.registration = mergedRegistration;
     }
 
     Object.assign(event, req.body);

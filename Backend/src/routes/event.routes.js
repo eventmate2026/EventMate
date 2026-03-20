@@ -24,7 +24,8 @@ router.post(
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   eventUpload.fields([
     { name: "poster", maxCount: 1 },
-    { name: "resourceFile", maxCount: 1 }
+    { name: "resourceFile", maxCount: 1 },
+    { name: "paymentQr", maxCount: 1 }
   ]),
   createEventController
 );
@@ -68,6 +69,11 @@ router.patch(
 router.patch(
   "/:id",
   authMiddleware,
+  eventUpload.fields([
+    { name: "poster", maxCount: 1 },
+    { name: "resourceFile", maxCount: 1 },
+    { name: "paymentQr", maxCount: 1 }
+  ]),
   updateEvent
 );
 
