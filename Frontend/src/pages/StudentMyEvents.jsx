@@ -71,15 +71,33 @@ const mapToUiRow = (registration) => {
   const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
   const certificateReady = Boolean(registration?.certificate);
   const canGiveFeedback = canSubmitRegistrationFeedback(registration);
+  const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim() || "NotRequired";
+  const paymentRequired = Number(registration?.payment?.amount || registration?.eventFee || 0) > 0;
+  const paymentRejected = paymentRequired && paymentStatus === "Rejected";
+  const paymentUnderReview =
+    paymentRequired &&
+    (paymentStatus === "UnderReview" || String(registration?.status || "").trim() === "PendingPaymentVerification");
+  const paymentPending =
+    paymentRequired &&
+    (paymentStatus === "Pending" || paymentRejected || String(registration?.status || "").trim() === "PendingPayment");
+  const canManagePayment = paymentRequired && Boolean(registration?.isTeamLeader);
 
   const primaryLabel = attendanceMarked
     ? "Attended"
+    : paymentUnderReview
+      ? "Payment Review"
+      : paymentPending
+        ? "Payment Pending"
     : registrationStatus === "Confirmed"
       ? "Registered"
       : registrationStatus;
 
   const primaryLabelClass = attendanceMarked
     ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+    : paymentUnderReview
+      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
+      : paymentPending
+        ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
     : registrationStatus === "Confirmed"
       ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
       : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
@@ -94,11 +112,16 @@ const mapToUiRow = (registration) => {
     feedbackSubmitted,
     certificateReady,
     canGiveFeedback,
+    paymentStatus,
+    paymentPending,
+    paymentRejected,
+    paymentUnderReview,
+    canManagePayment,
     monthDay: formatMonthDay(registration?.eventStartDate),
   };
 };
 
-const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadCertificate }) => (
+const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadCertificate, onViewPayment }) => (
   <article className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-3 sm:p-4">
     <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
       <div className="relative h-28 sm:h-28 overflow-hidden rounded-xl">
@@ -124,6 +147,14 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
           {row.certificateReady ? (
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
               Certificate Ready
+            </span>
+          ) : row.paymentUnderReview ? (
+            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+              Payment Review
+            </span>
+          ) : row.paymentPending ? (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+              Payment Needed
             </span>
           ) : row.canGiveFeedback ? (
             <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
@@ -159,6 +190,12 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
           {row.certificateReady
             ? "Your certificate is ready to download."
+            : row.paymentUnderReview
+            ? "Your payment proof is under review. QR will appear after approval."
+            : row.paymentPending
+            ? row.canManagePayment
+              ? "Complete payment to confirm your registration and unlock the QR pass."
+              : "Your team leader needs to complete payment before the QR pass is issued."
             : row.canGiveFeedback
             ? "Your event is completed and feedback is now available."
             : row.feedbackSubmitted
@@ -176,17 +213,33 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
                 void onDownloadCertificate(row);
                 return;
               }
+              if (row.paymentPending || row.paymentUnderReview) {
+                onViewPayment(row.id);
+                return;
+              }
               if (row.canGiveFeedback) {
                 onGiveFeedback(row.eventId);
                 return;
               }
               onViewQr(row.id);
             }}
-            disabled={!row.certificateReady && !row.canGiveFeedback && !row.hasQr}
+            disabled={
+              !row.certificateReady &&
+              !row.paymentPending &&
+              !row.paymentUnderReview &&
+              !row.canGiveFeedback &&
+              !row.hasQr
+            }
             className="rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
           >
             {row.certificateReady
               ? "Download Certificate"
+              : row.paymentPending
+              ? row.canManagePayment
+                ? "Complete Payment"
+                : "View Payment"
+              : row.paymentUnderReview
+              ? "View Payment"
               : row.canGiveFeedback
               ? "Give Feedback"
               : row.hasQr
@@ -307,6 +360,12 @@ export default function StudentMyEvents() {
     navigate("/student-dashboard/feedback-pending", {
       state: normalizedId ? { eventId: normalizedId, expandFeedback: true } : undefined,
     });
+  };
+
+  const openPayment = (registrationId) => {
+    const normalizedId = String(registrationId || "").trim();
+    if (!normalizedId) return;
+    navigate(`/student-dashboard/my-events/payment/${encodeURIComponent(normalizedId)}`);
   };
 
   const downloadCertificate = async (row) => {
@@ -445,6 +504,7 @@ export default function StudentMyEvents() {
                 onViewDetails={openEventDetails}
                 onGiveFeedback={openFeedback}
                 onDownloadCertificate={downloadCertificate}
+                onViewPayment={openPayment}
               />
             ))}
           </div>

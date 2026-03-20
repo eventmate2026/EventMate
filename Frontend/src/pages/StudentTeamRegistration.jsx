@@ -143,6 +143,10 @@ export default function StudentTeamRegistration() {
     registration?.status === "PendingMemberVerification" &&
     ((statusSummary?.pending || 0) + (statusSummary?.awaitingSignup || 0) > 0);
   const canEditMembers = registration?.status === "PendingMemberVerification";
+  const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim();
+  const paymentRequired = Boolean(registration?.payment?.required);
+  const needsPayment = paymentRequired && (paymentStatus === "Pending" || paymentStatus === "Rejected");
+  const paymentUnderReview = paymentRequired && paymentStatus === "UnderReview";
 
   return (
     <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
@@ -324,14 +328,48 @@ export default function StudentTeamRegistration() {
                 <div className="text-sm text-slate-600 dark:text-slate-300">
                   {registration.status === "Confirmed"
                     ? "Registration confirmed. QR codes are available in My Events."
-                    : registration.status === "PendingPayment"
-                      ? "Team accepted. Registration is being finalized. Check back for your QR codes soon."
+                    : needsPayment
+                      ? "All team members accepted. Complete payment to unlock the QR pass."
+                      : paymentUnderReview
+                        ? "Payment proof is under review. QR codes will appear after approval."
                       : registration.anyRejected
                         ? "A team member rejected the invitation. You cannot continue."
                         : registration.allAccepted
-                          ? "All members accepted. Registration will be confirmed automatically."
+                          ? "All members accepted. Registration is being finalized."
                           : "Waiting for team members to accept the invitation."}
                 </div>
+                {paymentRequired ? (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        paymentStatus === "Verified"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                          : paymentStatus === "UnderReview"
+                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+                            : paymentStatus === "Rejected"
+                              ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                      }`}
+                    >
+                      Payment: {formatStatus(paymentStatus)}
+                    </span>
+                    {(needsPayment || paymentUnderReview) && registration?.registrationId ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/student-dashboard/my-events/payment/${encodeURIComponent(
+                              registration.registrationId
+                            )}`
+                          )
+                        }
+                        className="rounded-md bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-indigo-700"
+                      >
+                        {needsPayment ? "Complete Payment" : "View Payment"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </section>
           </>
