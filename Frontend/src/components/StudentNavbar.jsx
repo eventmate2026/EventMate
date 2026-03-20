@@ -29,8 +29,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const isDark = theme === "dark";
   const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
-    "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
-    "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+    "p-2 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
+    "dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
   const mobileProfilePanelMotion = prefersReducedMotion
     ? {
         initial: false,
@@ -167,7 +167,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
   return (
     <>
-    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
+    <nav className="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
@@ -295,7 +295,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                 setIsMobileProfileOpen(false);
                 toggleTheme();
               }}
-              className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
+              className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white p-2 text-indigo-700 shadow-sm hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -318,7 +318,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                     exit={mobileProfilePanelMotion.exit}
                     transition={mobileProfilePanelTransition}
                     role="menu"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-slate-950"
                   >
                     <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
@@ -371,9 +371,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             type="button"
             aria-label="Close mobile menu"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
+            className="fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/45 sm:hidden"
           />
-          <div className="fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto border-b border-gray-200 bg-white/98 pb-6 shadow-2xl dark:border-white/10 dark:bg-gray-900/98 sm:hidden">
+          <div className="fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto border-b border-gray-200 bg-white pb-6 shadow-2xl dark:border-white/10 dark:bg-gray-950 sm:hidden">
             <div className="pt-2 pb-3 space-y-1">
             <button
               onClick={() => handleNavClick('home')}

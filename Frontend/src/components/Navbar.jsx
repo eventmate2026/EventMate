@@ -48,8 +48,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const isDark = theme === "dark";
   const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
-    "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
-    "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+    "p-2 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
+    "dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
 
   const roleHomePath = {
     MAIN_ADMIN: "/admin-dashboard",
@@ -299,7 +299,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm"
     : isPrivileged
       ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
-      : "fixed inset-x-0 top-0 z-[110] bg-white/85 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.6)]";
+      : "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 shadow-sm";
   const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
   const showPublicMobileQuickActions = isPublic && location.pathname === "/";
   const isAdminUsersRoute =
@@ -338,7 +338,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     ? { duration: 0 }
     : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
   const mobileThemeButtonClass =
-    "inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+    "inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white p-2 text-indigo-700 shadow-sm hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
   const mobileMenuLinkClass =
     "mx-2 block rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5";
   const mobileMenuSubLinkClass =
@@ -547,7 +547,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 </button>
 
                 {isAdminUsersMenuOpen && (
-                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-900/95">
+                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-950">
                     <Link
                       to="/admin-dashboard/user-management"
                       onClick={closeAdminUsersMenuImmediately}
@@ -905,7 +905,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               <div className="flex items-center gap-0.5 max-[320px]:gap-px min-[380px]:gap-1.5">
                 <Link
                   to="/login"
-                  className="rounded-full border border-gray-200 bg-white/80 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:px-1.5 max-[320px]:text-[9px] min-[380px]:px-3 min-[380px]:py-1.5 min-[380px]:text-xs"
+                  className="rounded-full border border-gray-200 bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-slate-800 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:px-1.5 max-[320px]:text-[9px] min-[380px]:px-3 min-[380px]:py-1.5 min-[380px]:text-xs"
                 >
                   Login
                 </Link>
@@ -919,7 +919,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:p-1 min-[380px]:p-2"
+                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white p-1.5 text-gray-700 shadow-sm hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-slate-800 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:p-1 min-[380px]:p-2"
                 >
                   {isDark ? (
                     <Sun className="h-[0.9rem] w-[0.9rem] max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
@@ -983,7 +983,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                       exit={mobileProfilePanelMotion.exit}
                       transition={mobileProfilePanelTransition}
                       role="menu"
-                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-slate-950"
                     >
                       <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
@@ -1040,13 +1040,13 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
             type="button"
             aria-label="Close mobile menu"
             onClick={closeMenus}
-            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/35 backdrop-blur-[1px]`}
+            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/45`}
           />
           <div
-            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto overscroll-contain backdrop-blur ${
+            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto overscroll-contain ${
               isPublic
-                ? "nav-public-mobile-panel bg-white/96 dark:bg-slate-950/96"
-                : "border-b border-gray-200 dark:border-white/10 bg-white/95 dark:bg-gray-900/95 shadow-2xl"
+                ? "nav-public-mobile-panel bg-white dark:bg-slate-950"
+                : "border-b border-gray-200 dark:border-white/10 bg-white dark:bg-gray-950 shadow-2xl"
             }`}
           >
             <div className="pt-2 pb-3 space-y-1">
