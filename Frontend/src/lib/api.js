@@ -11,12 +11,45 @@ const GET_CACHE_TTL_MS = 60000;
 const NETWORK_RETRY_DELAY_MS = 1200;
 const MAX_AUTO_RETRY_ATTEMPTS = 2;
 const BACKEND_WARM_TTL_MS = 45000;
+const TOKEN_EXPIRY_SKEW_SECONDS = 15;
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 502, 503, 504]);
 const RETRYABLE_NETWORK_ERROR_CODES = new Set(["ECONNABORTED", "ERR_NETWORK"]);
 const responseCache = new Map();
 const pendingGetRequests = new Map();
 let backendWarmupPromise = null;
 let backendWarmedAt = 0;
+let refreshPromise = null;
+
+const decodeJwtPayload = (token) => {
+  const parts = String(token || "").trim().split(".");
+  if (parts.length < 2) return null;
+
+  let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+  const paddingLength = base64.length % 4;
+  if (paddingLength) {
+    base64 += "=".repeat(4 - paddingLength);
+  }
+
+  try {
+    if (typeof globalThis?.atob === "function") {
+      const binary = globalThis.atob(base64);
+      const utf8 = Array.from(binary, (char) =>
+        `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`
+      ).join("");
+      return JSON.parse(decodeURIComponent(utf8));
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const isJwtExpired = (token, skewSeconds = TOKEN_EXPIRY_SKEW_SECONDS) => {
+  const exp = Number(decodeJwtPayload(token)?.exp || 0);
+  if (!Number.isFinite(exp) || exp <= 0) return false;
+  return Date.now() + Math.max(0, Number(skewSeconds) || 0) * 1000 >= exp * 1000;
+};
 
 const pause = (durationMs) =>
   new Promise((resolve) => {
@@ -24,6 +57,11 @@ const pause = (durationMs) =>
   });
 
 const getRequestMethod = (config) => String(config?.method || "get").toLowerCase();
+const isRefreshRequest = (config) => {
+  const refreshUrl = SummaryApi.refresh_token?.url;
+  if (!refreshUrl || !config?.url) return false;
+  return config.url.includes(refreshUrl);
+};
 
 const isRetryableMethod = (config) => {
   const method = getRequestMethod(config);
@@ -178,12 +216,71 @@ const resolveAdapter = (config) => {
   return null;
 };
 
-api.interceptors.request.use((config) => {
-  const token = getStoredToken();
+const refreshAccessTokenIfPossible = async () => {
+  const refreshToken = getStoredRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
+  if (isJwtExpired(refreshToken, 0)) {
+    clearAuth();
+    return null;
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = api({
+      ...SummaryApi.refresh_token,
+      data: { refreshToken },
+      skipAuth: true,
+      skipRetry: true,
+    })
+      .then((response) => {
+        const nextAccess = response.data?.accessToken;
+        const nextRefresh = response.data?.refreshToken;
+        if (!nextAccess) {
+          throw new Error("Missing access token.");
+        }
+        storeAuth({ accessToken: nextAccess, refreshToken: nextRefresh });
+        return nextAccess;
+      })
+      .catch((error) => {
+        const refreshStatus = Number(error?.response?.status || 0);
+        if (refreshStatus === 401 || refreshStatus === 403 || isJwtExpired(refreshToken, 0)) {
+          clearAuth();
+        }
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+api.interceptors.request.use(async (config) => {
+  const refreshRequest = isRefreshRequest(config);
+  let token = getStoredToken();
   config.headers = config.headers || {};
-  if (token && !config.skipAuth) {
+
+  if (!config.skipAuth && !refreshRequest) {
+    if ((!token || isJwtExpired(token)) && getStoredRefreshToken()) {
+      try {
+        token = await refreshAccessTokenIfPossible();
+      } catch {
+        token = null;
+      }
+    }
+
+    if (token && !isJwtExpired(token)) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else if (config.headers?.Authorization) {
+      delete config.headers.Authorization;
+    }
+  } else if (token && !config.skipAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   if (config.skipAuth && config.headers?.Authorization) {
     delete config.headers.Authorization;
   }
@@ -251,14 +348,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshPromise = null;
-
-const isRefreshRequest = (config) => {
-  const refreshUrl = SummaryApi.refresh_token?.url;
-  if (!refreshUrl || !config?.url) return false;
-  return config.url.includes(refreshUrl);
-};
-
 api.interceptors.response.use(
   (response) => {
     const method = getRequestMethod(response?.config);
@@ -322,25 +411,11 @@ api.interceptors.response.use(
     }
 
     try {
-      if (!refreshPromise) {
-        refreshPromise = api({
-          ...SummaryApi.refresh_token,
-          data: { refreshToken },
-          skipAuth: true,
-        })
-          .then((response) => {
-            const nextAccess = response.data?.accessToken;
-            const nextRefresh = response.data?.refreshToken;
-            if (!nextAccess) throw new Error("Missing access token.");
-            storeAuth({ accessToken: nextAccess, refreshToken: nextRefresh });
-            return nextAccess;
-          })
-          .finally(() => {
-            refreshPromise = null;
-          });
+      const newAccessToken = await refreshAccessTokenIfPossible();
+      if (!newAccessToken) {
+        clearAuth();
+        throw error;
       }
-
-      const newAccessToken = await refreshPromise;
       original._retry = true;
       original.headers = original.headers || {};
       original.headers.Authorization = `Bearer ${newAccessToken}`;

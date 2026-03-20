@@ -298,8 +298,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const navClass = isPublic
     ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm"
     : isPrivileged
-      ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
-      : "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 shadow-sm";
+      ? "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
+      : "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 shadow-sm";
   const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
   const showPublicMobileQuickActions = isPublic && location.pathname === "/";
   const isAdminUsersRoute =

@@ -20,8 +20,8 @@ html {
   scroll-padding-top: var(--eventmate-nav-offset);
   scrollbar-gutter: stable both-edges;
   transition: background-color 0.45s ease, color 0.45s ease;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.72) rgba(148, 163, 184, 0.14);
+  scrollbar-width: auto;
+  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
 }
 
 body {
@@ -209,8 +209,8 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 ) {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.72) rgba(148, 163, 184, 0.14);
+  scrollbar-width: auto;
+  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -226,8 +226,9 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 14px;
+  height: 14px;
+  background: rgba(15, 23, 42, 0.84);
 }
 
 :where(
@@ -242,8 +243,8 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-track {
-  background: rgba(148, 163, 184, 0.14);
-  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.84);
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
 }
 
 :where(
@@ -258,10 +259,11 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.72), rgba(20, 184, 166, 0.72));
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.9), rgba(100, 116, 139, 0.95));
   border-radius: 999px;
-  border: 1px solid transparent;
+  border: 3px solid rgba(15, 23, 42, 0.84);
   background-clip: padding-box;
+  min-height: 36px;
 }
 
 :where(
@@ -276,7 +278,64 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.92), rgba(13, 148, 136, 0.92));
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.96), rgba(148, 163, 184, 0.98));
+}
+
+:where(
+  html,
+  body,
+  textarea,
+  select,
+  .eventmate-route-shell,
+  .eventmate-page,
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-auto"],
+  [class*="overflow-scroll"]
+)::-webkit-scrollbar-button {
+  display: block;
+  width: 14px;
+  height: 14px;
+  background-color: rgba(15, 23, 42, 0.84);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+}
+
+:where(
+  html,
+  body,
+  textarea,
+  select,
+  .eventmate-route-shell,
+  .eventmate-page,
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-auto"],
+  [class*="overflow-scroll"]
+)::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image:
+    linear-gradient(135deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%),
+    linear-gradient(225deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%);
+  background-position: calc(50% - 2px) 58%, calc(50% + 2px) 58%;
+}
+
+:where(
+  html,
+  body,
+  textarea,
+  select,
+  .eventmate-route-shell,
+  .eventmate-page,
+  [class*="overflow-y-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-auto"],
+  [class*="overflow-scroll"]
+)::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image:
+    linear-gradient(-45deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%),
+    linear-gradient(45deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%);
+  background-position: calc(50% - 2px) 42%, calc(50% + 2px) 42%;
 }
 
 :where(
@@ -911,7 +970,7 @@ table {
     [class*="overflow-auto"],
     [class*="overflow-scroll"]
   )::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 12px;
+    height: 12px;
   }
 }
