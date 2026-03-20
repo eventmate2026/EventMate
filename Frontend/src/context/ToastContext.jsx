@@ -42,7 +42,7 @@ const normalizeToastPayload = (input) => {
 
 function ToastViewport({ toasts, onDismiss }) {
   return (
-    <div className="pointer-events-none fixed inset-0 z-[120] flex flex-col items-center justify-center gap-3 px-4 sm:px-6">
+    <div className="pointer-events-none fixed inset-x-0 top-4 z-[120] flex flex-col items-center gap-3 px-4 sm:px-6">
       {toasts.map((toast) => {
         const palette = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
         const Icon = palette.icon;

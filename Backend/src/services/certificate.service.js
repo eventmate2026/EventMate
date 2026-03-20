@@ -9,6 +9,7 @@ import ParticipantQR from "../models/ParticipantQR.model.js";
 import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import Feedback from "../models/Feedback.model.js";
+import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { sendNotification } from "./notification.service.js";
 
@@ -1551,14 +1552,24 @@ const issueCertificateForParticipant = async ({
     );
   }
 
+  const participantUser = await User.findOne({ email: participantEmail }).select(
+    "_id fullName role email"
+  );
+  const notificationRecipientId = participantUser?._id || registration.registeredBy;
+  const notificationRecipientName =
+    participantUser?.fullName || participantName || registration?.teamLeader?.name || "Student";
+  const notificationRecipientRole = participantUser?.role || "STUDENT";
+  const notificationRecipientEmail = participantUser?.email || participantEmail;
+
   await sendNotification({
-    recipientId: registration.registeredBy,
-    recipientName: participantName,
-    recipientRole: "STUDENT",
+    recipientId: notificationRecipientId,
+    recipientName: notificationRecipientName,
+    recipientRole: notificationRecipientRole,
+    recipientEmail: notificationRecipientEmail,
     title: "Certificate Issued!",
     message: emailDeliveryFailed
-      ? `Your certificate for ${event.title} is ready. Download it from your dashboard.`
-      : `Your certificate for ${event.title} is ready. Check your email!`,
+      ? `Your certificate for ${event.title} is ready on the website. Download it from your dashboard.`
+      : `Your certificate for ${event.title} is ready on the website and has also been emailed to you.`,
     type: "CERTIFICATE",
     refId: event._id
   });

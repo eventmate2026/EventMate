@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToast } from "../context/ToastContext";
 import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
@@ -71,18 +72,16 @@ const saveSubmittedEventIds = (ids) => {
 
 export default function StudentFeedbackPending() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [modal, setModal] = useState(null);
   const [expandedEventId, setExpandedEventId] = useState("");
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
   const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedEventIds());
   useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(modal);
 
   useEffect(() => {
     const loadRows = async () => {
@@ -112,10 +111,6 @@ export default function StudentFeedbackPending() {
 
     loadRows();
   }, [submittedEventIds]);
-
-  const handleModalClose = () => {
-    setModal(null);
-  };
 
   const feedbackRows = useMemo(
     () =>
@@ -171,24 +166,16 @@ export default function StudentFeedbackPending() {
     const draft = drafts[eventId] || { rating: "", comment: "" };
     const rating = Number(draft.rating);
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-      const payload = { type: "error", text: "Please select a rating between 1 and 5." };
-      setNotice(payload);
-      setModal(payload);
+      toast.error("Please select a rating between 1 and 5.");
       return;
     }
 
     if (!row?.canSubmit) {
-      const payload = {
-        type: "error",
-        text: "Feedback requires confirmed registration and marked attendance.",
-      };
-      setNotice(payload);
-      setModal(payload);
+      toast.error("Feedback requires confirmed registration and marked attendance.");
       return;
     }
 
     setSubmittingEventId(eventId);
-    setNotice(null);
     try {
       const response = await api({
         ...SummaryApi.submit_feedback,
@@ -198,27 +185,15 @@ export default function StudentFeedbackPending() {
           comment: String(draft.comment || "").trim() || undefined,
         },
       });
-      const payload = {
-        type: "success",
-        text: response.data?.message || "Feedback submitted successfully.",
-      };
-      setNotice(payload);
-      setModal(payload);
+      toast.success(response.data?.message || "Feedback submitted successfully.");
       markEventAsSubmitted(eventId);
     } catch (submitError) {
       const backendMessage = submitError?.response?.data?.message || "Unable to submit feedback.";
       if (/already submitted/i.test(backendMessage)) {
-        const payload = {
-          type: "success",
-          text: "Feedback for this event was already submitted. Removed from pending queue.",
-        };
-        setNotice(payload);
-        setModal(payload);
+        toast.success("Feedback for this event was already submitted. Removed from pending queue.");
         markEventAsSubmitted(eventId);
       } else {
-        const payload = { type: "error", text: backendMessage };
-        setNotice(payload);
-        setModal(payload);
+        toast.error(backendMessage);
       }
     } finally {
       setSubmittingEventId("");
@@ -233,36 +208,6 @@ export default function StudentFeedbackPending() {
 
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
-            <div
-              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
-                modal.type === "success"
-                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
-                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
-              }`}
-            >
-              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
-            </div>
-            <h2 className="mt-4 text-xl font-semibold">
-              {modal.type === "success" ? "Thank You!" : "Unable to Submit"}
-            </h2>
-            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
-            <button
-              type="button"
-              onClick={handleModalClose}
-              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
-                modal.type === "success"
-                  ? "bg-emerald-500 hover:bg-emerald-600"
-                  : "bg-rose-500 hover:bg-rose-600"
-              }`}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 space-y-6">
         <button
           type="button"

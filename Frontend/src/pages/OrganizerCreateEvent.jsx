@@ -5,8 +5,8 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
+import { useToast } from "../context/ToastContext";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const initialForm = {
   title: "",
@@ -45,6 +45,7 @@ const formatBytes = (bytes = 0) => {
 
 export default function OrganizerCreateEvent() {
   const navigate = useNavigate();
+  const toast = useToast();
   const user = getStoredUser();
   const defaultDepartment =
     user?.professionalProfile?.department || user?.academicProfile?.branch || "";
@@ -55,10 +56,8 @@ export default function OrganizerCreateEvent() {
   });
 
   const [form, setForm] = useState(buildInitialForm);
-  const [message, setMessage] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
-  useToastFeedback(message);
   const [previewUrl, setPreviewUrl] = useState("");
   const resourceInputRef = useRef(null);
   const [resourceError, setResourceError] = useState("");
@@ -321,10 +320,9 @@ export default function OrganizerCreateEvent() {
   };
 
   const submitEvent = async ({ publish }) => {
-    setMessage(null);
     const validationError = validateForm();
     if (validationError) {
-      setMessage({ type: "error", text: validationError });
+      toast.error(validationError);
       return;
     }
 
@@ -389,28 +387,14 @@ export default function OrganizerCreateEvent() {
         }
       }
 
-      setMessage({
-        type: "success",
-        text: publish
+      toast.success(
+        publish
           ? `Event created and published successfully.${assignmentNote}`
-          : `${createResponse.data?.message || "Event created as draft."}${assignmentNote}`,
-      });
-
-      setForm(buildInitialForm());
-      setPreviewUrl("");
-      setResourceError("");
-      if (resourceInputRef.current) {
-        resourceInputRef.current.value = "";
-      }
-      setCoordinatorPick("");
-      setSelectedCoordinatorIds([]);
-      setJudges([]);
-      setMentors([]);
+          : `${createResponse.data?.message || "Event created as draft."}${assignmentNote}`
+      );
+      navigate("/organizer-dashboard");
     } catch (error) {
-      setMessage({
-        type: "error",
-        text: error.response?.data?.message || "Unable to create event.",
-      });
+      toast.error(error.response?.data?.message || "Unable to create event.");
     } finally {
       setIsSavingDraft(false);
       setIsPublishing(false);
@@ -466,18 +450,6 @@ export default function OrganizerCreateEvent() {
               </button>
             </div>
           </div>
-
-          {message && (
-            <p
-              className={`mt-4 text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
 
           <div className="mt-6 space-y-4">
             <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 p-4">
@@ -569,7 +541,9 @@ export default function OrganizerCreateEvent() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setMessage({ type: "success", text: "Multi-slot support is not available in this backend build; one schedule is used." })}
+                  onClick={() =>
+                    toast.info("Multi-slot support is not available in this backend build; one schedule is used.")
+                  }
                   className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                 >
                   + Add Section

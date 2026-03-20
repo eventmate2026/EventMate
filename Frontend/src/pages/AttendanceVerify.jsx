@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredToken, getStoredUser } from "../lib/auth";
-import { useToastFeedback } from "../hooks/useToastFeedback";
+import { useToast } from "../context/ToastContext";
 
 const parseToken = (value) => String(value || "").trim();
 
@@ -12,36 +12,32 @@ export default function AttendanceVerify() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = parseToken(searchParams.get("token"));
+  const toast = useToast();
 
   const user = useMemo(() => getStoredUser(), []);
   const accessToken = useMemo(() => getStoredToken(), []);
 
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [message, setMessage] = useState("");
   const [eventName, setEventName] = useState("");
-  useToastFeedback(message, { defaultType: success ? "success" : "error" });
 
   useEffect(() => {
     const markFromToken = async () => {
       if (!token) {
-        setMessage("Attendance token is missing in this QR link.");
+        toast.error("Attendance token is missing in this QR link.");
         return;
       }
 
       if (!user || !accessToken) {
-        setMessage("Please log in as organizer or assigned coordinator to verify attendance.");
+        toast.error("Please log in as organizer or assigned coordinator to verify attendance.");
         return;
       }
 
       if (!["ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"].includes(user.role)) {
-        setMessage("Only organizers or assigned coordinators can verify attendance.");
+        toast.error("Only organizers or assigned coordinators can verify attendance.");
         return;
       }
 
       setLoading(true);
-      setMessage("");
-      setSuccess(false);
 
       try {
         const response = await api({
@@ -54,13 +50,12 @@ export default function AttendanceVerify() {
 
         const payload = response?.data?.data || {};
         setEventName(String(payload?.eventName || "").trim());
-        setMessage(
+        toast.success(
           response?.data?.message ||
             `Attendance marked for ${payload?.participantName || "participant"}.`
         );
-        setSuccess(true);
       } catch (error) {
-        setMessage(
+        toast.error(
           error?.response?.data?.message ||
             "Unable to verify attendance from this QR link."
         );
@@ -70,7 +65,7 @@ export default function AttendanceVerify() {
     };
 
     markFromToken();
-  }, [accessToken, token, user]);
+  }, [accessToken, toast, token, user]);
 
   return (
     <section className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
@@ -99,18 +94,7 @@ export default function AttendanceVerify() {
               <Loader2 size={14} className="animate-spin" />
               Verifying attendance...
             </p>
-          ) : (
-            <p
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-                success
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-              {message || "No verification response."}
-            </p>
-          )}
+          ) : null}
         </div>
 
         {!token ? null : (

@@ -2,8 +2,10 @@ import QRCode from "qrcode";
 import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
 import ParticipantQR from "../models/ParticipantQR.model.js";
+import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
+import { sendNotification } from "./notification.service.js";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -150,6 +152,15 @@ export const generateQRsForRegistration = async (registration, event) => {
     : "TBA";
 
   const venue = event.venue?.location || event.venue?.mode || "TBA";
+  const participantEmails = participants
+    .map((participant) => String(participant?.email || "").trim().toLowerCase())
+    .filter(Boolean);
+  const users = participantEmails.length
+    ? await User.find({ email: { $in: participantEmails } }).select("_id fullName role email")
+    : [];
+  const userByEmail = new Map(
+    users.map((user) => [String(user?.email || "").trim().toLowerCase(), user])
+  );
 
   for (const participant of participants) {
     const token = crypto.randomBytes(32).toString("hex");
@@ -168,6 +179,7 @@ export const generateQRsForRegistration = async (registration, event) => {
       qrImageUrl
     });
 
+    let emailDeliveryFailed = false;
     // Send confirmation email
     try {
       await sendEmail(
@@ -194,9 +206,27 @@ export const generateQRsForRegistration = async (registration, event) => {
         }
       );
     } catch (emailError) {
+      emailDeliveryFailed = true;
       console.error(
         `QR email failed for ${participant.email}: ${emailError?.message || "Unknown error"}`
       );
+    }
+
+    const normalizedEmail = String(participant?.email || "").trim().toLowerCase();
+    const participantUser = userByEmail.get(normalizedEmail);
+    if (participantUser?._id) {
+      await sendNotification({
+        recipientId: participantUser._id,
+        recipientName: participantUser.fullName || participant.name || "Participant",
+        recipientRole: participantUser.role || "STUDENT",
+        recipientEmail: participantUser.email || normalizedEmail,
+        title: "QR Pass Ready",
+        message: emailDeliveryFailed
+          ? `Your QR pass for ${event.title} is ready on the website. Open My Events to view it.`
+          : `Your QR pass for ${event.title} is ready. It is available on the website and has also been emailed to you.`,
+        type: "REGISTRATION",
+        refId: event._id
+      });
     }
   }
 };

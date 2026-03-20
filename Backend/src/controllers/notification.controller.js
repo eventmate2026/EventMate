@@ -149,7 +149,8 @@ export const adminSendNotification = async (req, res, next) => {
           message,
           type: mode,
           refId: req.user?._id || null,
-          groupId
+          groupId,
+          sendEmailCopy: mode === "NOTICE"
         })
       )
     );
@@ -312,7 +313,8 @@ export const organizerSendNotification = async (req, res, next) => {
           message,
           type: mode,
           refId: event._id,
-          groupId
+          groupId,
+          sendEmailCopy: mode === "NOTICE"
         })
       )
     );

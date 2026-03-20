@@ -172,7 +172,6 @@ export default function StudentDashboard() {
   const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
 
   const fetchDashboardEvents = async () => {
@@ -326,18 +325,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
-      {message && (
-        <p
-          className={`mb-6 rounded-lg px-3 py-2 text-sm ${
-            message.type === "success"
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-              : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
-
       {registrationWarning && (
         <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
           {registrationWarning}

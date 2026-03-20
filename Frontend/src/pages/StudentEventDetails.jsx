@@ -19,6 +19,7 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
+import { useToast } from "../context/ToastContext";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
@@ -119,6 +120,7 @@ const findEventInMyRegistrations = async (eventId) => {
 export default function StudentEventDetails({ mode = "details" }) {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const user = getStoredUser();
   const lockedDepartment = String(user?.academicProfile?.branch || "").trim();
   const isRegistrationMode = mode === "register";
@@ -129,17 +131,12 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [pendingRegistrationId, setPendingRegistrationId] = useState("");
-  const [pendingTeamRegistrationId, setPendingTeamRegistrationId] = useState("");
   const [registrationWarning, setRegistrationWarning] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
   useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(message);
 
   const [registrationType, setRegistrationType] = useState("INDIVIDUAL");
   const [teamName, setTeamName] = useState("");
@@ -158,9 +155,6 @@ export default function StudentEventDetails({ mode = "details" }) {
     const fetchEventDetails = async () => {
       setLoading(true);
       setError(null);
-      setMessage(null);
-      setPendingRegistrationId("");
-      setPendingTeamRegistrationId("");
       setRegistrationWarning(null);
       setTeamRegistrationInfo(null);
       try {
@@ -245,10 +239,6 @@ export default function StudentEventDetails({ mode = "details" }) {
 
     fetchEventDetails();
   }, [eventId]);
-
-  const handleModalClose = () => {
-    setModal(null);
-  };
 
   const allowedRegistrationTypes = useMemo(() => {
     const participationMode = event?.participationMode || "INDIVIDUAL";
@@ -506,25 +496,21 @@ export default function StudentEventDetails({ mode = "details" }) {
   const handleRegister = async () => {
     if (!event || isRegistered || isRegistering) return;
     if (isCoordinatorBlocked) {
-      const payload = {
-        type: "error",
-        text: isAssignedCoordinator
+      toast.error(
+        isAssignedCoordinator
           ? "You are assigned as a coordinator for this event. Coordinators cannot register."
-          : "Coordinator accounts cannot register for team events.",
-      };
-      setMessage(payload);
+          : "Coordinator accounts cannot register for team events."
+      );
       return;
     }
     if (!event.registrationOpen) return;
     const validationError = validateRegistration();
     if (validationError) {
-      const payload = { type: "error", text: validationError };
-      setMessage(payload);
+      toast.error(validationError);
       return;
     }
 
     setIsRegistering(true);
-    setMessage(null);
     try {
       const response = await api({
         ...SummaryApi.register_for_event,
@@ -546,16 +532,13 @@ export default function StudentEventDetails({ mode = "details" }) {
 
       const registrationStatus = String(response.data?.data?.status || "").trim();
       const qrReadyNow = registrationStatus === "Confirmed";
-      const popupPayload = {
-        type: "success",
-        text: qrReadyNow
+      toast.success(
+        qrReadyNow
           ? "Registered successfully. Your QR pass is now available in My Events."
           : isTeamRegistration
             ? "Team registration created. Invitations go to members with accounts; others will get an invite after signup and login. Track accept/reject status and registration will auto-confirm once everyone accepts."
-            : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
-      };
-      setMessage(popupPayload);
-      setModal(popupPayload);
+            : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed."
+      );
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
       setEvent((prev) =>
@@ -563,21 +546,9 @@ export default function StudentEventDetails({ mode = "details" }) {
           ? { ...prev, participantCount: Number(prev.participantCount || 0) + headCount }
           : prev
       );
-
-      const registrationId = response.data?.data?._id || response.data?.data?.id;
-      if (registrationId) {
-        if (isTeamRegistration) {
-          setPendingTeamRegistrationId(String(registrationId));
-        } else {
-          setPendingRegistrationId(String(registrationId));
-        }
-      }
+      navigate("/student-dashboard");
     } catch (err) {
-      const payload = {
-        type: "error",
-        text: err.response?.data?.message || "Unable to register for this event.",
-      };
-      setMessage(payload);
+      toast.error(err.response?.data?.message || "Unable to register for this event.");
     } finally {
       setIsRegistering(false);
     }
@@ -605,36 +576,6 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   return (
     <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
-            <div
-              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
-                modal.type === "success"
-                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
-                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
-              }`}
-            >
-              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
-            </div>
-            <h2 className="mt-4 text-xl font-semibold">
-              {modal.type === "success" ? "Thank You!" : "Unable to Register"}
-            </h2>
-            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
-            <button
-              type="button"
-              onClick={handleModalClose}
-              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
-                modal.type === "success"
-                  ? "bg-emerald-500 hover:bg-emerald-600"
-                  : "bg-rose-500 hover:bg-rose-600"
-              }`}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -690,33 +631,6 @@ export default function StudentEventDetails({ mode = "details" }) {
           <div className={isRegistrationMode ? "px-4 py-5 sm:px-6" : ""}>
             {isRegistrationMode ? (
               <>
-                {message?.type === "success" && (
-                  <div className="mb-4 flex flex-wrap gap-3">
-                    {pendingTeamRegistrationId && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(
-                            `/student-dashboard/team-registration/${encodeURIComponent(
-                              pendingTeamRegistrationId
-                            )}`
-                          )
-                        }
-                        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                      >
-                        View Team Invitations
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => navigate("/student-dashboard/my-events")}
-                      className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
-                    >
-                      Open My Events
-                    </button>
-                  </div>
-                )}
-
                 {registrationWarning && (
                   <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
                     {registrationWarning}
@@ -729,11 +643,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                       ? "You are assigned as a coordinator for this event. Coordinators cannot register."
                       : "Coordinator accounts cannot register for team events."}
                   </div>
-                ) : isRegistered ? (
-                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
-                    You are already registered for this event.
-                  </div>
-                ) : (
+                ) : isRegistered ? null : (
                   <>
                     {event.participationMode === "BOTH" && (
                       <div className="mb-4 grid grid-cols-2 gap-2">
@@ -1154,12 +1064,6 @@ export default function StudentEventDetails({ mode = "details" }) {
                     )}
                   </aside>
                 </div>
-
-                {isRegistered ? (
-                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
-                    You are already registered for this event.
-                  </div>
-                ) : null}
 
                 {canViewTeamInvites ? (
                   <button

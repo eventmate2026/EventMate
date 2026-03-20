@@ -9,14 +9,11 @@ export default function VerifyRegistration() {
   const token = params.get("token");
   const toast = useToast();
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState({ type: "info", text: "Verifying registration..." });
 
   useEffect(() => {
     const verify = async () => {
       if (!token) {
-        const nextMessage = { type: "error", text: "Missing verification token." };
-        setMessage(nextMessage);
-        toast.error(nextMessage.text);
+        toast.error("Missing verification token.");
         setLoading(false);
         return;
       }
@@ -27,18 +24,9 @@ export default function VerifyRegistration() {
           method: "get",
           skipAuth: true,
         });
-        setMessage({
-          type: "success",
-          text: response.data?.message || "Registration verified successfully.",
-        });
         toast.success(response.data?.message || "Registration verified successfully.");
       } catch (error) {
-        const nextMessage = {
-          type: "error",
-          text: error.response?.data?.message || "Unable to verify registration.",
-        };
-        setMessage(nextMessage);
-        toast.error(nextMessage.text);
+        toast.error(error.response?.data?.message || "Unable to verify registration.");
       } finally {
         setLoading(false);
       }
@@ -59,17 +47,7 @@ export default function VerifyRegistration() {
               <Loader2 size={14} className="animate-spin" />
               Verifying...
             </p>
-          ) : (
-            <p
-              className={`text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-6 flex items-center justify-center gap-4 text-sm">
