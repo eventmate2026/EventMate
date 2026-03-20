@@ -150,12 +150,18 @@ const getSmtpConfig = () => {
   };
 };
 
-const getEmailProvider = () => {
+const getExplicitEmailProvider = () => {
   const explicitProvider = String(process.env.EMAIL_PROVIDER || "").trim().toLowerCase();
   if (["smtp", "gmail", "googlemail", "outlook", "hotmail"].includes(explicitProvider)) {
     return "smtp";
   }
   if (explicitProvider === "sendgrid") return "sendgrid";
+  return "";
+};
+
+const getEmailProvider = () => {
+  const explicitProvider = getExplicitEmailProvider();
+  if (explicitProvider) return explicitProvider;
 
   const smtpConfig = getSmtpConfig();
   if ((smtpConfig.host || smtpConfig.service) && smtpConfig.user && smtpConfig.pass) {
@@ -279,6 +285,7 @@ const sendWithSendGrid = async ({
 };
 
 const sendEmail = async (to, subject, html, options = {}) => {
+  const explicitProvider = getExplicitEmailProvider();
   const emailProvider = getEmailProvider();
   const senderName = process.env.EMAIL_FROM_NAME || "EventMate";
   const senderEmail =
@@ -302,8 +309,10 @@ const sendEmail = async (to, subject, html, options = {}) => {
     throw err;
   }
 
-  // Prioritize SendGrid if available (more reliable)
-  if (canUseSendGrid()) {
+  // Respect an explicit SMTP provider selection instead of always preferring SendGrid.
+  const shouldUseSendGrid = emailProvider === "sendgrid" || (!explicitProvider && canUseSendGrid());
+
+  if (shouldUseSendGrid) {
     try {
       await retryWithBackoff(
         () =>
