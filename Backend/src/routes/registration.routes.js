@@ -1,10 +1,14 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
+import upload from "../middleware/multer.middleware.js";
 import {
   initiateRegistration,
   verifyMember,
   getTeamRegistrationStatus,
+  getRegistrationPaymentDetails,
+  submitRegistrationPayment,
+  reviewRegistrationPayment,
   confirmTeamRegistration,
   getTeamInvitationDetails,
   respondToTeamInvitation,
@@ -34,6 +38,25 @@ router.post("/invite/:token/:action", respondToTeamInvitation);
 
 // Team leader - view team invitation status
 router.get("/team/:registrationId/status", authMiddleware, getTeamRegistrationStatus);
+
+// Student/team leader - view registration payment details
+router.get("/:registrationId/payment", authMiddleware, getRegistrationPaymentDetails);
+
+// Student/team leader - submit payment proof
+router.post(
+  "/:registrationId/payment",
+  authMiddleware,
+  upload.single("paymentScreenshot"),
+  submitRegistrationPayment
+);
+
+// Organizer/admin - approve or reject payment proof
+router.patch(
+  "/:registrationId/payment/review",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  reviewRegistrationPayment
+);
 
 // Team leader - confirm team registration after all accepted
 router.post("/team/:registrationId/confirm", authMiddleware, confirmTeamRegistration);

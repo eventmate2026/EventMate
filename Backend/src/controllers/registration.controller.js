@@ -147,6 +147,56 @@ export const getTeamRegistrationStatus = async (req, res, next) => {
   }
 };
 
+export const getRegistrationPaymentDetails = async (req, res, next) => {
+  try {
+    const result = await registrationService.getRegistrationPaymentDetails(
+      req.params.registrationId,
+      req.user._id
+    );
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const submitRegistrationPayment = async (req, res, next) => {
+  try {
+    const result = await registrationService.submitRegistrationPayment(
+      req.params.registrationId,
+      req.user._id,
+      req.body,
+      req.file
+    );
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reviewRegistrationPayment = async (req, res, next) => {
+  try {
+    const result = await registrationService.reviewRegistrationPayment(
+      req.params.registrationId,
+      req.user,
+      req.body
+    );
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Team leader - confirm team registration
 export const confirmTeamRegistration = async (req, res, next) => {
   try {

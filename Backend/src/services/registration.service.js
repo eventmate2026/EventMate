@@ -733,9 +733,14 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   if (existing)
     throw new Error("You already have an active registration for this event");
 
+  const requiresPayment = eventRequiresPayment(event);
+  if (requiresPayment) {
+    ensureEventPaymentConfigured(event);
+  }
+
   let initialStatus;
   if (!isTeam) {
-    initialStatus = "Confirmed";
+    initialStatus = requiresPayment ? "PendingPayment" : "Confirmed";
   } else {
     initialStatus = "PendingMemberVerification";
   }
@@ -768,10 +773,16 @@ await sendNotification({
   recipientId: userId,
   recipientName: registration.teamLeader.name,
   recipientRole: "STUDENT",
-  title: isTeam ? "Team Registration Started" : "Registration Confirmed!",
+  title: isTeam
+    ? "Team Registration Started"
+    : requiresPayment
+      ? "Registration Created"
+      : "Registration Confirmed!",
   message: isTeam
     ? `Team registration for ${event.title} is pending member acceptance.`
-    : `You're registered for ${event.title}`,
+    : requiresPayment
+      ? `Your registration for ${event.title} is waiting for payment confirmation.`
+      : `You're registered for ${event.title}`,
   type: "REGISTRATION",
   refId: registration._id
 });
@@ -852,17 +863,16 @@ export const verifyMember = async (token) => {
     registration.allMembersVerified = true;
     const event = await Event.findById(registration.event);
     if (!event) throw new Error("Event not found");
-    registration.status = "Confirmed";
-    await registration.save();
-    await generateQRsForRegistration(registration, event);
+    const result = await advanceRegistrationAfterAcceptance(registration, event);
+    return {
+      message: result.message
+    };
   } else {
     await registration.save();
   }
 
   return {
-    message: allVerified
-      ? "Email verified! Registration confirmed. Check your email for your QR code."
-      : "Email verified successfully. Waiting for other members to verify."
+    message: "Email verified successfully. Waiting for other members to verify."
   };
 };
 
@@ -922,6 +932,8 @@ export const getTeamRegistrationStatus = async (registrationId, requesterId) => 
     allAccepted &&
     !anyRejected &&
     String(registration.status || "") === "PendingMemberVerification";
+  const payment = registration?.payment || {};
+  const requiresPayment = eventRequiresPayment(event);
 
   return {
     registrationId: registration._id,
@@ -937,6 +949,19 @@ export const getTeamRegistrationStatus = async (registrationId, requesterId) => 
       date: formatEventDate(event),
       venue: event?.venue?.location || event?.venue || "TBA"
     },
+    payment: requiresPayment
+      ? {
+          required: true,
+          amount: Number(payment?.amount || event?.registration?.fee || 0),
+          paymentStatus: String(payment?.paymentStatus || "Pending").trim() || "Pending",
+          rejectionReason: String(payment?.rejectionReason || "").trim(),
+        }
+      : {
+          required: false,
+          amount: 0,
+          paymentStatus: "NotRequired",
+          rejectionReason: "",
+        },
     members,
     summary,
     allAccepted,
@@ -1030,18 +1055,15 @@ export const respondToTeamInvitation = async (token, action) => {
   registration.allMembersVerified = allAccepted;
 
   let event = null;
-  let autoConfirmed = false;
+  let acceptanceResult = null;
   if (allAccepted && !anyRejected && String(registration.status || "") === "PendingMemberVerification") {
     event = await Event.findById(registration.event);
     if (!event) throw new Error("Event not found");
-    registration.status = "Confirmed";
-    autoConfirmed = true;
+    acceptanceResult = await advanceRegistrationAfterAcceptance(registration, event);
   }
 
-  await registration.save();
-
-  if (autoConfirmed && event) {
-    await generateQRsForRegistration(registration, event);
+  if (!acceptanceResult) {
+    await registration.save();
   }
 
   try {
@@ -1064,7 +1086,7 @@ export const respondToTeamInvitation = async (token, action) => {
     status: invite.status,
     message:
       nextStatus === "ACCEPTED"
-        ? "Invitation accepted. Thanks for confirming."
+        ? acceptanceResult?.message || "Invitation accepted. Thanks for confirming."
         : "Invitation rejected. The team leader has been notified."
   };
 };
@@ -1100,13 +1122,12 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
     registration.status === "PendingPayment" ||
     registration.status === "PendingPaymentVerification"
   ) {
-    registration.status = "Confirmed";
-    registration.allMembersVerified = true;
-    await registration.save();
-    await generateQRsForRegistration(registration, event);
     return {
       status: registration.status,
-      message: "Team accepted. Registration confirmed and QR codes have been sent."
+      message:
+        String(registration.status || "") === "PendingPaymentVerification"
+          ? "Payment proof is under review. QR codes will be sent after approval."
+          : "Team accepted. Complete payment to receive the event QR pass."
     };
   }
 
@@ -1128,14 +1149,11 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
   const allAccepted = invites.every((invite) => invite.status === "ACCEPTED");
   if (!allAccepted) throw new Error("Waiting for all team members to accept");
 
-  registration.allMembersVerified = true;
-  registration.status = "Confirmed";
-  await registration.save();
-  await generateQRsForRegistration(registration, event);
+  const result = await advanceRegistrationAfterAcceptance(registration, event);
 
   return {
-    status: registration.status,
-    message: "Team accepted. Registration confirmed and QR codes have been sent."
+    status: result.status,
+    message: result.message
   };
 };
 
@@ -1186,6 +1204,233 @@ export const resendTeamInvites = async (registrationId, requesterId) => {
       sent > 0
         ? `Invitations resent to ${sent} member${sent === 1 ? "" : "s"}.`
         : "No pending invitations to resend."
+  };
+};
+
+/* ================================================
+   PAYMENT DETAILS / SUBMISSION / REVIEW
+================================================ */
+
+export const getRegistrationPaymentDetails = async (registrationId, requesterId) => {
+  const requester = await User.findById(requesterId).select("email role");
+  if (!requester) throw new Error("User not found");
+
+  const registration = await EventRegistration.findById(registrationId).populate(
+    "event",
+    "title schedule venue registration isTeamEvent organizer createdBy"
+  );
+
+  if (!registration) throw new Error("Registration not found");
+
+  const event = registration.event;
+  if (!event) throw new Error("Event not found");
+
+  const canReview = canReviewPaymentForEvent(event, requester);
+  const canView = canReview || isRegistrationViewer(registration, requesterId, requester?.email);
+  if (!canView) {
+    throw new Error("Not authorized to view payment details for this registration");
+  }
+
+  if (!eventRequiresPayment(event)) {
+    throw new Error("This event does not require payment");
+  }
+
+  ensureEventPaymentConfigured(event);
+  applyEventPaymentDefaults(registration, event);
+  const paymentConfig = getEventPaymentConfig(event);
+  const isOwner = normalizeId(registration?.registeredBy) === normalizeId(requesterId);
+
+  return {
+    registrationId: registration._id,
+    status: registration.status,
+    isTeamEvent: Boolean(event?.isTeamEvent),
+    isTeamLeader: isOwner,
+    canSubmitPayment: isOwner && String(registration.status || "") !== "Confirmed",
+    canReviewPayment: canReview,
+    event: {
+      id: event?._id || null,
+      title: event?.title || "Event",
+      date: formatEventDate(event),
+      venue: event?.venue?.location || event?.venue || "TBA"
+    },
+    payment: {
+      amount: Number(registration?.payment?.amount || event?.registration?.fee || 0),
+      method: String(registration?.payment?.method || paymentConfig.method || "PHONEPE_QR")
+        .trim() || "PHONEPE_QR",
+      transactionId: String(registration?.payment?.transactionId || "").trim(),
+      paymentScreenshot: String(registration?.payment?.paymentScreenshot || "").trim(),
+      paymentStatus: String(registration?.payment?.paymentStatus || "Pending").trim() || "Pending",
+      rejectionReason: String(registration?.payment?.rejectionReason || "").trim(),
+      verifiedAt: registration?.payment?.verifiedAt || null
+    },
+    paymentConfig
+  };
+};
+
+export const submitRegistrationPayment = async (
+  registrationId,
+  requesterId,
+  payload,
+  paymentScreenshotFile
+) => {
+  if (!paymentScreenshotFile) {
+    throw new Error("Payment screenshot is required");
+  }
+
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  if (normalizeId(registration?.registeredBy) !== normalizeId(requesterId)) {
+    throw new Error("Only the registration owner can submit payment");
+  }
+
+  if (registration.status === "Cancelled" || registration.status === "Rejected") {
+    throw new Error("This registration is no longer active");
+  }
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+  if (!eventRequiresPayment(event)) {
+    throw new Error("This event does not require payment");
+  }
+
+  ensureEventPaymentConfigured(event);
+  applyEventPaymentDefaults(registration, event);
+
+  const currentPaymentStatus = String(registration?.payment?.paymentStatus || "").trim();
+  if (registration.status === "Confirmed" && currentPaymentStatus === "Verified") {
+    return {
+      status: registration.status,
+      paymentStatus: currentPaymentStatus,
+      message: "Payment has already been approved."
+    };
+  }
+
+  if (String(registration.status || "") === "PendingMemberVerification") {
+    throw new Error("Wait for all team members to accept before submitting payment");
+  }
+
+  if (
+    String(registration.status || "") === "PendingPaymentVerification" &&
+    currentPaymentStatus === "UnderReview"
+  ) {
+    throw new Error("Payment proof is already under review");
+  }
+
+  const transactionId = String(payload?.transactionId || "").trim();
+  if (!transactionId) {
+    throw new Error("Transaction ID is required");
+  }
+
+  const uploadedScreenshot = await uploadImageCloudinary(paymentScreenshotFile, {
+    folder: "eventmate/registrations/payments",
+    resourceType: "image"
+  });
+
+  registration.status = "PendingPaymentVerification";
+  registration.allMembersVerified = true;
+  registration.payment.transactionId = transactionId;
+  registration.payment.paymentScreenshot = uploadedScreenshot.url;
+  registration.payment.paymentStatus = "UnderReview";
+  registration.payment.rejectionReason = "";
+  registration.payment.verifiedBy = null;
+  registration.payment.verifiedAt = null;
+  await registration.save();
+
+  await sendNotification({
+    recipientId: event.createdBy,
+    recipientName: event?.organizer?.name || "Organizer",
+    recipientRole: "ORGANIZER",
+    title: "Payment Submitted",
+    message: `${registration?.teamLeader?.name || "A participant"} submitted payment proof for ${event.title}.`,
+    type: "REGISTRATION",
+    refId: registration._id
+  });
+
+  await notifyAssignedCoordinators(event, () => ({
+    title: "Payment Submitted",
+    message: `${registration?.teamLeader?.name || "A participant"} submitted payment proof for ${event.title}.`,
+    type: "REGISTRATION",
+    refId: registration._id
+  }));
+
+  return {
+    status: registration.status,
+    paymentStatus: registration.payment.paymentStatus,
+    message: "Payment proof submitted for review."
+  };
+};
+
+export const reviewRegistrationPayment = async (registrationId, reviewer, payload) => {
+  const registration = await EventRegistration.findById(registrationId);
+  if (!registration) throw new Error("Registration not found");
+
+  const event = await Event.findById(registration.event);
+  if (!event) throw new Error("Event not found");
+
+  if (!canReviewPaymentForEvent(event, reviewer)) {
+    throw new Error("Not authorized to review this payment");
+  }
+
+  if (!eventRequiresPayment(event)) {
+    throw new Error("This event does not require payment");
+  }
+
+  applyEventPaymentDefaults(registration, event);
+
+  if (!String(registration?.payment?.paymentScreenshot || "").trim()) {
+    throw new Error("No payment proof has been submitted yet");
+  }
+
+  const action = String(payload?.action || "").trim().toLowerCase();
+  if (action !== "approve" && action !== "reject") {
+    throw new Error("Review action must be approve or reject");
+  }
+
+  if (action === "approve") {
+    await finalizeRegistrationConfirmation(registration, event, reviewer?._id || null);
+
+    await sendNotification({
+      recipientId: registration.registeredBy,
+      recipientName: registration?.teamLeader?.name || "Participant",
+      recipientRole: "STUDENT",
+      title: "Payment Approved",
+      message: `Your registration for ${event.title} is confirmed. Your QR pass is now ready.`,
+      type: "REGISTRATION",
+      refId: registration._id
+    });
+
+    return {
+      status: registration.status,
+      paymentStatus: registration.payment.paymentStatus,
+      message: "Payment approved and registration confirmed."
+    };
+  }
+
+  const rejectionReason = String(payload?.rejectionReason || "").trim();
+  if (!rejectionReason) {
+    throw new Error("Rejection reason is required");
+  }
+
+  await moveRegistrationToPendingPayment(registration, event, {
+    paymentStatus: "Rejected",
+    rejectionReason
+  });
+
+  await sendNotification({
+    recipientId: registration.registeredBy,
+    recipientName: registration?.teamLeader?.name || "Participant",
+    recipientRole: "STUDENT",
+    title: "Payment Rejected",
+    message: `Payment proof for ${event.title} was rejected. Reason: ${rejectionReason}`,
+    type: "REGISTRATION",
+    refId: registration._id
+  });
+
+  return {
+    status: registration.status,
+    paymentStatus: registration.payment.paymentStatus,
+    message: "Payment rejected. Student can submit a new proof."
   };
 };
 
@@ -1482,7 +1727,10 @@ export const getMyRegistrations = async (userId) => {
     : { registeredBy: userId };
 
   const registrations = await EventRegistration.find(registrationQuery)
-    .populate("event", "title category schedule venue status posterUrl certificate isTeamEvent")
+    .populate(
+      "event",
+      "title category schedule venue status posterUrl certificate isTeamEvent registration organizer"
+    )
     .sort({ createdAt: -1 });
 
   const registrationIds = registrations.map((registration) => registration._id);

@@ -182,6 +182,18 @@ const SummaryApi = {
     url: "/api/registrations/team/:registrationId/status",
     method: "get",
   },
+  get_registration_payment: {
+    url: "/api/registrations/:registrationId/payment",
+    method: "get",
+  },
+  submit_registration_payment: {
+    url: "/api/registrations/:registrationId/payment",
+    method: "post",
+  },
+  review_registration_payment: {
+    url: "/api/registrations/:registrationId/payment/review",
+    method: "patch",
+  },
 
   confirm_team_registration: {
     url: "/api/registrations/team/:registrationId/confirm",

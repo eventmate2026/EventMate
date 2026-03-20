@@ -59,6 +59,11 @@ const normalizeRegistration = (item) => {
   const eventStartTime = String(eventDoc?.schedule?.startTime || "").trim();
   const eventEndTime = String(eventDoc?.schedule?.endTime || "").trim();
   const certificate = item?.certificate && typeof item.certificate === "object" ? item.certificate : null;
+  const paymentConfig =
+    eventDoc?.registration?.paymentConfig && typeof eventDoc.registration.paymentConfig === "object"
+      ? eventDoc.registration.paymentConfig
+      : {};
+  const payment = item?.payment && typeof item.payment === "object" ? item.payment : {};
   return {
     id: String(item?._id || item?.id || "").trim(),
     eventId,
@@ -76,8 +81,24 @@ const normalizeRegistration = (item) => {
     createdAt: item?.createdAt || null,
     isTeamLeader: Boolean(item?.isTeamLeader),
     isTeamEvent: Boolean(eventDoc?.isTeamEvent),
+    eventFee: Number(eventDoc?.registration?.fee || 0) || 0,
     feedbackSubmitted: Boolean(item?.feedbackSubmitted),
     certificate,
+    payment: {
+      amount: Number(payment?.amount || eventDoc?.registration?.fee || 0) || 0,
+      method: String(payment?.method || paymentConfig?.method || "FREE").trim() || "FREE",
+      paymentStatus: String(payment?.paymentStatus || "NotRequired").trim() || "NotRequired",
+      transactionId: String(payment?.transactionId || "").trim(),
+      paymentScreenshot: String(payment?.paymentScreenshot || "").trim(),
+      rejectionReason: String(payment?.rejectionReason || "").trim(),
+      verifiedAt: payment?.verifiedAt || null,
+    },
+    paymentConfig: {
+      accountName: String(paymentConfig?.accountName || "").trim(),
+      upiId: String(paymentConfig?.upiId || "").trim(),
+      qrImageUrl: String(paymentConfig?.qrImageUrl || "").trim(),
+      instructions: String(paymentConfig?.instructions || "").trim(),
+    },
     qr: qrImageUrl
       ? {
           qrImageUrl,
