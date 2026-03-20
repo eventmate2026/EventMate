@@ -117,9 +117,12 @@ const getSmtpConfig = () => {
   const port = normalizeNumber(process.env.SMTP_PORT, 465);
   const secure = normalizeBoolean(process.env.SMTP_SECURE, port === 465);
   const family = normalizeNumber(process.env.SMTP_FAMILY, 4);
-  const connectionTimeout = normalizeNumber(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000);
-  const greetingTimeout = normalizeNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
-  const socketTimeout = normalizeNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 15000);
+  // Increased timeouts for production reliability (30s connection, 30s greeting, 45s socket)
+  const connectionTimeout = normalizeNumber(process.env.SMTP_CONNECTION_TIMEOUT_MS, 30000);
+  const greetingTimeout = normalizeNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 30000);
+  const socketTimeout = normalizeNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 45000);
+  const pool = normalizeBoolean(process.env.SMTP_POOL, true);
+  const maxConnections = normalizeNumber(process.env.SMTP_MAX_CONNECTIONS, 5);
 
   return {
     host,
@@ -132,6 +135,8 @@ const getSmtpConfig = () => {
     connectionTimeout,
     greetingTimeout,
     socketTimeout,
+    pool,
+    maxConnections,
   };
 };
 
@@ -168,6 +173,12 @@ const createSmtpTransporter = () => {
     connectionTimeout: smtpConfig.connectionTimeout,
     greetingTimeout: smtpConfig.greetingTimeout,
     socketTimeout: smtpConfig.socketTimeout,
+    pool: {
+      maxConnections: smtpConfig.maxConnections,
+      maxMessages: 100,
+      rateDelta: 1000,
+      rateLimit: 14, // 14 messages per second max
+    },
     auth: {
       user: smtpConfig.user,
       pass: smtpConfig.pass,
@@ -194,6 +205,42 @@ const getSmtpErrorMessage = (error) => {
   }
   return String(error?.message || "").trim();
 };
+
+/**
+ * Retry logic with exponential backoff for transient email delivery failures
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxAttempts - Maximum number of attempts
+ * @param {number} initialDelayMs - Initial delay in milliseconds
+ * @returns {Promise<any>}
+ */
+const retryWithBackoff = async (fn, maxAttempts = 3, initialDelayMs = 1000) => {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const isTransient =
+        error?.code === "ETIMEDOUT" ||
+        error?.code === "ECONNREFUSED" ||
+        error?.code === "EHOSTUNREACH" ||
+        error?.message?.includes("timeout") ||
+        error?.message?.includes("temporarily unavailable");
+
+      if (!isTransient || attempt === maxAttempts) {
+        throw error;
+      }
+
+      const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
+      console.warn(
+        `Email delivery attempt ${attempt} failed (${error?.code || error?.message}). Retrying in ${delayMs}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+};
+
 
 const sendWithSendGrid = async ({
   to,
@@ -245,29 +292,12 @@ const sendEmail = async (to, subject, html, options = {}) => {
     throw err;
   }
 
-  if (emailProvider === "smtp") {
+  // Prioritize SendGrid if available (more reliable)
+  if (canUseSendGrid()) {
     try {
-      const transporter = createSmtpTransporter();
-      await transporter.sendMail({
-        to,
-        from: {
-          name: senderName,
-          address: senderEmail,
-        },
-        replyTo,
-        subject,
-        text,
-        html,
-        attachments,
-      });
-      return;
-    } catch (error) {
-      console.error("SMTP Error:", error);
-
-      if (canUseSendGrid()) {
-        console.warn("SMTP delivery failed. Falling back to SendGrid.");
-        try {
-          await sendWithSendGrid({
+      await retryWithBackoff(
+        () =>
+          sendWithSendGrid({
             to,
             subject,
             text,
@@ -276,12 +306,54 @@ const sendEmail = async (to, subject, html, options = {}) => {
             senderEmail,
             senderName,
             replyTo,
-          });
-          return;
-        } catch (fallbackError) {
-          console.error("SendGrid Fallback Error:", fallbackError.response?.body || fallbackError);
-        }
+          }),
+        3,
+        1000
+      );
+      return;
+    } catch (error) {
+      console.error("SendGrid Error (Primary):", error.response?.body || error);
+
+      // Fall back to SMTP if SendGrid fails and it's configured
+      if (emailProvider === "smtp") {
+        console.warn("SendGrid delivery failed. Falling back to SMTP.");
+      } else {
+        const providerMessage = getSendGridErrorMessage(error);
+        const err = new Error(
+          providerMessage
+            ? `Failed to send email: ${providerMessage}`
+            : "Failed to send email"
+        );
+        err.statusCode = 503;
+        throw err;
       }
+    }
+  }
+
+  // Use SMTP as fallback or primary provider
+  if (emailProvider === "smtp") {
+    try {
+      const transporter = createSmtpTransporter();
+      await retryWithBackoff(
+        () =>
+          transporter.sendMail({
+            to,
+            from: {
+              name: senderName,
+              address: senderEmail,
+            },
+            replyTo,
+            subject,
+            text,
+            html,
+            attachments,
+          }),
+        3,
+        2000
+      );
+      return;
+    } catch (error) {
+      console.error("SMTP Error:", error);
 
       const providerMessage = getSmtpErrorMessage(error);
       const err = new Error(
@@ -294,6 +366,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
   }
 
+  // Fallback: Try SendGrid one more time if not already attempted
   try {
     await sendWithSendGrid({
       to,
@@ -306,7 +379,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
       replyTo,
     });
   } catch (error) {
-    console.error("SendGrid Error:", error.response?.body || error);
+    console.error("SendGrid Error (Fallback):", error.response?.body || error);
 
     const providerMessage = getSendGridErrorMessage(error);
     const err = new Error(
