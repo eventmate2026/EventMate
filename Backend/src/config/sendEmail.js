@@ -115,6 +115,7 @@ const createSmtpTransporter = () => {
   const smtpUser = String(process.env.SMTP_USER || "").trim();
   const smtpPass = String(process.env.SMTP_PASS || "").trim();
   const smtpSecure = normalizeBoolean(process.env.SMTP_SECURE, smtpPort === 465);
+  const smtpFamily = Number(process.env.SMTP_FAMILY || 4);
 
   if (!smtpHost || !smtpUser || !smtpPass) {
     const err = new Error("Missing SMTP configuration");
@@ -126,9 +127,13 @@ const createSmtpTransporter = () => {
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+    family: Number.isFinite(smtpFamily) ? smtpFamily : 4,
     connectionTimeout: 15000,
     greetingTimeout: 10000,
     socketTimeout: 20000,
+    tls: {
+      servername: smtpHost,
+    },
     auth: {
       user: smtpUser,
       pass: smtpPass,
