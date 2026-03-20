@@ -7,7 +7,7 @@ const NotificationSchema = new mongoose.Schema(
       userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
+        default: null
       },
       name: {
         type: String,
@@ -73,6 +73,54 @@ const NotificationSchema = new mongoose.Schema(
     groupId: {
       type: String,
       default: null
+    },
+
+    emailDelivery: {
+      requested: {
+        type: Boolean,
+        default: false
+      },
+      trackingMode: {
+        type: String,
+        enum: ["PROVIDER_ACCEPTANCE", "WEBHOOK_DELIVERY"],
+        default: "PROVIDER_ACCEPTANCE"
+      },
+      status: {
+        type: String,
+        enum: [
+          "NOT_REQUESTED",
+          "PENDING",
+          "PROCESSING",
+          "SENT",
+          "FAILED",
+          "SKIPPED"
+        ],
+        default: "NOT_REQUESTED"
+      },
+      attempts: {
+        type: Number,
+        default: 0
+      },
+      queuedAt: {
+        type: Date,
+        default: null
+      },
+      lastAttemptAt: {
+        type: Date,
+        default: null
+      },
+      acceptedAt: {
+        type: Date,
+        default: null
+      },
+      deliveredAt: {
+        type: Date,
+        default: null
+      },
+      lastError: {
+        type: String,
+        default: ""
+      }
     },
 
     isRead: {

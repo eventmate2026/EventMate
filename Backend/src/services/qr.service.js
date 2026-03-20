@@ -7,6 +7,19 @@ import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 import { sendNotification } from "./notification.service.js";
 
+export const buildAttendanceVerificationUrl = (
+  token,
+  frontendUrl = getPrimaryFrontendUrl()
+) => {
+  const normalizedToken = String(token || "").trim();
+  const baseUrl = String(frontendUrl || "").trim().replace(/\/+$/, "");
+
+  if (!normalizedToken) return "";
+  if (!baseUrl) return normalizedToken;
+
+  return `${baseUrl}/attendance/verify?token=${encodeURIComponent(normalizedToken)}`;
+};
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -20,7 +33,7 @@ cloudinary.config({
 
 const generateAndUploadQR = async (token) => {
   // Only the verification URL — clean and safe when scanned by anyone
-  const verifyUrl = `${getPrimaryFrontendUrl()}/attendance/verify?token=${token}`;
+  const verifyUrl = buildAttendanceVerificationUrl(token);
 
   const qrBuffer = await QRCode.toBuffer(verifyUrl, {
     type: "png",
@@ -90,14 +103,18 @@ const qrEmailTemplate = ({
         <p style="color: #6b7280; font-size: 13px; margin-top: 8px;">
           Your unique QR code — do not share
         </p>
-        <p style="margin-top: 12px;">
-          <a
-            href="${verifyUrl}"
-            style="display: inline-block; padding: 10px 18px; border-radius: 8px; background: #4f46e5; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700;"
-          >
-            Open QR Link
-          </a>
-        </p>
+        ${
+          /^https?:\/\//i.test(String(verifyUrl || "").trim())
+            ? `<p style="margin-top: 12px;">
+                <a
+                  href="${verifyUrl}"
+                  style="display: inline-block; padding: 10px 18px; border-radius: 8px; background: #4f46e5; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700;"
+                >
+                  Open QR Link
+                </a>
+              </p>`
+            : ""
+        }
       </div>
 
       <div style="background: #f3f4f6; border-radius: 8px; padding: 16px; margin-top: 16px;">

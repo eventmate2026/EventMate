@@ -23,6 +23,15 @@ const ROLE_LABELS = {
   STUDENT: "Student"
 };
 
+const EMAIL_STATUS_LABELS = {
+  NOT_REQUESTED: "Web Only",
+  PENDING: "Email Queued",
+  PROCESSING: "Sending",
+  SENT: "Accepted by Provider",
+  FAILED: "Email Failed",
+  SKIPPED: "Email Skipped"
+};
+
 const normalizeId = (value) => String(value || "").trim();
 
 const getInitials = (value) =>
@@ -59,6 +68,44 @@ const formatDateTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const getEmailStatusLabel = (status, trackingMode) => {
+  const normalizedStatus = String(status || "").trim().toUpperCase();
+  if (normalizedStatus === "SENT") {
+    return String(trackingMode || "").trim().toUpperCase() === "WEBHOOK_DELIVERY"
+      ? "Delivered"
+      : "Accepted by Provider";
+  }
+
+  return EMAIL_STATUS_LABELS[normalizedStatus] || status || "Web Only";
+};
+
+const getEmailStatusTimestamp = (item) => {
+  if (item.emailDeliveredAt) {
+    return `Delivered ${formatDateTime(item.emailDeliveredAt)}`;
+  }
+  if (item.emailAcceptedAt) {
+    return `Accepted ${formatDateTime(item.emailAcceptedAt)}`;
+  }
+  if (item.emailLastAttemptAt) {
+    return `Attempted ${formatDateTime(item.emailLastAttemptAt)}`;
+  }
+  return "No email attempt";
+};
+
+const getEmailStatusTone = (status) => {
+  const normalized = String(status || "").trim().toUpperCase();
+  if (normalized === "SENT") {
+    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
+  }
+  if (normalized === "FAILED") {
+    return "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300";
+  }
+  if (normalized === "PENDING" || normalized === "PROCESSING") {
+    return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200";
+  }
+  return "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-200";
 };
 
 const parseRegistrationRows = (payload) => {
@@ -280,16 +327,26 @@ export default function OrganizerEventContactCenter() {
 
     let registeredStudents = [];
     if (isTeamEvent) {
-      const leaderUsers = new Map();
+      const participantUsers = new Map();
       registrations.forEach((reg) => {
         const leaderEmail = String(reg?.teamLeader?.email || "").trim().toLowerCase();
         const leaderFromEmail = leaderEmail ? byEmail.get(leaderEmail) : null;
         const leaderFromId = byId.get(normalizeId(reg?.registeredBy));
         const leaderUser = leaderFromEmail || leaderFromId;
         const leaderId = normalizeId(leaderUser?._id || leaderUser?.id);
-        if (leaderUser && leaderId) leaderUsers.set(leaderId, leaderUser);
+        if (leaderUser && leaderId) participantUsers.set(leaderId, leaderUser);
+
+        const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
+        teamMembers.forEach((member) => {
+          const memberEmail = String(member?.email || "").trim().toLowerCase();
+          const memberUser = memberEmail ? byEmail.get(memberEmail) : null;
+          const memberId = normalizeId(memberUser?._id || memberUser?.id);
+          if (memberUser && memberId) {
+            participantUsers.set(memberId, memberUser);
+          }
+        });
       });
-      registeredStudents = Array.from(leaderUsers.values())
+      registeredStudents = Array.from(participantUsers.values())
         .filter((user) => !coordinatorIds.has(normalizeId(user?._id || user?.id)))
         .filter((user) => matchesSearch(user, term))
         .sort(sortByName);
@@ -540,12 +597,12 @@ export default function OrganizerEventContactCenter() {
   const pageTitle = isMessagingDisabled ? "Message History" : "Message Participants";
   const pageDescription = isMessagingDisabled
     ? `${eventTitle} - Review who received which messages and notices.`
-    : `${eventTitle} - Reach coordinators, temporary coordinators, and registered students.`;
-  const registeredLabel = isTeamEvent ? "Team Leaders" : "Registered Students";
+    : `${eventTitle} - Reach coordinators, temporary coordinators, and registered participants.`;
+  const registeredLabel = isTeamEvent ? "Team Participants" : "Registered Students";
   const registeredDescription = isTeamEvent
-    ? "Team leaders registered for this event."
+    ? "Team leaders and team members registered for this event."
     : "Students registered for this event.";
-  const registeredQuickLabel = isTeamEvent ? "Team Leaders" : "Registered Students";
+  const registeredQuickLabel = isTeamEvent ? "Team Participants" : "Registered Students";
   const activeGroup = useMemo(
     () => sentGroups.find((group) => group.groupId === activeGroupId) || null,
     [sentGroups, activeGroupId]
@@ -717,7 +774,7 @@ export default function OrganizerEventContactCenter() {
                   title: registeredLabel,
                   description: registeredDescription,
                   users: directory.registeredStudents,
-                  emptyLabel: isTeamEvent ? "No team leaders found." : "No registered students found.",
+                  emptyLabel: isTeamEvent ? "No team participants found." : "No registered students found.",
                   disabled: isMessagingDisabled
                 })}
               </div>
@@ -837,6 +894,10 @@ export default function OrganizerEventContactCenter() {
                   <p className="text-sm text-slate-500 dark:text-slate-300">
                     Full history of sent messages with seen/unseen status.
                   </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Until a verified sending domain and delivery webhook are added, email tracking means queued,
+                    attempted, or accepted by the provider, not confirmed inbox delivery.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -878,6 +939,10 @@ export default function OrganizerEventContactCenter() {
                         const isActive = group.groupId === activeGroupId;
                         const readCount = Number(group.readCount || 0);
                         const total = Number(group.total || 0);
+                        const emailRequestedCount = Number(group.emailRequestedCount || 0);
+                        const emailSentCount = Number(group.emailSentCount || 0);
+                        const emailFailedCount = Number(group.emailFailedCount || 0);
+                        const emailPendingCount = Number(group.emailPendingCount || 0);
                         return (
                           <button
                             key={group.groupId}
@@ -902,6 +967,13 @@ export default function OrganizerEventContactCenter() {
                                 {readCount}/{total} seen
                               </span>
                             </div>
+                            {emailRequestedCount > 0 && (
+                              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">
+                                Email: {emailSentCount}/{emailRequestedCount} sent
+                                {emailPendingCount > 0 ? `, ${emailPendingCount} pending` : ""}
+                                {emailFailedCount > 0 ? `, ${emailFailedCount} failed` : ""}
+                              </p>
+                            )}
                             {group.message && (
                               <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                                 {String(group.message).slice(0, 120)}
@@ -920,6 +992,9 @@ export default function OrganizerEventContactCenter() {
                     {activeGroup && (
                       <span className="text-xs text-slate-500 dark:text-slate-300">
                         {activeGroup.readCount}/{activeGroup.total} seen
+                        {Number(activeGroup.emailRequestedCount || 0) > 0
+                          ? ` | ${activeGroup.emailSentCount || 0}/${activeGroup.emailRequestedCount || 0} emailed`
+                          : ""}
                       </span>
                     )}
                   </div>
@@ -995,6 +1070,21 @@ export default function OrganizerEventContactCenter() {
                             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                               {item.isRead ? formatDateTime(item.readAt) : "Waiting"}
                             </p>
+                            <span
+                              className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getEmailStatusTone(
+                                item.emailStatus
+                              )}`}
+                            >
+                              {getEmailStatusLabel(item.emailStatus, item.emailTrackingMode)}
+                            </span>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              {getEmailStatusTimestamp(item)}
+                            </p>
+                            {item.emailLastError ? (
+                              <p className="mt-1 max-w-[180px] text-[11px] text-red-500 dark:text-red-300">
+                                {item.emailLastError}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       ))}

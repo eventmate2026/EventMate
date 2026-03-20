@@ -21,16 +21,32 @@ export const buildCertificateEmailSlug = (email) =>
 
 const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
 
-const getBackendBaseUrl = () => {
+const getBackendBaseUrl = ({ required = true } = {}) => {
   const backendBaseUrl = normalizeBaseUrl(
     process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL
   );
 
-  if (!backendBaseUrl) {
+  if (!backendBaseUrl && required) {
     throw new Error("BACKEND_URL is required to generate certificate links.");
   }
 
   return backendBaseUrl;
+};
+
+export const buildCertificateDownloadUrl = (
+  eventId,
+  participantEmail,
+  backendBaseUrl = getBackendBaseUrl({ required: false })
+) => {
+  const normalizedBaseUrl = normalizeBaseUrl(backendBaseUrl);
+  const normalizedEventId = String(eventId || "").trim();
+  const emailSlug = buildCertificateEmailSlug(participantEmail);
+
+  if (!normalizedBaseUrl || !normalizedEventId || !emailSlug) {
+    return "";
+  }
+
+  return `${normalizedBaseUrl}/api/certificates/download/${normalizedEventId}/${emailSlug}`;
 };
 
 const formatCertificateDate = (value) => {
@@ -1416,25 +1432,33 @@ const certificateEmailTemplate = ({
           Verification Code: <strong>${verificationCode || "N/A"}</strong>
         </p>
 
-        <div style="text-align: center; margin: 32px 0;">
-          <a href="${certificateUrl}" 
-             download
-             style="
-               display: inline-block;
-               padding: 14px 32px;
-               background: linear-gradient(135deg, #7C3AED, #EC4899);
-               color: white;
-               text-decoration: none;
-               border-radius: 8px;
-               font-weight: bold;
-               font-size: 15px;
-             ">
-            Download Certificate
-          </a>
-        </div>
+        ${
+          certificateUrl
+            ? `<div style="text-align: center; margin: 32px 0;">
+                <a href="${certificateUrl}" 
+                   download
+                   style="
+                     display: inline-block;
+                     padding: 14px 32px;
+                     background: linear-gradient(135deg, #7C3AED, #EC4899);
+                     color: white;
+                     text-decoration: none;
+                     border-radius: 8px;
+                     font-weight: bold;
+                     font-size: 15px;
+                   ">
+                  Download Certificate
+                </a>
+              </div>`
+            : ""
+        }
 
         <p style="font-size: 13px; color: #9ca3af; text-align: center;">
-          You can also view and download your certificate anytime from your EventMate dashboard.
+          ${
+            certificateUrl
+              ? "You can also view and download your certificate anytime from your EventMate dashboard."
+              : "Your certificate is ready in EventMate. Open the dashboard to view and download it while your public domain is still being set up."
+          }
         </p>
 
       </div>
@@ -1478,8 +1502,7 @@ const issueCertificateForParticipant = async ({
     ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
-  const backendBaseUrl = getBackendBaseUrl();
-  const certificateUrl = `${backendBaseUrl}/api/certificates/download/${event._id}/${buildCertificateEmailSlug(participantEmail)}`;
+  const certificateUrl = buildCertificateDownloadUrl(event._id, participantEmail);
   let certificateRecord = null;
   let verificationCode = null;
   let duplicateParticipantCertificate = false;

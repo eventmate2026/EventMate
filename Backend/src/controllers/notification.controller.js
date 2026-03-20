@@ -8,6 +8,96 @@ import mongoose from "mongoose";
 
 const escapeRegex = (value) =>
   String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeId = (value) => String(value || "").trim();
+const normalizeName = (value, fallback) =>
+  String(value || "").trim() || fallback;
+
+export const collectOrganizerEventAudience = (registrations = [], isTeamEvent = false) => {
+  const allowedIds = new Set();
+  const participantEmails = new Set();
+
+  registrations.forEach((reg) => {
+    const registrationOwnerId = normalizeId(reg?.registeredBy);
+    if (registrationOwnerId) {
+      allowedIds.add(registrationOwnerId);
+    }
+
+    const leaderEmail = normalizeEmail(reg?.teamLeader?.email);
+    if (leaderEmail) {
+      participantEmails.add(leaderEmail);
+    }
+
+    if (!isTeamEvent) return;
+
+    const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
+    teamMembers.forEach((member) => {
+      const memberEmail = normalizeEmail(member?.email);
+      if (memberEmail) {
+        participantEmails.add(memberEmail);
+      }
+    });
+  });
+
+  return {
+    allowedIds,
+    participantEmails
+  };
+};
+
+export const buildTeamNoticeRecipientMap = (registrations = []) => {
+  const recipientMap = new Map();
+
+  registrations.forEach((reg) => {
+    const ownerId = normalizeId(reg?.registeredBy);
+    if (!ownerId) return;
+
+    const seenEmails = new Set();
+    const recipients = [];
+
+    const pushRecipient = (emailValue, nameValue, roleValue) => {
+      const email = normalizeEmail(emailValue);
+      if (!email || seenEmails.has(email)) return;
+      seenEmails.add(email);
+      recipients.push({
+        email,
+        name: normalizeName(nameValue, roleValue === "leader" ? "Team Leader" : "Team Member"),
+        role: roleValue
+      });
+    };
+
+    pushRecipient(reg?.teamLeader?.email, reg?.teamLeader?.name, "leader");
+
+    const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
+    teamMembers.forEach((member) => {
+      pushRecipient(member?.email, member?.name, "member");
+    });
+
+    if (recipients.length > 0) {
+      recipientMap.set(ownerId, recipients);
+    }
+  });
+
+  return recipientMap;
+};
+
+const buildNotificationReceipt = (item) => ({
+  userId: item.recipient?.userId || null,
+  name: item.recipient?.name || "User",
+  email: item.recipient?.email || "",
+  role: item.recipient?.role || "USER",
+  isRead: Boolean(item.isRead),
+  readAt: item.readAt || null,
+  sentAt: item.createdAt || null,
+  emailStatus: item.emailDelivery?.status || "NOT_REQUESTED",
+  emailTrackingMode: item.emailDelivery?.trackingMode || "PROVIDER_ACCEPTANCE",
+  emailAcceptedAt:
+    item.emailDelivery?.acceptedAt || item.emailDelivery?.deliveredAt || null,
+  emailDeliveredAt: item.emailDelivery?.deliveredAt || null,
+  emailLastAttemptAt: item.emailDelivery?.lastAttemptAt || null,
+  emailAttempts: Number(item.emailDelivery?.attempts || 0),
+  emailLastError: item.emailDelivery?.lastError || ""
+});
 
 // Get all unread notifications for logged in user
 export const getMyNotifications = async (req, res, next) => {
@@ -89,7 +179,6 @@ export const markOneRead = async (req, res, next) => {
 // Admin broadcast/message to users
 export const adminSendNotification = async (req, res, next) => {
   try {
-    const normalizeId = (value) => String(value || "").trim();
     const ids = Array.isArray(req.body?.userIds)
       ? req.body.userIds
       : req.body?.userId
@@ -174,7 +263,6 @@ export const adminSendNotification = async (req, res, next) => {
 // Organizer event-scoped broadcast/message
 export const organizerSendNotification = async (req, res, next) => {
   try {
-    const normalizeId = (value) => String(value || "").trim();
     const ids = Array.isArray(req.body?.userIds)
       ? req.body.userIds
       : req.body?.userId
@@ -255,27 +343,21 @@ export const organizerSendNotification = async (req, res, next) => {
       emailUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
     }
 
-    const registrations = await EventRegistration.find({ event: eventId }).select("registeredBy teamLeader.email");
+    const registrations = await EventRegistration.find({ event: eventId }).select(
+      "registeredBy teamLeader.name teamLeader.email teamMembers.name teamMembers.email"
+    );
+    const audience = collectOrganizerEventAudience(
+      registrations,
+      Boolean(event?.isTeamEvent)
+    );
 
-    if (event?.isTeamEvent) {
-      const leaderEmailSet = new Set();
-      registrations.forEach((reg) => {
-        const regId = normalizeId(reg?.registeredBy);
-        if (regId) allowedIds.add(regId);
-        const email = String(reg?.teamLeader?.email || "").trim().toLowerCase();
-        if (email) leaderEmailSet.add(email);
-      });
+    audience.allowedIds.forEach((id) => allowedIds.add(id));
 
-      if (leaderEmailSet.size) {
-        const leaderEmails = Array.from(leaderEmailSet);
-        const leaderUsers = await User.find({ email: { $in: leaderEmails } }).select("_id");
-        leaderUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
-      }
-    } else {
-      registrations.forEach((reg) => {
-        const regId = normalizeId(reg?.registeredBy);
-        if (regId) allowedIds.add(regId);
-      });
+    if (audience.participantEmails.size) {
+      const participantUsers = await User.find({
+        email: { $in: Array.from(audience.participantEmails) }
+      }).select("_id");
+      participantUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
     }
 
     if (requesterId) allowedIds.delete(requesterId);
@@ -288,10 +370,73 @@ export const organizerSendNotification = async (req, res, next) => {
       });
     }
 
-    const recipients = await User.find({ _id: { $in: validRecipientIds } }).select(
+    const directRecipients = await User.find({ _id: { $in: validRecipientIds } }).select(
       "_id fullName role email"
     );
+    const notificationTargets = new Map();
 
+    directRecipients.forEach((user) => {
+      const key = normalizeId(user?._id);
+      if (!key) return;
+      notificationTargets.set(key, {
+        recipientId: user._id,
+        recipientName: user.fullName || "User",
+        recipientRole: user.role || "STUDENT",
+        recipientEmail: user.email || ""
+      });
+    });
+
+    if (mode === "NOTICE" && Boolean(event?.isTeamEvent)) {
+      const teamRecipientMap = buildTeamNoticeRecipientMap(registrations);
+      const expandedEmails = new Map();
+
+      validRecipientIds.forEach((id) => {
+        const recipients = teamRecipientMap.get(id);
+        if (!recipients) return;
+        recipients.forEach((recipient) => {
+          if (recipient?.email) {
+            expandedEmails.set(recipient.email, recipient);
+          }
+        });
+      });
+
+      const expandedEmailList = Array.from(expandedEmails.keys());
+      if (expandedEmailList.length > 0) {
+        const expandedUsers = await User.find({
+          email: { $in: expandedEmailList }
+        }).select("_id fullName role email");
+        const userByEmail = new Map(
+          expandedUsers.map((user) => [normalizeEmail(user?.email), user])
+        );
+        const requesterEmail = normalizeEmail(req.user?.email);
+
+        expandedEmails.forEach((recipient, email) => {
+          const matchedUser = userByEmail.get(email);
+          if (matchedUser?._id) {
+            const matchedUserId = normalizeId(matchedUser._id);
+            if (!matchedUserId || matchedUserId === requesterId) return;
+            notificationTargets.set(matchedUserId, {
+              recipientId: matchedUser._id,
+              recipientName: matchedUser.fullName || recipient.name || "Participant",
+              recipientRole: matchedUser.role || "STUDENT",
+              recipientEmail: matchedUser.email || email
+            });
+            return;
+          }
+
+          if (email && email !== requesterEmail) {
+            notificationTargets.set(`email:${email}`, {
+              recipientId: null,
+              recipientName: recipient.name || "Participant",
+              recipientRole: "STUDENT",
+              recipientEmail: email
+            });
+          }
+        });
+      }
+    }
+
+    const recipients = Array.from(notificationTargets.values());
     if (!recipients.length) {
       return res.status(404).json({
         success: false,
@@ -302,10 +447,10 @@ export const organizerSendNotification = async (req, res, next) => {
     const sendResults = await Promise.all(
       recipients.map((user) =>
         sendNotification({
-          recipientId: user._id,
-          recipientName: user.fullName || "User",
-          recipientRole: user.role,
-          recipientEmail: user.email,
+          recipientId: user.recipientId,
+          recipientName: user.recipientName,
+          recipientRole: user.recipientRole,
+          recipientEmail: user.recipientEmail,
           senderId: req.user?._id || null,
           senderName: req.user?.fullName || "Organizer",
           senderRole: req.user?.role || "ORGANIZER",
@@ -319,7 +464,10 @@ export const organizerSendNotification = async (req, res, next) => {
       )
     );
 
-    const resolvedIds = recipients.map((user) => normalizeId(user?._id));
+    const resolvedIds = recipients
+      .map((user) => normalizeId(user?.recipientId))
+      .filter(Boolean);
+    const emailOnlyCount = recipients.filter((user) => !user?.recipientId).length;
     const skipped = uniqueIds.filter((id) => !resolvedIds.includes(id));
     const sentCount = sendResults.filter(Boolean).length;
 
@@ -327,6 +475,7 @@ export const organizerSendNotification = async (req, res, next) => {
       success: true,
       count: sentCount,
       sentTo: resolvedIds,
+      emailOnlyCount,
       skipped,
       groupId
     });
@@ -394,7 +543,25 @@ export const getOrganizerSentGroups = async (req, res, next) => {
           type: { $first: "$type" },
           createdAt: { $first: "$createdAt" },
           total: { $sum: 1 },
-          readCount: { $sum: { $cond: ["$isRead", 1, 0] } }
+          readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
+          emailRequestedCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.requested", true] }, 1, 0] }
+          },
+          emailSentCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "SENT"] }, 1, 0] }
+          },
+          emailFailedCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "FAILED"] }, 1, 0] }
+          },
+          emailPendingCount: {
+            $sum: {
+              $cond: [
+                { $in: ["$emailDelivery.status", ["PENDING", "PROCESSING"]] },
+                1,
+                0
+              ]
+            }
+          }
         }
       },
       { $sort: { createdAt: -1 } }
@@ -415,7 +582,11 @@ export const getOrganizerSentGroups = async (req, res, next) => {
         type: group.type,
         createdAt: group.createdAt,
         total: group.total,
-        readCount: group.readCount
+        readCount: group.readCount,
+        emailRequestedCount: group.emailRequestedCount || 0,
+        emailSentCount: group.emailSentCount || 0,
+        emailFailedCount: group.emailFailedCount || 0,
+        emailPendingCount: group.emailPendingCount || 0
       }))
     });
   } catch (error) {
@@ -467,18 +638,10 @@ export const getOrganizerGroupReceipts = async (req, res, next) => {
       "sender.userId": req.user?._id,
       refId: eventId
     })
-      .select("recipient isRead readAt createdAt")
+      .select("recipient isRead readAt createdAt emailDelivery")
       .sort({ "recipient.name": 1 });
 
-    const receipts = notifications.map((item) => ({
-      userId: item.recipient?.userId,
-      name: item.recipient?.name || "User",
-      email: item.recipient?.email || "",
-      role: item.recipient?.role || "USER",
-      isRead: Boolean(item.isRead),
-      readAt: item.readAt || null,
-      sentAt: item.createdAt || null
-    }));
+    const receipts = notifications.map(buildNotificationReceipt);
 
     const readCount = receipts.filter((item) => item.isRead).length;
 
@@ -517,7 +680,25 @@ export const getAdminSentGroups = async (req, res, next) => {
           type: { $first: "$type" },
           createdAt: { $first: "$createdAt" },
           total: { $sum: 1 },
-          readCount: { $sum: { $cond: ["$isRead", 1, 0] } }
+          readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
+          emailRequestedCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.requested", true] }, 1, 0] }
+          },
+          emailSentCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "SENT"] }, 1, 0] }
+          },
+          emailFailedCount: {
+            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "FAILED"] }, 1, 0] }
+          },
+          emailPendingCount: {
+            $sum: {
+              $cond: [
+                { $in: ["$emailDelivery.status", ["PENDING", "PROCESSING"]] },
+                1,
+                0
+              ]
+            }
+          }
         }
       },
       { $sort: { createdAt: -1 } }
@@ -538,7 +719,11 @@ export const getAdminSentGroups = async (req, res, next) => {
         type: group.type,
         createdAt: group.createdAt,
         total: group.total,
-        readCount: group.readCount
+        readCount: group.readCount,
+        emailRequestedCount: group.emailRequestedCount || 0,
+        emailSentCount: group.emailSentCount || 0,
+        emailFailedCount: group.emailFailedCount || 0,
+        emailPendingCount: group.emailPendingCount || 0
       }))
     });
   } catch (error) {
@@ -562,18 +747,10 @@ export const getAdminGroupReceipts = async (req, res, next) => {
       groupId,
       "sender.userId": req.user?._id
     })
-      .select("recipient isRead readAt createdAt")
+      .select("recipient isRead readAt createdAt emailDelivery")
       .sort({ "recipient.name": 1 });
 
-    const receipts = notifications.map((item) => ({
-      userId: item.recipient?.userId,
-      name: item.recipient?.name || "User",
-      email: item.recipient?.email || "",
-      role: item.recipient?.role || "USER",
-      isRead: Boolean(item.isRead),
-      readAt: item.readAt || null,
-      sentAt: item.createdAt || null
-    }));
+    const receipts = notifications.map(buildNotificationReceipt);
 
     const readCount = receipts.filter((item) => item.isRead).length;
 

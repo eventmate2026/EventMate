@@ -5,7 +5,10 @@ import app from "./src/app.js";
 import connectDB from "./src/config/db.js";
 import { createCorsOriginValidator } from "./src/config/clientOrigins.js";
 import startCronJobs from "./src/utils/cronJobs.js";
-import { initSocket } from "./src/services/notification.service.js";
+import {
+  initSocket,
+  startNotificationEmailWorker
+} from "./src/services/notification.service.js";
 
 dotenv.config();
 
@@ -41,10 +44,14 @@ io.on("connection", (socket) => {
 // Pass io instance to notification service
 initSocket(io);
 
-connectDB();
-startCronJobs();
+const bootstrap = async () => {
+  await connectDB();
+  startCronJobs();
+  startNotificationEmailWorker();
 
-// Use httpServer instead of app.listen
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+};
+
+bootstrap();

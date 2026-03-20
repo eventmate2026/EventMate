@@ -3,6 +3,23 @@ import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 
 let io = null;
+let workerIntervalId = null;
+let workerBusy = false;
+let scheduledFlushId = null;
+
+export const EMAIL_DELIVERY_STATUS = {
+  NOT_REQUESTED: "NOT_REQUESTED",
+  PENDING: "PENDING",
+  PROCESSING: "PROCESSING",
+  SENT: "SENT",
+  FAILED: "FAILED",
+  SKIPPED: "SKIPPED"
+};
+
+export const EMAIL_TRACKING_MODE = {
+  PROVIDER_ACCEPTANCE: "PROVIDER_ACCEPTANCE",
+  WEBHOOK_DELIVERY: "WEBHOOK_DELIVERY"
+};
 
 const NOTIFICATION_ROUTE_BY_ROLE = {
   MAIN_ADMIN: "/admin-dashboard/notifications",
@@ -55,6 +72,219 @@ const buildNotificationEmailTemplate = ({
   </div>
 `;
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+export const getNotificationEmailTrackingMode = () => {
+  const configured = String(process.env.EMAIL_DELIVERY_TRACKING_MODE || "")
+    .trim()
+    .toUpperCase();
+
+  if (configured === EMAIL_TRACKING_MODE.WEBHOOK_DELIVERY) {
+    return EMAIL_TRACKING_MODE.WEBHOOK_DELIVERY;
+  }
+
+  return EMAIL_TRACKING_MODE.PROVIDER_ACCEPTANCE;
+};
+
+export const buildNotificationEmailDeliveryState = ({
+  sendEmailCopy = false,
+  recipientEmail = ""
+} = {}) => {
+  const normalizedEmail = normalizeEmail(recipientEmail);
+  const trackingMode = getNotificationEmailTrackingMode();
+
+  if (!sendEmailCopy) {
+    return {
+      requested: false,
+      trackingMode,
+      status: EMAIL_DELIVERY_STATUS.NOT_REQUESTED,
+      attempts: 0,
+      queuedAt: null,
+      lastAttemptAt: null,
+      acceptedAt: null,
+      deliveredAt: null,
+      lastError: ""
+    };
+  }
+
+  const queuedAt = new Date();
+  if (!normalizedEmail) {
+    return {
+      requested: true,
+      trackingMode,
+      status: EMAIL_DELIVERY_STATUS.SKIPPED,
+      attempts: 0,
+      queuedAt,
+      lastAttemptAt: null,
+      acceptedAt: null,
+      deliveredAt: null,
+      lastError: "Recipient email missing."
+    };
+  }
+
+  return {
+    requested: true,
+    trackingMode,
+    status: EMAIL_DELIVERY_STATUS.PENDING,
+    attempts: 0,
+    queuedAt,
+    lastAttemptAt: null,
+    acceptedAt: null,
+    deliveredAt: null,
+    lastError: ""
+  };
+};
+
+const dispatchNotificationEmail = async (notification) => {
+  const recipientEmail = normalizeEmail(notification?.recipient?.email);
+  if (!recipientEmail) {
+    throw new Error("Recipient email missing.");
+  }
+
+  const inboxUrl = buildNotificationInboxUrl(notification?.recipient?.role);
+  await sendEmail(
+    recipientEmail,
+    `EventMate Announcement: ${notification?.title || "Notification"}`,
+    buildNotificationEmailTemplate({
+      recipientName: notification?.recipient?.name,
+      title: notification?.title,
+      message: notification?.message,
+      senderName: notification?.sender?.name,
+      senderRole: notification?.sender?.role,
+      inboxUrl
+    })
+  );
+};
+
+export const processPendingNotificationEmails = async ({
+  batchSize = 20,
+  maxAttempts = 5
+} = {}) => {
+  if (workerBusy) return { processed: 0 };
+  workerBusy = true;
+
+  try {
+    const candidates = await Notification.find({
+      "emailDelivery.requested": true,
+      "emailDelivery.status": {
+        $in: [EMAIL_DELIVERY_STATUS.PENDING, EMAIL_DELIVERY_STATUS.FAILED]
+      },
+      "emailDelivery.attempts": { $lt: maxAttempts }
+    })
+      .sort({ createdAt: 1 })
+      .limit(batchSize);
+
+    let processed = 0;
+
+    for (const candidate of candidates) {
+      const claimed = await Notification.findOneAndUpdate(
+        {
+          _id: candidate._id,
+          "emailDelivery.requested": true,
+          "emailDelivery.status": {
+            $in: [EMAIL_DELIVERY_STATUS.PENDING, EMAIL_DELIVERY_STATUS.FAILED]
+          },
+          "emailDelivery.attempts": { $lt: maxAttempts }
+        },
+        {
+          $set: {
+            "emailDelivery.status": EMAIL_DELIVERY_STATUS.PROCESSING,
+            "emailDelivery.lastAttemptAt": new Date()
+          },
+          $inc: {
+            "emailDelivery.attempts": 1
+          }
+        },
+        { new: true }
+      );
+
+      if (!claimed) continue;
+
+      try {
+        await dispatchNotificationEmail(claimed);
+        await Notification.updateOne(
+          { _id: claimed._id },
+          {
+            $set: {
+              "emailDelivery.status": EMAIL_DELIVERY_STATUS.SENT,
+              "emailDelivery.acceptedAt": new Date(),
+              "emailDelivery.lastError": ""
+            }
+          }
+        );
+      } catch (emailError) {
+        await Notification.updateOne(
+          { _id: claimed._id },
+          {
+            $set: {
+              "emailDelivery.status": EMAIL_DELIVERY_STATUS.FAILED,
+              "emailDelivery.lastError": String(emailError?.message || "Unknown error").slice(0, 500)
+            }
+          }
+        );
+        console.error(
+          `Notification email failed for ${claimed?.recipient?.email || "unknown-recipient"}: ${
+            emailError?.message || "Unknown error"
+          }`
+        );
+      }
+
+      processed += 1;
+    }
+
+    return { processed };
+  } finally {
+    workerBusy = false;
+  }
+};
+
+const schedulePendingNotificationEmailProcessing = (delayMs = 250) => {
+  if (scheduledFlushId) return;
+
+  scheduledFlushId = setTimeout(() => {
+    scheduledFlushId = null;
+    processPendingNotificationEmails().catch((error) => {
+      console.error("Notification email worker flush error:", error?.message || error);
+    });
+  }, delayMs);
+
+  if (typeof scheduledFlushId?.unref === "function") {
+    scheduledFlushId.unref();
+  }
+};
+
+export const startNotificationEmailWorker = ({
+  intervalMs = 5000,
+  batchSize = 20,
+  maxAttempts = 5
+} = {}) => {
+  if (workerIntervalId) return workerIntervalId;
+
+  workerIntervalId = setInterval(() => {
+    processPendingNotificationEmails({ batchSize, maxAttempts }).catch((error) => {
+      console.error("Notification email worker interval error:", error?.message || error);
+    });
+  }, intervalMs);
+
+  if (typeof workerIntervalId?.unref === "function") {
+    workerIntervalId.unref();
+  }
+
+  schedulePendingNotificationEmailProcessing(100);
+  return workerIntervalId;
+};
+
+export const stopNotificationEmailWorker = () => {
+  if (workerIntervalId) {
+    clearInterval(workerIntervalId);
+    workerIntervalId = null;
+  }
+  if (scheduledFlushId) {
+    clearTimeout(scheduledFlushId);
+    scheduledFlushId = null;
+  }
+};
+
 // Called once from server.js to attach socket.io instance
 export const initSocket = (socketIo) => {
   io = socketIo;
@@ -78,9 +308,7 @@ export const sendNotification = async ({
   type,
   refId = null,
   groupId = null,
-  sendEmailCopy = false,
-  emailSubject = "",
-  emailHtml = ""
+  sendEmailCopy = false
 }) => {
   try {
     const payload = {
@@ -94,7 +322,11 @@ export const sendNotification = async ({
       message,
       type,
       refId,
-      groupId: groupId || null
+      groupId: groupId || null,
+      emailDelivery: buildNotificationEmailDeliveryState({
+        sendEmailCopy,
+        recipientEmail
+      })
     };
 
     if (senderId) {
@@ -109,7 +341,7 @@ export const sendNotification = async ({
     const notification = await Notification.create(payload);
 
     // Emit to socket if user is online
-    if (io) {
+    if (io && recipientId) {
       io.to(`user_${recipientId}`).emit("notification", {
         _id: notification._id,
         title,
@@ -120,27 +352,8 @@ export const sendNotification = async ({
       });
     }
 
-    if (sendEmailCopy && recipientEmail) {
-      try {
-        const inboxUrl = buildNotificationInboxUrl(recipientRole);
-        await sendEmail(
-          recipientEmail,
-          emailSubject || `EventMate Announcement: ${title}`,
-          emailHtml ||
-            buildNotificationEmailTemplate({
-              recipientName,
-              title,
-              message,
-              senderName,
-              senderRole,
-              inboxUrl
-            })
-        );
-      } catch (emailError) {
-        console.error(
-          `Notification email failed for ${recipientEmail}: ${emailError?.message || "Unknown error"}`
-        );
-      }
+    if (notification?.emailDelivery?.status === EMAIL_DELIVERY_STATUS.PENDING) {
+      schedulePendingNotificationEmailProcessing();
     }
 
     return notification;
