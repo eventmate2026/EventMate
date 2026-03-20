@@ -126,6 +126,9 @@ const createSmtpTransporter = () => {
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+    connectionTimeout: 15000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
     auth: {
       user: smtpUser,
       pass: smtpPass,
