@@ -346,21 +346,21 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
         </>
       )}
-        <div className="relative max-w-[1400px] mx-auto px-3 min-[380px]:px-4 sm:px-6 lg:px-10">
-          <div className="flex h-16 items-center justify-between gap-1.5 min-[380px]:gap-2 sm:h-[72px] sm:gap-3">
+        <div className="relative mx-auto max-w-[1400px] px-2.5 max-[320px]:px-2 min-[380px]:px-4 sm:px-6 lg:px-10">
+          <div className="flex h-16 items-center justify-between gap-1 max-[320px]:gap-0.5 min-[380px]:gap-2 sm:h-[72px] sm:gap-3">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex min-w-0 items-center gap-2 min-[380px]:gap-3 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-1.5 max-[320px]:gap-1 min-[380px]:gap-3 sm:gap-4">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
               onClick={() => handleNavClick('home')}
             >
-              <span className="relative font-extrabold text-[clamp(1.2rem,8vw,1.75rem)] leading-none tracking-[-0.04em] sm:text-2xl">
+              <span className="relative font-extrabold text-[clamp(1.05rem,7vw,1.75rem)] leading-none tracking-[-0.045em] max-[320px]:text-[0.95rem] sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
-                <span className="absolute -left-2.5 -top-2.5 h-5 w-5 rounded-full bg-indigo-400/25 blur-lg min-[380px]:-left-3 min-[380px]:-top-3 min-[380px]:h-6 min-[380px]:w-6" />
+                <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-indigo-400/25 blur-lg max-[320px]:-left-1.5 max-[320px]:-top-1.5 max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:-left-3 min-[380px]:-top-3 min-[380px]:h-6 min-[380px]:w-6" />
                 {isPublic && null}
               </span>
             </div>
@@ -871,18 +871,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-1 flex shrink-0 items-center gap-1 min-[380px]:gap-1.5 sm:-mr-2 ${mobileVisibilityClass}`}>
+          <div className={`-mr-1 flex shrink-0 items-center gap-0.5 max-[320px]:gap-px min-[380px]:gap-1.5 sm:-mr-2 ${mobileVisibilityClass}`}>
             {showPublicMobileQuickActions && (
-              <div className="flex items-center gap-1 min-[380px]:gap-1.5">
+              <div className="flex items-center gap-0.5 max-[320px]:gap-px min-[380px]:gap-1.5">
                 <Link
                   to="/login"
-                  className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 min-[380px]:px-3 min-[380px]:text-xs"
+                  className="rounded-full border border-gray-200 bg-white/80 px-2 py-1 text-[10px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:px-1.5 max-[320px]:text-[9px] min-[380px]:px-3 min-[380px]:py-1.5 min-[380px]:text-xs"
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm min-[380px]:px-3 min-[380px]:text-xs"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2 py-1 text-[10px] font-semibold text-white shadow-sm max-[320px]:px-1.5 max-[320px]:text-[9px] min-[380px]:px-3 min-[380px]:py-1.5 min-[380px]:text-xs"
                 >
                   Sign Up
                 </Link>
@@ -890,12 +890,12 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 min-[380px]:p-2"
+                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 max-[320px]:p-1 min-[380px]:p-2"
                 >
                   {isDark ? (
-                    <Sun className="h-[0.95rem] w-[0.95rem] min-[380px]:h-4 min-[380px]:w-4" />
+                    <Sun className="h-[0.9rem] w-[0.9rem] max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
                   ) : (
-                    <Moon className="h-[0.95rem] w-[0.95rem] min-[380px]:h-4 min-[380px]:w-4" />
+                    <Moon className="h-[0.9rem] w-[0.9rem] max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:h-4 min-[380px]:w-4" />
                   )}
                 </button>
               </div>
@@ -995,9 +995,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
               >
               {isMobileMenuOpen ? (
-                <X className="block h-5 w-5 min-[380px]:h-6 min-[380px]:w-6" />
+                <X className="block h-[1.1rem] w-[1.1rem] max-[320px]:h-4 max-[320px]:w-4 min-[380px]:h-6 min-[380px]:w-6" />
               ) : (
-                <Menu className="block h-5 w-5 min-[380px]:h-6 min-[380px]:w-6" />
+                <Menu className="block h-[1.1rem] w-[1.1rem] max-[320px]:h-4 max-[320px]:w-4 min-[380px]:h-6 min-[380px]:w-6" />
               )}
             </button>
           </div>
