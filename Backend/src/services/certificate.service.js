@@ -1601,10 +1601,6 @@ export const generateCertificatesForRegistration = async (registration, event) =
     if (!event?.certificate?.isEnabled) {
       return 0;
     }
-    const rankingComplete = await isEventWinnerRankingComplete(event?._id);
-    if (!rankingComplete) {
-      return 0;
-    }
 
     if (event?.isTeamEvent) {
       const feedbackExists = await hasTeamLeaderFeedback(event._id, registration._id);
@@ -1619,6 +1615,10 @@ export const generateCertificatesForRegistration = async (registration, event) =
 
     const customization = normalizeCertificateCustomization(event?.certificate?.customization);
     let participants = [];
+
+    if (isWinner && !normalizeWinnerPosition(position)) {
+      return 0;
+    }
 
     if (!event.isTeamEvent) {
       const leaderQR = await ParticipantQR.findOne({
@@ -1685,11 +1685,6 @@ export const generateCertificatesForEvent = async (eventId) => {
     throw new Error("Certificate template is not saved for this event");
   }
 
-  const rankingComplete = await isEventWinnerRankingComplete(event._id);
-  if (!rankingComplete) {
-    throw new Error("Winner ranks must be assigned before issuing certificates");
-  }
-
   if (event.status !== "Completed") {
     throw new Error("Certificates can only be generated after event is completed");
   }
@@ -1743,11 +1738,6 @@ export const generateCertificatesForSelection = async (event, selections = []) =
 
   if (!event?.certificate?.isEnabled) {
     throw new Error("Certificate template is not saved for this event");
-  }
-
-  const rankingComplete = await isEventWinnerRankingComplete(event._id);
-  if (!rankingComplete) {
-    throw new Error("Winner ranks must be assigned before issuing certificates");
   }
 
   if (event.status !== "Completed") {

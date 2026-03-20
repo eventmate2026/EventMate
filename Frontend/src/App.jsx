@@ -324,6 +324,7 @@ function ProtectedRoute({ children, requiredRole }) {
 
     const bootstrapAuth = async () => {
       let snapshot = readAuthSnapshot();
+      let shouldClearAuth = false;
 
       try {
         if (!snapshot.token && snapshot.refreshToken) {
@@ -344,20 +345,28 @@ function ProtectedRoute({ children, requiredRole }) {
         }
 
         if (snapshot.token && !snapshot.user) {
-          const profileResponse = await api({
-            ...SummaryApi.get_profile,
-            cacheTTL: 0,
-            skipCache: true,
-            skipDedupe: true,
-          });
-          const profileUser = profileResponse.data?.user || null;
-          if (profileUser) {
-            storeAuth({ user: profileUser });
+          try {
+            const profileResponse = await api({
+              ...SummaryApi.get_profile,
+              cacheTTL: 0,
+              skipCache: true,
+              skipDedupe: true,
+            });
+            const profileUser = profileResponse.data?.user || null;
+            if (profileUser) {
+              storeAuth({ user: profileUser });
+            }
+          } catch {
+            // Keep any existing stored session instead of forcing logout on a transient reload failure.
           }
         }
-      } catch {
-        clearAuth();
+      } catch (error) {
+        const status = Number(error?.response?.status || 0);
+        shouldClearAuth = status === 401 || status === 403;
       } finally {
+        if (shouldClearAuth) {
+          clearAuth();
+        }
         syncAuthState(true);
       }
     };

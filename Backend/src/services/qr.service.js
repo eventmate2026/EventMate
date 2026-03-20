@@ -45,14 +45,25 @@ const generateAndUploadQR = async (token) => {
     uploadStream.end(qrBuffer);
   });
 
-  return uploadResult.secure_url;
+  return {
+    qrImageUrl: uploadResult.secure_url,
+    qrBuffer,
+    verifyUrl,
+  };
 };
 
 /* ================================================
    EMAIL TEMPLATE
 ================================================ */
 
-const qrEmailTemplate = ({ participantName, eventName, eventDate, venue, qrImageUrl }) => `
+const qrEmailTemplate = ({
+  participantName,
+  eventName,
+  eventDate,
+  venue,
+  qrImageSrc,
+  verifyUrl,
+}) => `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #f9f9f9;">
     
     <div style="background: #4f46e5; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -70,12 +81,20 @@ const qrEmailTemplate = ({ participantName, eventName, eventDate, venue, qrImage
 
       <div style="text-align: center; margin: 32px 0;">
         <img 
-          src="${qrImageUrl}" 
+          src="${qrImageSrc}" 
           alt="Your Attendance QR Code"
           style="width: 220px; height: 220px; border: 3px solid #e5e7eb; border-radius: 12px; padding: 8px;"
         />
         <p style="color: #6b7280; font-size: 13px; margin-top: 8px;">
           Your unique QR code — do not share
+        </p>
+        <p style="margin-top: 12px;">
+          <a
+            href="${verifyUrl}"
+            style="display: inline-block; padding: 10px 18px; border-radius: 8px; background: #4f46e5; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 700;"
+          >
+            Open QR Link
+          </a>
         </p>
       </div>
 
@@ -136,7 +155,7 @@ export const generateQRsForRegistration = async (registration, event) => {
     const token = crypto.randomBytes(32).toString("hex");
 
     // Upload QR with only the token URL inside
-    const qrImageUrl = await generateAndUploadQR(token);
+    const { qrImageUrl, qrBuffer, verifyUrl } = await generateAndUploadQR(token);
 
     // Save to DB with all the info linked to the token
     await ParticipantQR.create({
@@ -150,16 +169,34 @@ export const generateQRsForRegistration = async (registration, event) => {
     });
 
     // Send confirmation email
-    await sendEmail(
-      participant.email,
-      `You're Registered! — ${event.title}`,
-      qrEmailTemplate({
-        participantName: participant.name,
-        eventName: event.title,
-        eventDate,
-        venue,
-        qrImageUrl
-      })
-    );
+    try {
+      await sendEmail(
+        participant.email,
+        `You're Registered! — ${event.title}`,
+        qrEmailTemplate({
+          participantName: participant.name,
+          eventName: event.title,
+          eventDate,
+          venue,
+          qrImageSrc: "cid:eventmate-registration-qr",
+          verifyUrl,
+        }),
+        {
+          attachments: [
+            {
+              content: qrBuffer.toString("base64"),
+              filename: `eventmate-qr-${token}.png`,
+              type: "image/png",
+              disposition: "inline",
+              contentId: "eventmate-registration-qr",
+            },
+          ],
+        }
+      );
+    } catch (emailError) {
+      console.error(
+        `QR email failed for ${participant.email}: ${emailError?.message || "Unknown error"}`
+      );
+    }
   }
 };

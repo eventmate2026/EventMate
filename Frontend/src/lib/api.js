@@ -206,7 +206,10 @@ api.interceptors.response.use(
       original.headers.Authorization = `Bearer ${newAccessToken}`;
       return api(original);
     } catch (refreshError) {
-      clearAuth();
+      const refreshStatus = Number(refreshError?.response?.status || 0);
+      if (refreshStatus === 401 || refreshStatus === 403) {
+        clearAuth();
+      }
       throw refreshError;
     }
   }

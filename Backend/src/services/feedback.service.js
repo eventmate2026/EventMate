@@ -2,7 +2,7 @@ import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import Feedback from "../models/Feedback.model.js";
-import { generateCertificatesForRegistration, isEventWinnerRankingComplete } from "./certificate.service.js";
+import { generateCertificatesForRegistration } from "./certificate.service.js";
 import { sendNotification } from "./notification.service.js";
 
 /* ================================================
@@ -92,8 +92,13 @@ export const submitFeedback = async (eventId, userId, payload) => {
   }
 
   const certificateEnabled = Boolean(event?.certificate?.isEnabled);
-  const rankingComplete = await isEventWinnerRankingComplete(event._id);
-  const certificateReady = certificateEnabled && rankingComplete;
+  const certificatePendingReason =
+    !certificateEnabled
+      ? "template-missing"
+      : registration?.winner?.isWinner && !registration?.winner?.position
+        ? "winner-ranking-pending"
+        : null;
+  const certificateReady = certificatePendingReason === null;
 
   if (certificateReady) {
     generateCertificatesForRegistration(registration, event).catch((err) =>
@@ -104,8 +109,8 @@ export const submitFeedback = async (eventId, userId, payload) => {
   return {
     feedback,
     certificateEnabled,
-    rankingComplete,
-    certificateReady
+    certificateReady,
+    certificatePendingReason
   };
 };
 

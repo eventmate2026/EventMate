@@ -11,8 +11,8 @@ export const submitFeedback = async (req, res, next) => {
       success: true,
       message: !result.certificateEnabled
         ? "Feedback submitted! Certificates will be issued after the organizer saves a certificate template."
-        : !result.rankingComplete
-          ? "Feedback submitted! Certificates will be issued after the organizer assigns ranks."
+        : result.certificatePendingReason === "winner-ranking-pending"
+          ? "Feedback submitted! Winner certificate will be issued after the organizer assigns your rank."
           : "Feedback submitted! Your certificate will be emailed shortly.",
       data: result.feedback
     });

@@ -186,6 +186,29 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     closeAdminUsersMenuImmediately();
   };
 
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  };
+
+  const handlePublicHomeClick = (event) => {
+    closeMenus();
+
+    if (location.pathname === "/" && !location.hash) {
+      event.preventDefault();
+      scrollToTop();
+      return;
+    }
+
+    event.preventDefault();
+    navigate("/");
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToTop);
+    });
+  };
+
   useEffect(() => {
     closeMenus();
   }, [location.pathname, location.hash, location.search]);
@@ -285,6 +308,12 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const mobileProfilePanelTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
+  const mobileThemeButtonClass =
+    "inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+  const mobileMenuLinkClass =
+    "mx-2 block rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5";
+  const mobileMenuSubLinkClass =
+    "mx-2 block rounded-xl px-4 py-2.5 text-sm font-medium text-indigo-600 transition hover:bg-gray-50 dark:text-indigo-300 dark:hover:bg-white/5";
 
   return (
     <>
@@ -293,7 +322,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         initial={chromeMotion.initial}
         animate={chromeMotion.animate}
         transition={chromeTransition}
-        className={navClass}
+        className={`${navClass} ${
+          isPublic && isMobileMenuOpen ? "border-b-transparent dark:border-b-transparent shadow-none" : ""
+        }`}
       >
       {!isPublic && !isPrivileged && (
         <>
@@ -316,16 +347,16 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         </>
       )}
       <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
-        <div className="flex items-center justify-between h-16 sm:h-[72px]">
+        <div className="flex items-center justify-between h-16 sm:h-[72px] gap-3">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
               onClick={() => handleNavClick('home')}
             >
-              <span className="font-extrabold text-2xl tracking-tight relative">
+              <span className="relative font-extrabold text-[1.9rem] leading-none tracking-tight sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
@@ -409,6 +440,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   <Link
                     key={item.key}
                     to={item.to}
+                    onClick={item.key === "home" ? handlePublicHomeClick : undefined}
                     className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
                       isCurrent
                         ? "text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500"
@@ -603,13 +635,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 { label: "Home", to: "/organizer-dashboard", key: "home" },
                 { label: "Coordinators", to: "/organizer-dashboard/coordinator-management", key: "coordinator-management" },
                 { label: "Contact Admin", to: "/organizer-dashboard/contact-admin", key: "contact-admin" },
-                { label: "Profile", to: "/organizer-dashboard/profile", key: "profile" },
               ].map((item) => {
                 const isCurrent =
                   (item.key === "home" && location.pathname === "/organizer-dashboard") ||
                   (item.key === "coordinator-management" && location.pathname.startsWith("/organizer-dashboard/coordinator-management")) ||
-                  (item.key === "contact-admin" && location.pathname.startsWith("/organizer-dashboard/contact-admin")) ||
-                  (item.key === "profile" && location.pathname.startsWith("/organizer-dashboard/profile"));
+                  (item.key === "contact-admin" && location.pathname.startsWith("/organizer-dashboard/contact-admin"));
 
                 return (
                   <Link
@@ -804,14 +834,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                         <p className="text-sm text-gray-900 dark:text-gray-100 font-bold">{displayName}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || 'student@college.com'}</p>
                       </div>
-
-                      <Link
-                        to={currentProfilePath}
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5"
-                      >
-                        Your Profile
-                      </Link>
                       <button
                         onClick={() => { onLogout?.(); setIsUserMenuOpen(false); }}
                         className="w-full text-left block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
@@ -849,9 +871,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-2 flex items-center gap-2 ${mobileVisibilityClass}`}>
+          <div className={`-mr-2 flex shrink-0 items-center gap-1.5 ${mobileVisibilityClass}`}>
             {showPublicMobileQuickActions && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Link
                   to="/login"
                   className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
@@ -868,7 +890,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
                 >
                   {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
@@ -879,7 +901,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 to={currentNotificationsPath}
                 onClick={closeMenus}
                 aria-label="Notifications"
-                className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
+                className="relative inline-flex shrink-0 items-center justify-center rounded-full p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
               >
                 <Bell className="h-5 w-5" />
                 {roleUnreadCount > 0 && (
@@ -890,19 +912,32 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </Link>
             )}
             {isAuthenticated && !isPublic && (
-              <div className="relative">
+              <button
+                type="button"
+                aria-label="Toggle theme"
+                onClick={() => {
+                  setIsMobileProfileOpen(false);
+                  toggleTheme();
+                }}
+                className={`${mobileThemeButtonClass} shrink-0 p-1.5`}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            )}
+            {isAuthenticated && !isPublic && (
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   onClick={handleMobileProfileClick}
                   aria-label="Open profile menu"
                   aria-expanded={isMobileProfileOpen}
                   aria-haspopup="menu"
-                  className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                  className="relative h-8 w-8 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
                 >
                   <AvatarWithFrame
                     src={avatarUrl}
                     alt="Profile"
-                    className="h-9 w-9"
+                    className="h-8 w-8"
                     coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
                     fallback={<span>{avatarInitials || "U"}</span>}
                   />
@@ -953,7 +988,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 setIsMobileProfileOpen(false);
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
+              className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
               {isMobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
@@ -964,29 +999,33 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
         <div
-          className={`${mobileVisibilityClass} max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}
+          className={`${mobileVisibilityClass} max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain backdrop-blur ${
+            isPublic
+              ? "nav-public-mobile-panel bg-white/96 dark:bg-slate-950/96"
+              : "border-b border-gray-200 dark:border-white/10 bg-white/95 dark:bg-gray-900/95"
+          }`}
         >
           <div className="pt-2 pb-3 space-y-1">
             {isPublic ? (
               <>
                 <Link
                   to="/"
-                  onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  onClick={handlePublicHomeClick}
+                  className={mobileMenuLinkClass}
                 >
                   Home
                 </Link>
                 <Link
                   to="/#events"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Events
                 </Link>
                 <Link
                   to="/#contact"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Contact us
                 </Link>
@@ -996,63 +1035,63 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 <Link
                   to="/admin-dashboard"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Home
                 </Link>
                 <Link
                   to="/admin-dashboard/system-oversight"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   System Oversight
                 </Link>
                 <Link
                   to="/admin-dashboard/user-management"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   User Management
                 </Link>
                 <Link
                   to="/admin-dashboard/organizer-management"
                   onClick={closeMenus}
-                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuSubLinkClass}
                 >
                   Organizer Management
                 </Link>
                 <Link
                   to="/admin-dashboard/coordinator-management"
                   onClick={closeMenus}
-                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuSubLinkClass}
                 >
                   Coordinator Management
                 </Link>
                 <Link
                   to="/admin-dashboard/notifications"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Notifications
                 </Link>
                 <Link
                   to="/admin-dashboard/contact-center"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Contact Center
                 </Link>
                 <Link
                   to="/admin-dashboard/certificates-audit"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Certificates & Audit Logs
                 </Link>
                 <Link
                   to="/admin-dashboard/security-reports"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Security & Reports
                 </Link>
@@ -1062,30 +1101,23 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 <Link
                   to="/organizer-dashboard"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Home
                 </Link>
                 <Link
                   to="/organizer-dashboard/coordinator-management"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Coordinators
                 </Link>
                 <Link
                   to="/organizer-dashboard/contact-admin"
                   onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className={mobileMenuLinkClass}
                 >
                   Contact Admin
-                </Link>
-                <Link
-                  to="/organizer-dashboard/profile"
-                  onClick={closeMenus}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
-                >
-                  Profile
                 </Link>
               </>
             ) : (
@@ -1095,38 +1127,38 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     <Link
                       to="/coordinator-dashboard"
                       onClick={closeMenus}
-                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                      className={mobileMenuLinkClass}
                     >
                       Home
                     </Link>
                     <Link
                       to="/coordinator-dashboard/contact-admin"
                       onClick={closeMenus}
-                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                      className={mobileMenuLinkClass}
                     >
                       Contact Admin
                     </Link>
                   </>
                 )}
                 {!isCoordinator && (
-                  <button onClick={() => handleNavClick('home')} className="w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">Home</button>
+                  <button onClick={() => handleNavClick('home')} className={`${mobileMenuLinkClass} w-full text-left`}>Home</button>
                 )}
                 {isStudent && (
                   <>
-                    <button onClick={() => handleNavClick('events')} className="w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                    <button onClick={() => handleNavClick('events')} className={`${mobileMenuLinkClass} w-full text-left`}>
                       Events
                     </button>
                     <Link
                       to="/student-dashboard/my-events"
                       onClick={closeMenus}
-                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                      className={mobileMenuLinkClass}
                     >
                       My Events
                     </Link>
                     <Link
                       to="/student-dashboard/contact-us"
                       onClick={closeMenus}
-                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                      className={mobileMenuLinkClass}
                     >
                       Contact us
                     </Link>
@@ -1135,38 +1167,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
               </>
             )}
           </div>
-          {isAuthenticated && (
-            <div className="border-t border-gray-200 pt-4 pb-4 dark:border-white/10">
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMenus();
-                    navigate(currentProfilePath);
-                  }}
-                  className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
-                  aria-label="Open profile"
-                >
-                  <AvatarWithFrame
-                    src={avatarUrl}
-                    alt="Profile"
-                    className="h-10 w-10"
-                    coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
-                    fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
-                  />
-                  <div className="ml-3">
-                    <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
-                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
-                  </div>
-                </button>
-                <div className="mt-3 space-y-1">
-                  <button onClick={() => { onLogout?.(); setIsMobileMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800 flex items-center gap-2">
-                    <LogOut size={18} /> Sign out
-                  </button>
-                </div>
-              </>
-            </div>
-          )}
         </div>
       )}
 
