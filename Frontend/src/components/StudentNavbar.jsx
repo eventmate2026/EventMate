@@ -149,7 +149,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         : "text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-indigo-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-white/20"
     }`;
   const mobileLinkClass = (pageName) =>
-    `mx-2 block w-[calc(100%-1rem)] rounded-xl px-4 py-3 text-left text-base font-medium transition ${
+    `block w-full rounded-xl px-4 py-3 text-left text-base font-medium transition ${
       isActivePage(pageName)
         ? "bg-purple-50 text-purple-700 dark:bg-indigo-500/10 dark:text-indigo-300"
         : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
@@ -371,41 +371,41 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             type="button"
             aria-label="Close mobile menu"
             onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/45 sm:hidden"
+            className="fixed inset-0 top-16 z-[105] bg-slate-950/55 backdrop-blur-[1px] sm:hidden"
           />
-          <div className="fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto border-b border-gray-200 bg-white pb-6 shadow-2xl dark:border-white/10 dark:bg-gray-950 sm:hidden">
-            <div className="pt-2 pb-3 space-y-1">
-            <button
-              onClick={() => handleNavClick('home')}
-              className={mobileLinkClass("home")}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => handleNavClick('events')}
-              className={mobileLinkClass("events")}
-            >
-              Events
-            </button>
-            <button
-              onClick={() => handleNavClick('my-events')}
-              className={mobileLinkClass("my-events")}
-            >
-              My Events
-            </button>
-            
-            <button
-              onClick={() => handleNavClick("contact-us")}
-              className={mobileLinkClass("contact-us")}
-            >
-              Contact us
-            </button>
+          <div className="fixed inset-x-0 top-16 z-[109] h-[calc(100svh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-950 sm:hidden">
+            <div className="flex min-h-full flex-col px-4 pt-3 pb-8">
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleNavClick('home')}
+                  className={mobileLinkClass("home")}
+                >
+                  Home
+                </button>
+                <button
+                  onClick={() => handleNavClick('events')}
+                  className={mobileLinkClass("events")}
+                >
+                  Events
+                </button>
+                <button
+                  onClick={() => handleNavClick('my-events')}
+                  className={mobileLinkClass("my-events")}
+                >
+                  My Events
+                </button>
+                <button
+                  onClick={() => handleNavClick("contact-us")}
+                  className={mobileLinkClass("contact-us")}
+                >
+                  Contact us
+                </button>
+              </div>
             </div>
           </div>
         </>
       )}
     </nav>
-    <div aria-hidden="true" className="h-16 shrink-0" />
     </>
   );
 };

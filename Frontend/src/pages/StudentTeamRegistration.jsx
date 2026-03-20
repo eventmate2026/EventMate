@@ -149,7 +149,7 @@ export default function StudentTeamRegistration() {
   const paymentUnderReview = paymentRequired && paymentStatus === "UnderReview";
 
   return (
-    <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
+    <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 pt-4 pb-8">
       <div className="max-w-5xl mx-auto space-y-5">
         <button
           type="button"

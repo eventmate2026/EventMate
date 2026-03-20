@@ -606,7 +606,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
         <Loader2 size={14} className="animate-spin" />
         Loading event details...
       </div>
@@ -615,7 +615,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (error || !event) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Event not found</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">{error || "This event is not available."}</p>
@@ -625,7 +625,7 @@ export default function StudentEventDetails({ mode = "details" }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#f3f4f8] pt-4 pb-6 sm:pt-5 sm:pb-8 dark:bg-gray-900">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -639,8 +639,8 @@ export default function StudentEventDetails({ mode = "details" }) {
         <section
           className={
             isRegistrationMode
-              ? "mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
-              : "mt-4"
+              ? "mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
+              : "mt-3"
           }
         >
           {isRegistrationMode && (

@@ -294,7 +294,7 @@ export default function StudentEvents() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard")}
@@ -303,7 +303,7 @@ export default function StudentEvents() {
         <ArrowLeft size={16} />
       </button>
 
-      <div className="mt-4 mb-8">
+      <div className="mt-3 mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">All Events</h1>
         <p className="text-gray-600 dark:text-gray-300">
           Explore upcoming events, competitions, and workshops shared by your campus teams.

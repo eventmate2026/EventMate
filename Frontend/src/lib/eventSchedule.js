@@ -53,9 +53,20 @@ export const buildRegistrationEventEndDateTime = (registration) =>
     fallbackToEndOfDay: true,
   });
 
+export const hasRegistrationEventEnded = (registration) => {
+  const status = String(registration?.eventStatus || "").trim().toLowerCase();
+  if (status === "completed" || status === "cancelled" || status === "canceled") return true;
+
+  const endDateTime = buildRegistrationEventEndDateTime(registration);
+  if (!endDateTime) return false;
+  return Date.now() >= endDateTime.getTime();
+};
+
 export const isRegistrationEventCompleted = (registration) => {
   const status = String(registration?.eventStatus || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
+
+  if (!hasRegistrationEventEnded(registration)) return false;
 
   const endDateTime = buildRegistrationEventEndDateTime(registration);
   if (!endDateTime) return false;

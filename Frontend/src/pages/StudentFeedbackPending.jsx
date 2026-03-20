@@ -210,7 +210,7 @@ export default function StudentFeedbackPending() {
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
+    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-4 pb-12">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 space-y-6">
         <button
           type="button"

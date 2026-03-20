@@ -117,7 +117,7 @@ export default function StudentRegistrationPayment() {
   const canUploadProof = Boolean(details?.canSubmitPayment) && !isUnderReview && !isVerified;
 
   return (
-    <section className="eventmate-page min-h-screen bg-slate-100/80 px-4 py-8 dark:bg-gray-900 sm:px-6">
+    <section className="eventmate-page min-h-screen bg-slate-100/80 px-4 pt-4 pb-8 dark:bg-gray-900 sm:px-6">
       <div className="mx-auto max-w-4xl space-y-5">
         <button
           type="button"

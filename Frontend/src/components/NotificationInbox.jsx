@@ -191,7 +191,7 @@ export default function NotificationInbox({
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
+    <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 pt-4 pb-8">
       <div className="max-w-5xl mx-auto space-y-6">
         <button
           type="button"

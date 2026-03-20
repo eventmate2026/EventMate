@@ -340,9 +340,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const mobileThemeButtonClass =
     "inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white p-2 text-indigo-700 shadow-sm hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
   const mobileMenuLinkClass =
-    "mx-2 block rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5";
+    "block w-full rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5";
   const mobileMenuSubLinkClass =
-    "mx-2 block rounded-xl px-4 py-2.5 text-sm font-medium text-indigo-600 transition hover:bg-gray-50 dark:text-indigo-300 dark:hover:bg-white/5";
+    "block w-full rounded-xl px-4 py-2.5 text-sm font-medium text-indigo-600 transition hover:bg-gray-50 dark:text-indigo-300 dark:hover:bg-white/5";
 
   return (
     <>
@@ -1040,177 +1040,179 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
             type="button"
             aria-label="Close mobile menu"
             onClick={closeMenus}
-            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/45`}
+            className={`${mobileVisibilityClass} fixed inset-0 top-16 z-[105] bg-slate-950/55 backdrop-blur-[1px]`}
           />
           <div
-            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto overscroll-contain ${
+            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 z-[109] h-[calc(100svh-4rem)] overflow-y-auto overscroll-contain ${
               isPublic
                 ? "nav-public-mobile-panel bg-white dark:bg-slate-950"
                 : "border-b border-gray-200 dark:border-white/10 bg-white dark:bg-gray-950 shadow-2xl"
             }`}
           >
-            <div className="pt-2 pb-3 space-y-1">
-            {isPublic ? (
-              <>
-                <Link
-                  to="/"
-                  onClick={handlePublicHomeClick}
-                  className={mobileMenuLinkClass}
-                >
-                  Home
-                </Link>
-                <Link
-                  to="/#events"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Events
-                </Link>
-                <Link
-                  to="/#contact"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Contact us
-                </Link>
-              </>
-            ) : isAdmin ? (
-              <>
-                <Link
-                  to="/admin-dashboard"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Home
-                </Link>
-                <Link
-                  to="/admin-dashboard/system-oversight"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  System Oversight
-                </Link>
-                <Link
-                  to="/admin-dashboard/user-management"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  User Management
-                </Link>
-                <Link
-                  to="/admin-dashboard/organizer-management"
-                  onClick={closeMenus}
-                  className={mobileMenuSubLinkClass}
-                >
-                  Organizer Management
-                </Link>
-                <Link
-                  to="/admin-dashboard/coordinator-management"
-                  onClick={closeMenus}
-                  className={mobileMenuSubLinkClass}
-                >
-                  Coordinator Management
-                </Link>
-                <Link
-                  to="/admin-dashboard/notifications"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Notifications
-                </Link>
-                <Link
-                  to="/admin-dashboard/contact-center"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Contact Center
-                </Link>
-                <Link
-                  to="/admin-dashboard/certificates-audit"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Certificates & Audit Logs
-                </Link>
-                <Link
-                  to="/admin-dashboard/security-reports"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Security & Reports
-                </Link>
-              </>
-            ) : isOrganizer ? (
-              <>
-                <Link
-                  to="/organizer-dashboard"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Home
-                </Link>
-                <Link
-                  to="/organizer-dashboard/coordinator-management"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Coordinators
-                </Link>
-                <Link
-                  to="/organizer-dashboard/contact-admin"
-                  onClick={closeMenus}
-                  className={mobileMenuLinkClass}
-                >
-                  Contact Admin
-                </Link>
-              </>
-            ) : (
-              <>
-                {isCoordinator && (
+            <div className="flex min-h-full flex-col px-4 pt-3 pb-8">
+              <div className="space-y-2">
+                {isPublic ? (
                   <>
                     <Link
-                      to="/coordinator-dashboard"
-                      onClick={closeMenus}
+                      to="/"
+                      onClick={handlePublicHomeClick}
                       className={mobileMenuLinkClass}
                     >
                       Home
                     </Link>
                     <Link
-                      to="/coordinator-dashboard/contact-admin"
+                      to="/#events"
                       onClick={closeMenus}
                       className={mobileMenuLinkClass}
                     >
-                      Contact Admin
-                    </Link>
-                  </>
-                )}
-                {!isCoordinator && (
-                  <button onClick={() => handleNavClick('home')} className={`${mobileMenuLinkClass} w-full text-left`}>Home</button>
-                )}
-                {isStudent && (
-                  <>
-                    <button onClick={() => handleNavClick('events')} className={`${mobileMenuLinkClass} w-full text-left`}>
                       Events
-                    </button>
-                    <Link
-                      to="/student-dashboard/my-events"
-                      onClick={closeMenus}
-                      className={mobileMenuLinkClass}
-                    >
-                      My Events
                     </Link>
                     <Link
-                      to="/student-dashboard/contact-us"
+                      to="/#contact"
                       onClick={closeMenus}
                       className={mobileMenuLinkClass}
                     >
                       Contact us
                     </Link>
                   </>
+                ) : isAdmin ? (
+                  <>
+                    <Link
+                      to="/admin-dashboard"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/system-oversight"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      System Oversight
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/user-management"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      User Management
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/organizer-management"
+                      onClick={closeMenus}
+                      className={mobileMenuSubLinkClass}
+                    >
+                      Organizer Management
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/coordinator-management"
+                      onClick={closeMenus}
+                      className={mobileMenuSubLinkClass}
+                    >
+                      Coordinator Management
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/notifications"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Notifications
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/contact-center"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Contact Center
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/certificates-audit"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Certificates & Audit Logs
+                    </Link>
+                    <Link
+                      to="/admin-dashboard/security-reports"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Security & Reports
+                    </Link>
+                  </>
+                ) : isOrganizer ? (
+                  <>
+                    <Link
+                      to="/organizer-dashboard"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      to="/organizer-dashboard/coordinator-management"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Coordinators
+                    </Link>
+                    <Link
+                      to="/organizer-dashboard/contact-admin"
+                      onClick={closeMenus}
+                      className={mobileMenuLinkClass}
+                    >
+                      Contact Admin
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {isCoordinator && (
+                      <>
+                        <Link
+                          to="/coordinator-dashboard"
+                          onClick={closeMenus}
+                          className={mobileMenuLinkClass}
+                        >
+                          Home
+                        </Link>
+                        <Link
+                          to="/coordinator-dashboard/contact-admin"
+                          onClick={closeMenus}
+                          className={mobileMenuLinkClass}
+                        >
+                          Contact Admin
+                        </Link>
+                      </>
+                    )}
+                    {!isCoordinator && (
+                      <button onClick={() => handleNavClick('home')} className={`${mobileMenuLinkClass} text-left`}>Home</button>
+                    )}
+                    {isStudent && (
+                      <>
+                        <button onClick={() => handleNavClick('events')} className={`${mobileMenuLinkClass} text-left`}>
+                          Events
+                        </button>
+                        <Link
+                          to="/student-dashboard/my-events"
+                          onClick={closeMenus}
+                          className={mobileMenuLinkClass}
+                        >
+                          My Events
+                        </Link>
+                        <Link
+                          to="/student-dashboard/contact-us"
+                          onClick={closeMenus}
+                          className={mobileMenuLinkClass}
+                        >
+                          Contact us
+                        </Link>
+                      </>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </div>
           </div>
         </>
       )}

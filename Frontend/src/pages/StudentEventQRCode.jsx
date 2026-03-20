@@ -112,7 +112,7 @@ export default function StudentEventQRCode() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard/my-events")}
@@ -138,7 +138,7 @@ export default function StudentEventQRCode() {
           {error}
         </div>
       ) : (
-        <section className="mt-6 mx-auto max-w-xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-5 sm:p-6 shadow-sm">
+        <section className="mt-4 mx-auto max-w-xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-5 sm:p-6 shadow-sm">
           <div className="rounded-xl border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50/70 dark:bg-indigo-500/10 px-4 py-3 text-center">
             <p className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-700 dark:text-indigo-200">
               <BadgeCheck size={14} />

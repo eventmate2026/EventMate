@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
-import { isRegistrationEventCompleted } from "../lib/eventSchedule";
+import { hasRegistrationEventEnded } from "../lib/eventSchedule";
 import { getStoredUser } from "../lib/auth";
 import { downloadCertificateAsset } from "../lib/certificateDownload";
 import { useToastFeedback } from "../hooks/useToastFeedback";
@@ -61,11 +61,12 @@ const normalizeStatus = (value) => {
 };
 
 const deriveEventPhase = (registration) => {
-  return isRegistrationEventCompleted(registration) ? "completed" : "upcoming";
+  return hasRegistrationEventEnded(registration) ? "completed" : "upcoming";
 };
 
 const mapToUiRow = (registration) => {
   const phase = deriveEventPhase(registration);
+  const eventEnded = hasRegistrationEventEnded(registration);
   const registrationStatus = normalizeStatus(registration?.status);
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
   const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
@@ -105,6 +106,7 @@ const mapToUiRow = (registration) => {
   return {
     ...registration,
     phase,
+    eventEnded,
     registrationStatus,
     primaryLabel,
     primaryLabelClass,
@@ -200,6 +202,8 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
             ? "Your event is completed and feedback is now available."
             : row.feedbackSubmitted
             ? "Feedback is submitted. Your certificate will appear once the organizer finishes certificate setup."
+            : row.eventEnded
+            ? "This event has ended. Any attendance, feedback, or certificate updates will appear here soon."
             : row.qr?.attendanceMarked
             ? "Attendance has been marked for this event."
             : "Use your QR code at check-in when the event starts."}
@@ -409,7 +413,7 @@ export default function StudentMyEvents() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard")}
@@ -418,7 +422,7 @@ export default function StudentMyEvents() {
         <ArrowLeft size={16} />
       </button>
 
-      <section className="mt-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-5 sm:p-6">
+      <section className="mt-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Events</h1>
