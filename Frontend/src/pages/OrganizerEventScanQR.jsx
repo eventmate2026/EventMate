@@ -69,6 +69,12 @@ const resolveTokenFromQrImageUrl = (value) => {
   return "";
 };
 
+const resolveParticipantToken = (participant) => {
+  const explicitToken = String(participant?.token || "").trim();
+  if (explicitToken) return explicitToken;
+  return resolveTokenFromQrImageUrl(participant?.qrImageUrl);
+};
+
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "").trim() || "Pending";
@@ -123,7 +129,7 @@ const toParticipantRows = (registration) => {
       role: String(participant?.role || "participant").trim(),
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
-      token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
+      token: resolveParticipantToken(participant),
     };
   });
 };
@@ -514,6 +520,48 @@ export default function OrganizerEventScanQR() {
     }
   }, []);
 
+  const syncParticipantAttendance = useCallback((token, payload, fallbackParticipant) => {
+    const tokenText = String(token || "").trim();
+    const participantName = String(payload?.participantName || fallbackParticipant?.participantName || "Participant");
+    const participantEmail = String(payload?.email || fallbackParticipant?.participantEmail || "");
+    const participantDepartment = fallbackParticipant?.participantDepartment || "";
+    const markedAt = payload?.markedAt || new Date().toISOString();
+    const role = String(payload?.role || fallbackParticipant?.role || "participant").trim();
+
+    setParticipantRows((prev) => {
+      const index = prev.findIndex((row) => String(row?.token || "").trim() === tokenText);
+      if (index >= 0) {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          participantName: participantName || next[index].participantName,
+          participantEmail: participantEmail || next[index].participantEmail,
+          participantDepartment: participantDepartment || next[index].participantDepartment,
+          attendanceMarked: true,
+          attendanceMarkedAt: markedAt,
+          token: tokenText || next[index].token,
+        };
+        return next;
+      }
+
+      return [
+        {
+          id: `session-${tokenText || Date.now()}`,
+          registrationId: "",
+          registrationStatus: "Confirmed",
+          participantName,
+          participantEmail,
+          participantDepartment,
+          role,
+          attendanceMarked: true,
+          attendanceMarkedAt: markedAt,
+          token: tokenText,
+        },
+        ...prev,
+      ];
+    });
+  }, []);
+
   const markAttendanceWithToken = useCallback(
     async (rawToken, sourceLabel) => {
       const token = parseAttendanceToken(rawToken);
@@ -535,30 +583,32 @@ export default function OrganizerEventScanQR() {
 
         const payload = response?.data?.data || {};
         const participantName = String(payload?.participantName || participant?.participantName || "Participant");
-      const participantEmail = String(payload?.email || participant?.participantEmail || "");
-      const participantDepartment = participant?.participantDepartment || "";
-      const successText = response.data?.message || `Attendance marked for ${participantName}.`;
+        const participantEmail = String(payload?.email || participant?.participantEmail || "");
+        const participantDepartment = participant?.participantDepartment || "";
+        const successText = response.data?.message || `Attendance marked for ${participantName}.`;
 
-      setLastResult({
-        type: "success",
-        participantName,
-        participantEmail,
-        participantDepartment,
-        text: successText,
-        sourceLabel,
-        at: Date.now(),
-      });
-
-      addRecentScan(
-        {
+        setLastResult({
           type: "success",
           participantName,
           participantEmail,
           participantDepartment,
+          text: successText,
           sourceLabel,
-        },
-        { countForRate: true }
-      );
+          at: Date.now(),
+        });
+
+        addRecentScan(
+          {
+            type: "success",
+            participantName,
+            participantEmail,
+            participantDepartment,
+            sourceLabel,
+          },
+          { countForRate: true }
+        );
+
+        syncParticipantAttendance(token, payload, participant);
 
         setMessage({ type: "success", text: successText });
         await load({ silent: true });
@@ -593,7 +643,7 @@ export default function OrganizerEventScanQR() {
         setMarking(false);
       }
     },
-    [addRecentScan, load]
+    [addRecentScan, load, syncParticipantAttendance]
   );
 
   const handleConfirmPending = async () => {

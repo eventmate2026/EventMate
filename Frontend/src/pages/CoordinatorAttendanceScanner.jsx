@@ -69,6 +69,12 @@ const resolveTokenFromQrImageUrl = (value) => {
   return "";
 };
 
+const resolveParticipantToken = (participant) => {
+  const explicitToken = String(participant?.token || "").trim();
+  if (explicitToken) return explicitToken;
+  return resolveTokenFromQrImageUrl(participant?.qrImageUrl);
+};
+
 const toParticipantRows = (registration) => {
   const registrationId = normalizeId(registration?._id || registration?.id);
   const registrationStatus = String(registration?.status || "").trim() || "Pending";
@@ -123,7 +129,7 @@ const toParticipantRows = (registration) => {
       role: String(participant?.role || "participant").trim(),
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
-      token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
+      token: resolveParticipantToken(participant),
     };
   });
 };

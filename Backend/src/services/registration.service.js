@@ -1349,7 +1349,7 @@ export const getEventRegistrations = async (eventId, requester) => {
     registrations.map(async (reg) => {
       const qrs = await ParticipantQR.find({
         registration: reg._id
-      }).select("name email role qrImageUrl attendanceMarked attendanceMarkedAt");
+      }).select("name email role token qrImageUrl attendanceMarked attendanceMarkedAt");
 
       return {
         ...reg.toObject(),
