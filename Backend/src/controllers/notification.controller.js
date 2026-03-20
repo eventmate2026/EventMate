@@ -94,10 +94,34 @@ const buildNotificationReceipt = (item) => ({
   emailAcceptedAt:
     item.emailDelivery?.acceptedAt || item.emailDelivery?.deliveredAt || null,
   emailDeliveredAt: item.emailDelivery?.deliveredAt || null,
+  emailOpenedAt: item.emailDelivery?.openedAt || null,
+  emailOpenCount: Number(item.emailDelivery?.openCount || 0),
   emailLastAttemptAt: item.emailDelivery?.lastAttemptAt || null,
   emailAttempts: Number(item.emailDelivery?.attempts || 0),
   emailLastError: item.emailDelivery?.lastError || ""
 });
+
+const resolveWebhookNotificationId = (event) =>
+  String(
+    event?.notificationId ||
+      event?.custom_args?.notificationId ||
+      event?.customArgs?.notificationId ||
+      ""
+  ).trim();
+
+const isNotificationEmailWebhookAuthorized = (req) => {
+  const configuredSecret = String(process.env.EMAIL_EVENT_WEBHOOK_SECRET || "").trim();
+  if (!configuredSecret) return true;
+
+  const providedSecret = String(
+    req.headers["x-email-webhook-secret"] ||
+      req.query?.secret ||
+      req.body?.secret ||
+      ""
+  ).trim();
+
+  return configuredSecret === providedSecret;
+};
 
 // Get all unread notifications for logged in user
 export const getMyNotifications = async (req, res, next) => {
@@ -759,6 +783,65 @@ export const getAdminGroupReceipts = async (req, res, next) => {
       count: receipts.length,
       readCount,
       data: receipts
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const recordNotificationEmailEvents = async (req, res, next) => {
+  try {
+    if (!isNotificationEmailWebhookAuthorized(req)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email webhook secret"
+      });
+    }
+
+    const events = Array.isArray(req.body) ? req.body : [];
+    let updated = 0;
+
+    for (const event of events) {
+      const notificationId = resolveWebhookNotificationId(event);
+      if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) continue;
+
+      const eventName = String(event?.event || "").trim().toLowerCase();
+      const update = {};
+
+      if (eventName === "delivered") {
+        update["emailDelivery.deliveredAt"] = new Date();
+        update["emailDelivery.status"] = "SENT";
+      } else if (eventName === "open") {
+        update["emailDelivery.openedAt"] = new Date();
+      } else if (eventName === "bounce" || eventName === "dropped" || eventName === "spamreport") {
+        update["emailDelivery.status"] = "FAILED";
+        update["emailDelivery.lastError"] = String(
+          event?.reason || event?.response || eventName
+        ).slice(0, 500);
+      } else if (eventName === "deferred") {
+        update["emailDelivery.status"] = "PROCESSING";
+        update["emailDelivery.lastError"] = String(
+          event?.reason || event?.response || "Delivery deferred"
+        ).slice(0, 500);
+      } else {
+        continue;
+      }
+
+      const updateOperation = { $set: update };
+      if (eventName === "open") {
+        updateOperation.$inc = { "emailDelivery.openCount": 1 };
+      }
+
+      const result = await Notification.updateOne(
+        { _id: notificationId },
+        updateOperation
+      );
+      updated += Number(result?.modifiedCount || 0);
+    }
+
+    return res.status(200).json({
+      success: true,
+      updated
     });
   } catch (error) {
     next(error);

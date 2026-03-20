@@ -10,7 +10,8 @@ import {
   getOrganizerSentGroups,
   getOrganizerGroupReceipts,
   getAdminSentGroups,
-  getAdminGroupReceipts
+  getAdminGroupReceipts,
+  recordNotificationEmailEvents
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get("/my", authMiddleware, getMyNotifications);
 router.patch("/read-all", authMiddleware, markAllRead);
 router.patch("/:notificationId/read", authMiddleware, markOneRead);
+router.post("/email-events", recordNotificationEmailEvents);
 router.post("/admin-send", authMiddleware, roleMiddleware("MAIN_ADMIN"), adminSendNotification);
 router.post("/organizer-send", authMiddleware, roleMiddleware("ORGANIZER"), organizerSendNotification);
 router.get("/organizer-sent", authMiddleware, roleMiddleware("ORGANIZER"), getOrganizerSentGroups);

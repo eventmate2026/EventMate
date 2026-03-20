@@ -117,10 +117,61 @@ const NotificationSchema = new mongoose.Schema(
         type: Date,
         default: null
       },
+      openedAt: {
+        type: Date,
+        default: null
+      },
+      openCount: {
+        type: Number,
+        default: 0
+      },
+      providerMessageId: {
+        type: String,
+        default: ""
+      },
       lastError: {
         type: String,
         default: ""
       }
+    },
+
+    emailPayload: {
+      subject: {
+        type: String,
+        default: ""
+      },
+      html: {
+        type: String,
+        default: ""
+      },
+      text: {
+        type: String,
+        default: ""
+      },
+      attachments: [
+        {
+          filename: {
+            type: String,
+            default: ""
+          },
+          content: {
+            type: String,
+            default: ""
+          },
+          type: {
+            type: String,
+            default: ""
+          },
+          disposition: {
+            type: String,
+            default: ""
+          },
+          contentId: {
+            type: String,
+            default: ""
+          }
+        }
+      ]
     },
 
     isRead: {

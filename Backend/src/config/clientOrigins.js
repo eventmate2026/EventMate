@@ -1,5 +1,12 @@
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/+$/, "");
 
+const normalizeDeployUrl = (value) => {
+  const normalized = normalizeOrigin(value);
+  if (!normalized) return "";
+  if (/^https?:\/\//i.test(normalized)) return normalized;
+  return `https://${normalized}`;
+};
+
 const collectOrigins = (...values) =>
   Array.from(
     new Set(
@@ -11,7 +18,13 @@ const collectOrigins = (...values) =>
   );
 
 export const getAllowedFrontendOrigins = () =>
-  collectOrigins(process.env.FRONTEND_URLS, process.env.FRONTEND_URL);
+  collectOrigins(
+    process.env.FRONTEND_URLS,
+    process.env.FRONTEND_URL,
+    normalizeDeployUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    normalizeDeployUrl(process.env.VERCEL_BRANCH_URL),
+    normalizeDeployUrl(process.env.VERCEL_URL)
+  );
 
 export const getPrimaryFrontendUrl = () => getAllowedFrontendOrigins()[0] || "";
 

@@ -10,7 +10,6 @@ import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import Feedback from "../models/Feedback.model.js";
 import User from "../models/User.model.js";
-import sendEmail from "../config/sendEmail.js";
 import { sendNotification } from "./notification.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1565,16 +1564,6 @@ const issueCertificateForParticipant = async ({
     verificationCode: certificateRecord.verificationCode
   });
 
-  let emailDeliveryFailed = false;
-  try {
-    await sendEmail(participantEmail, subject, html);
-  } catch (emailError) {
-    emailDeliveryFailed = true;
-    console.error(
-      `Certificate email failed for ${participantEmail}: ${emailError?.message || "Unknown error"}`
-    );
-  }
-
   const participantUser = await User.findOne({ email: participantEmail }).select(
     "_id fullName role email"
   );
@@ -1590,11 +1579,14 @@ const issueCertificateForParticipant = async ({
     recipientRole: notificationRecipientRole,
     recipientEmail: notificationRecipientEmail,
     title: "Certificate Issued!",
-    message: emailDeliveryFailed
-      ? `Your certificate for ${event.title} is ready on the website. Download it from your dashboard.`
-      : `Your certificate for ${event.title} is ready on the website and has also been emailed to you.`,
+    message: `Your certificate for ${event.title} is ready on the website and has been queued for email delivery.`,
     type: "CERTIFICATE",
-    refId: event._id
+    refId: event._id,
+    sendEmailCopy: true,
+    emailPayload: {
+      subject,
+      html
+    }
   });
 
   await createCertificateAuditLog({
@@ -1611,14 +1603,12 @@ const issueCertificateForParticipant = async ({
     actorName: "System",
     actorRole: "SYSTEM",
     source: "SYSTEM",
-    message: emailDeliveryFailed
-      ? "Certificate issued, but email delivery failed."
-      : "Certificate issued and delivered to participant.",
+    message: "Certificate issued and queued for email delivery.",
     metadata: {
       registrationId: registration._id,
       certificateType: resolvedType,
       position: resolvedPosition || null,
-      emailDeliveryFailed
+      emailQueued: true
     }
   });
 

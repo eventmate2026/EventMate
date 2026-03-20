@@ -267,10 +267,11 @@ const sendWithSendGrid = async ({
   senderEmail,
   senderName,
   replyTo,
+  customArgs,
 }) => {
   warnIfSenderLooksUnsafe(senderEmail, replyTo);
 
-  await sgMail.send({
+  return sgMail.send({
     to,
     from: {
       email: senderEmail,
@@ -281,6 +282,7 @@ const sendWithSendGrid = async ({
     text,
     html,
     attachments,
+    customArgs,
   });
 };
 
@@ -296,6 +298,14 @@ const sendEmail = async (to, subject, html, options = {}) => {
   const replyTo = process.env.EMAIL_REPLY_TO || senderEmail;
   const attachments = Array.isArray(options?.attachments) ? options.attachments : [];
   const text = String(options?.text || htmlToPlainText(html)).trim();
+  const sendGridCustomArgs =
+    options?.sendGridCustomArgs && typeof options.sendGridCustomArgs === "object"
+      ? Object.fromEntries(
+          Object.entries(options.sendGridCustomArgs)
+            .map(([key, value]) => [String(key).trim(), String(value ?? "").trim()])
+            .filter(([key, value]) => key && value)
+        )
+      : undefined;
 
   if (!senderEmail) {
     const err = new Error("Missing sender email configuration");
@@ -314,7 +324,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
 
   if (shouldUseSendGrid) {
     try {
-      await retryWithBackoff(
+      const [response] = await retryWithBackoff(
         () =>
           sendWithSendGrid({
             to,
@@ -325,11 +335,12 @@ const sendEmail = async (to, subject, html, options = {}) => {
             senderEmail,
             senderName,
             replyTo,
+            customArgs: sendGridCustomArgs,
           }),
         3,
         1000
       );
-      return;
+      return response;
     } catch (error) {
       console.error("SendGrid Error (Primary):", error.response?.body || error);
 
@@ -353,7 +364,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
   if (emailProvider === "smtp") {
     try {
       const transporter = createSmtpTransporter();
-      await retryWithBackoff(
+      const smtpResult = await retryWithBackoff(
         () =>
           transporter.sendMail({
             to,
@@ -370,7 +381,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
         3,
         2000
       );
-      return;
+      return smtpResult;
     } catch (error) {
       console.error("SMTP Error:", error);
 
@@ -387,7 +398,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
 
   // Fallback: Try SendGrid one more time if not already attempted
   try {
-    await sendWithSendGrid({
+    const [fallbackResponse] = await sendWithSendGrid({
       to,
       subject,
       text,
@@ -396,7 +407,9 @@ const sendEmail = async (to, subject, html, options = {}) => {
       senderEmail,
       senderName,
       replyTo,
+      customArgs: sendGridCustomArgs,
     });
+    return fallbackResponse;
   } catch (error) {
     console.error("SendGrid Error (Fallback):", error.response?.body || error);
 

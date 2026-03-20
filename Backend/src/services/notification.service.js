@@ -21,6 +21,13 @@ export const EMAIL_TRACKING_MODE = {
   WEBHOOK_DELIVERY: "WEBHOOK_DELIVERY"
 };
 
+export const isNotificationEmailWorkerEnabled = () =>
+  !["false", "0", "no"].includes(
+    String(process.env.NOTIFICATION_EMAIL_WORKER_ENABLED || "")
+      .trim()
+      .toLowerCase()
+  );
+
 const NOTIFICATION_ROUTE_BY_ROLE = {
   MAIN_ADMIN: "/admin-dashboard/notifications",
   ORGANIZER: "/organizer-dashboard/notifications",
@@ -73,6 +80,25 @@ const buildNotificationEmailTemplate = ({
 `;
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const normalizeEmailAttachments = (attachments = []) =>
+  (Array.isArray(attachments) ? attachments : [])
+    .map((attachment) => ({
+      filename: String(attachment?.filename || "").trim(),
+      content: String(attachment?.content || "").trim(),
+      type: String(attachment?.type || "").trim(),
+      disposition: String(attachment?.disposition || "").trim(),
+      contentId: String(attachment?.contentId || "").trim()
+    }))
+    .filter((attachment) => attachment.filename && attachment.content);
+
+const resolveProviderMessageId = (response) =>
+  String(
+    response?.headers?.["x-message-id"] ||
+      response?.headers?.["X-Message-Id"] ||
+      response?.messageId ||
+      ""
+  ).trim();
 
 export const getNotificationEmailTrackingMode = () => {
   const configured = String(process.env.EMAIL_DELIVERY_TRACKING_MODE || "")
@@ -141,18 +167,32 @@ const dispatchNotificationEmail = async (notification) => {
     throw new Error("Recipient email missing.");
   }
 
+  const customSubject = String(notification?.emailPayload?.subject || "").trim();
+  const customHtml = String(notification?.emailPayload?.html || "").trim();
+  const customText = String(notification?.emailPayload?.text || "").trim();
+  const customAttachments = normalizeEmailAttachments(notification?.emailPayload?.attachments);
   const inboxUrl = buildNotificationInboxUrl(notification?.recipient?.role);
-  await sendEmail(
+  return sendEmail(
     recipientEmail,
-    `EventMate Announcement: ${notification?.title || "Notification"}`,
-    buildNotificationEmailTemplate({
-      recipientName: notification?.recipient?.name,
-      title: notification?.title,
-      message: notification?.message,
-      senderName: notification?.sender?.name,
-      senderRole: notification?.sender?.role,
-      inboxUrl
-    })
+    customSubject || `EventMate Announcement: ${notification?.title || "Notification"}`,
+    customHtml ||
+      buildNotificationEmailTemplate({
+        recipientName: notification?.recipient?.name,
+        title: notification?.title,
+        message: notification?.message,
+        senderName: notification?.sender?.name,
+        senderRole: notification?.sender?.role,
+        inboxUrl
+      }),
+    {
+      text: customText,
+      attachments: customAttachments,
+      sendGridCustomArgs:
+        notification?._id &&
+        notification?.emailDelivery?.trackingMode === EMAIL_TRACKING_MODE.WEBHOOK_DELIVERY
+          ? { notificationId: String(notification._id) }
+          : undefined
+    }
   );
 };
 
@@ -201,13 +241,14 @@ export const processPendingNotificationEmails = async ({
       if (!claimed) continue;
 
       try {
-        await dispatchNotificationEmail(claimed);
+        const providerResponse = await dispatchNotificationEmail(claimed);
         await Notification.updateOne(
           { _id: claimed._id },
           {
             $set: {
               "emailDelivery.status": EMAIL_DELIVERY_STATUS.SENT,
               "emailDelivery.acceptedAt": new Date(),
+              "emailDelivery.providerMessageId": resolveProviderMessageId(providerResponse),
               "emailDelivery.lastError": ""
             }
           }
@@ -308,9 +349,20 @@ export const sendNotification = async ({
   type,
   refId = null,
   groupId = null,
-  sendEmailCopy = false
+  sendEmailCopy = false,
+  emailPayload = null
 }) => {
   try {
+    const normalizedEmailPayload =
+      emailPayload && typeof emailPayload === "object"
+        ? {
+            subject: String(emailPayload.subject || "").trim(),
+            html: String(emailPayload.html || "").trim(),
+            text: String(emailPayload.text || "").trim(),
+            attachments: normalizeEmailAttachments(emailPayload.attachments)
+          }
+        : null;
+
     const payload = {
       recipient: {
         userId: recipientId,
@@ -326,7 +378,8 @@ export const sendNotification = async ({
       emailDelivery: buildNotificationEmailDeliveryState({
         sendEmailCopy,
         recipientEmail
-      })
+      }),
+      emailPayload: normalizedEmailPayload || undefined
     };
 
     if (senderId) {

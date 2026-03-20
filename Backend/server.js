@@ -7,6 +7,7 @@ import { createCorsOriginValidator } from "./src/config/clientOrigins.js";
 import startCronJobs from "./src/utils/cronJobs.js";
 import {
   initSocket,
+  isNotificationEmailWorkerEnabled,
   startNotificationEmailWorker
 } from "./src/services/notification.service.js";
 
@@ -47,7 +48,11 @@ initSocket(io);
 const bootstrap = async () => {
   await connectDB();
   startCronJobs();
-  startNotificationEmailWorker();
+  if (isNotificationEmailWorkerEnabled()) {
+    startNotificationEmailWorker();
+  } else {
+    console.log("Notification email worker disabled for this backend instance.");
+  }
 
   httpServer.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);

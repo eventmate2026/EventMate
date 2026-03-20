@@ -13,6 +13,7 @@ import {
   buildTeamNoticeRecipientMap,
   collectOrganizerEventAudience
 } from "../src/controllers/notification.controller.js";
+import { getAllowedFrontendOrigins } from "../src/config/clientOrigins.js";
 
 test("buildNotificationEmailDeliveryState returns NOT_REQUESTED when email copy is disabled", () => {
   const result = buildNotificationEmailDeliveryState({
@@ -151,4 +152,28 @@ test("buildCertificateDownloadUrl returns empty string when no backend URL is co
   const result = buildCertificateDownloadUrl("event123", "student@example.com", "");
 
   assert.equal(result, "");
+});
+
+test("getAllowedFrontendOrigins falls back to Vercel deployment URL", () => {
+  const previousFrontendUrl = process.env.FRONTEND_URL;
+  const previousVercelUrl = process.env.VERCEL_URL;
+
+  process.env.FRONTEND_URL = "";
+  process.env.VERCEL_URL = "eventmate-app.vercel.app";
+
+  const result = getAllowedFrontendOrigins();
+
+  if (previousFrontendUrl === undefined) {
+    delete process.env.FRONTEND_URL;
+  } else {
+    process.env.FRONTEND_URL = previousFrontendUrl;
+  }
+
+  if (previousVercelUrl === undefined) {
+    delete process.env.VERCEL_URL;
+  } else {
+    process.env.VERCEL_URL = previousVercelUrl;
+  }
+
+  assert.ok(result.includes("https://eventmate-app.vercel.app"));
 });
