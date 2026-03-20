@@ -21,6 +21,10 @@ const initialForm = {
   maxParticipants: "",
   registrationOpen: true,
   registrationFee: "0",
+  paymentAccountName: "",
+  paymentUpiId: "",
+  paymentInstructions: "",
+  paymentQr: null,
   eventMode: "INDIVIDUAL",
   minTeamSize: "2",
   maxTeamSize: "4",
@@ -59,6 +63,7 @@ export default function OrganizerCreateEvent() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [paymentQrPreviewUrl, setPaymentQrPreviewUrl] = useState("");
   const resourceInputRef = useRef(null);
   const [resourceError, setResourceError] = useState("");
   const [coordinatorOptions, setCoordinatorOptions] = useState([]);
@@ -79,6 +84,17 @@ export default function OrganizerCreateEvent() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [form.poster]);
+
+  useEffect(() => {
+    if (!form.paymentQr) {
+      setPaymentQrPreviewUrl("");
+      return;
+    }
+
+    const url = URL.createObjectURL(form.paymentQr);
+    setPaymentQrPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [form.paymentQr]);
 
   useEffect(() => {
     const loadCoordinatorOptions = async () => {
@@ -140,6 +156,10 @@ export default function OrganizerCreateEvent() {
       const nextFile = files?.[0] || null;
       if (name === "resourceFile") {
         handleResourceFile(nextFile);
+        return;
+      }
+      if (name === "paymentQr") {
+        setForm((prev) => ({ ...prev, paymentQr: nextFile }));
         return;
       }
       setForm((prev) => ({ ...prev, [name]: nextFile }));
@@ -258,6 +278,15 @@ export default function OrganizerCreateEvent() {
       return "Department is required for department-level events.";
     }
 
+    if (Number(form.registrationFee || 0) > 0) {
+      if (!String(form.paymentAccountName || "").trim()) {
+        return "Account name is required for paid events.";
+      }
+      if (!String(form.paymentUpiId || "").trim() && !form.paymentQr) {
+        return "UPI ID or payment QR image is required for paid events.";
+      }
+    }
+
     return null;
   };
 
@@ -293,6 +322,20 @@ export default function OrganizerCreateEvent() {
         lastDate: form.registrationLastDate || form.startDate,
         maxParticipants: Number(form.maxParticipants),
         fee: Number(form.registrationFee || 0),
+        paymentConfig:
+          Number(form.registrationFee || 0) > 0
+            ? {
+                method: "PHONEPE_QR",
+                accountName: String(form.paymentAccountName || "").trim(),
+                upiId: String(form.paymentUpiId || "").trim(),
+                instructions: String(form.paymentInstructions || "").trim(),
+              }
+            : {
+                method: "FREE",
+                accountName: "",
+                upiId: "",
+                instructions: "",
+              },
       })
     );
 
@@ -314,6 +357,9 @@ export default function OrganizerCreateEvent() {
     payload.append("maxTeamSize", isTeamEvent ? String(Number(form.maxTeamSize || 4)) : "1");
     if (form.resourceFile) {
       payload.append("resourceFile", form.resourceFile);
+    }
+    if (form.paymentQr) {
+      payload.append("paymentQr", form.paymentQr);
     }
 
     return payload;
@@ -661,6 +707,81 @@ export default function OrganizerCreateEvent() {
                         onChange={handleChange}
                         className={`mt-1 ${fieldClass}`}
                       />
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {Number(form.registrationFee || 0) > 0 && (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Payment Collection
+                  </p>
+                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Account Name
+                      </span>
+                      <input
+                        name="paymentAccountName"
+                        value={form.paymentAccountName}
+                        onChange={handleChange}
+                        placeholder="e.g. EventMate Campus Cell"
+                        className={`mt-1 ${fieldClass}`}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        UPI ID
+                      </span>
+                      <input
+                        name="paymentUpiId"
+                        value={form.paymentUpiId}
+                        onChange={handleChange}
+                        placeholder="e.g. eventmate@upi"
+                        className={`mt-1 ${fieldClass}`}
+                      />
+                    </label>
+
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Payment Instructions
+                      </span>
+                      <textarea
+                        name="paymentInstructions"
+                        value={form.paymentInstructions}
+                        onChange={handleChange}
+                        rows={3}
+                        placeholder="Share what students should mention in the payment note or any proof requirements."
+                        className={`mt-1 ${fieldClass}`}
+                      />
+                    </label>
+
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Payment QR
+                      </span>
+                      <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 p-4 text-center hover:bg-slate-50 dark:border-white/20 dark:hover:bg-white/5">
+                        <UploadCloud size={18} className="text-indigo-500" />
+                        <span className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                          {form.paymentQr ? form.paymentQr.name : "Upload payment QR (PNG, JPG)"}
+                        </span>
+                        <input
+                          type="file"
+                          name="paymentQr"
+                          onChange={handleChange}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                      </label>
+                      {paymentQrPreviewUrl ? (
+                        <img
+                          src={paymentQrPreviewUrl}
+                          alt="Payment QR preview"
+                          className="mt-3 h-40 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
+                        />
+                      ) : null}
                     </label>
                   </div>
                 </div>

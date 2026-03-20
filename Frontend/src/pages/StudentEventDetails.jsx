@@ -563,14 +563,19 @@ export default function StudentEventDetails({ mode = "details" }) {
         Number(response.data?.data?.totalParticipants) ||
         (isTeamRegistration ? teamMembers.length + 1 : 1);
 
+      const createdRegistrationId = String(
+        response.data?.data?._id || response.data?.data?.id || ""
+      ).trim();
       const registrationStatus = String(response.data?.data?.status || "").trim();
       const qrReadyNow = registrationStatus === "Confirmed";
       toast.success(
-        qrReadyNow
-          ? "Registered successfully. Your QR pass is now available in My Events."
-          : isTeamRegistration
-            ? "Team registration created. Invitations go to members with accounts; others will get an invite after signup and login. Track accept/reject status and registration will auto-confirm once everyone accepts."
-            : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed."
+        registrationStatus === "PendingPayment"
+          ? "Registration created. Complete the payment to receive your QR pass."
+          : qrReadyNow
+            ? "Registered successfully. Your QR pass is now available in My Events."
+            : isTeamRegistration
+              ? "Team registration created. Track member acceptance and complete payment when the team is ready."
+              : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed."
       );
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
@@ -579,7 +584,19 @@ export default function StudentEventDetails({ mode = "details" }) {
           ? { ...prev, participantCount: Number(prev.participantCount || 0) + headCount }
           : prev
       );
-      navigate("/student-dashboard");
+      if (registrationStatus === "PendingPayment" && createdRegistrationId) {
+        navigate(
+          `/student-dashboard/my-events/payment/${encodeURIComponent(createdRegistrationId)}`
+        );
+        return;
+      }
+      if (isTeamRegistration && createdRegistrationId) {
+        navigate(
+          `/student-dashboard/team-registration/${encodeURIComponent(createdRegistrationId)}`
+        );
+        return;
+      }
+      navigate("/student-dashboard/my-events");
     } catch (err) {
       toast.error(err.response?.data?.message || "Unable to register for this event.");
     } finally {
