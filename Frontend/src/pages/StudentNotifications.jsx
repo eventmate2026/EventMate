@@ -6,6 +6,8 @@ export default function StudentNotifications() {
       title="Student Notifications"
       subtitle="All your backend notifications are listed here."
       unreadEventName="eventmate:student-unread-count"
+      backPath="/student-dashboard"
+      backLabel="Back to Dashboard"
     />
   );
 }

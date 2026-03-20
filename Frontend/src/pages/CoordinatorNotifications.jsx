@@ -6,6 +6,8 @@ export default function CoordinatorNotifications() {
       title="Coordinator Notifications"
       subtitle="Your backend notifications are listed here."
       unreadEventName="eventmate:coordinator-unread-count"
+      backPath="/coordinator-dashboard"
+      backLabel="Back to Dashboard"
     />
   );
 }

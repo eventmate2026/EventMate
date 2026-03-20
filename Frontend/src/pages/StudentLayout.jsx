@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import StudentNavbar from "../components/StudentNavbar";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
@@ -18,7 +18,6 @@ const resolveActivePage = (pathname) => {
 export default function StudentLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const contentRef = useRef(null);
   const [user, setUser] = useState(() => getStoredUser());
   const activePage = resolveActivePage(location.pathname);
 
@@ -35,20 +34,10 @@ export default function StudentLayout() {
     navigate("/login", { replace: true });
   };
 
-  useEffect(() => {
-    const scroller = contentRef.current;
-    if (scroller) {
-      scroller.scrollTo({ top: 0, behavior: "auto" });
-    }
-  }, [location.pathname, location.search, location.hash]);
-
   return (
-    <div className="eventmate-page h-full min-h-0 overflow-hidden bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col transition-colors">
+    <div className="eventmate-page min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col transition-colors">
       <StudentNavbar activePage={activePage} user={user} onLogout={handleLogout} />
-      <main
-        ref={contentRef}
-        className="eventmate-scroll-region flex-1 min-h-0 overflow-y-auto overscroll-contain"
-      >
+      <main className="flex-1">
         <Outlet />
       </main>
     </div>

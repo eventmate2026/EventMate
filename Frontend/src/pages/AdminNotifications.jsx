@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredToken, getStoredUser } from "../lib/auth";
@@ -76,6 +77,7 @@ const getUserId = () => {
 };
 
 export default function AdminNotifications() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [contactsMap, setContactsMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -262,9 +264,27 @@ export default function AdminNotifications() {
     return String(item?.message || "No message.");
   };
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/admin-dashboard", { replace: true });
+  };
+
   return (
     <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
+        <button
+          type="button"
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-indigo-600 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
+        >
+          <ArrowLeft size={16} />
+          Back to Dashboard
+        </button>
+
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
