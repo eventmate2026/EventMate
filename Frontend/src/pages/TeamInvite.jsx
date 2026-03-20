@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const formatStatus = (status) =>
   String(status || "")
@@ -22,6 +23,7 @@ export default function TeamInvite() {
   const [responding, setResponding] = useState(false);
   const [message, setMessage] = useState({ type: "info", text: "Loading invitation..." });
   const [autoResponded, setAutoResponded] = useState(false);
+  useToastFeedback(message);
 
   const loadInvite = async () => {
     if (!token) {

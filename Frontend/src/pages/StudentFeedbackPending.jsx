@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
 
@@ -80,6 +81,8 @@ export default function StudentFeedbackPending() {
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
   const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedEventIds());
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(modal);
 
   useEffect(() => {
     const loadRows = async () => {
@@ -276,18 +279,6 @@ export default function StudentFeedbackPending() {
             Submit feedback for completed events to unlock certificate flow.
           </p>
         </header>
-
-        {notice && (
-          <p
-            className={`rounded-lg px-3 py-2 text-sm ${
-              notice.type === "success"
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
-                : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
-            }`}
-          >
-            {notice.text}
-          </p>
-        )}
 
         {warning && (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">

@@ -23,6 +23,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 import { computeProfileProgress } from "../lib/profileProgress";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   Draft: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -239,6 +240,8 @@ export default function OrganizerDashboard() {
   const [completingEventId, setCompletingEventId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  useToastFeedback(message);
+  useToastFeedback(error, { defaultType: "error" });
 
   const fetchRegistrationStats = async (eventRows) => {
     const rows = Array.isArray(eventRows) ? eventRows : [];
@@ -675,18 +678,6 @@ export default function OrganizerDashboard() {
             );
           })}
         </section>
-
-        {message && (
-          <p
-            className={`rounded-lg px-3 py-2 text-sm ${
-              message.type === "success"
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
 
         {loading && (
           <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">

@@ -5,6 +5,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const initialForm = {
   title: "",
@@ -46,6 +47,7 @@ export default function OrganizerEditEvent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [message, setMessage] = useState(null);
+  useToastFeedback(message);
 
   const loadEvent = async () => {
     setLoading(true);
@@ -300,18 +302,6 @@ export default function OrganizerEditEvent() {
               </button>
             </div>
           </div>
-
-          {message && (
-            <p
-              className={`text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
 
           {form.status !== "Draft" && (
             <p className="text-xs text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15 rounded-lg px-3 py-2 inline-flex items-center gap-2">

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getStoredUser } from "../lib/auth";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToast } from "../context/ToastContext";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -27,14 +28,13 @@ const parseContactRows = (payload) => {
 
 export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const user = getStoredUser();
 
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
   const [apiWarning, setApiWarning] = useState(null);
   const [canReadHistory, setCanReadHistory] = useState(false);
 
@@ -89,23 +89,21 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError(null);
-    setSuccess(null);
 
     if (subject.trim().length < 3) {
-      setError("Subject must be at least 3 characters.");
+      toast.error("Subject must be at least 3 characters.");
       return;
     }
 
     if (message.trim().length < 10) {
-      setError("Message must be at least 10 characters.");
+      toast.error("Message must be at least 10 characters.");
       return;
     }
 
     const fullName = String(user?.fullName || "").trim();
     const email = String(user?.email || "").trim();
     if (!fullName || !email) {
-      setError("Your profile is missing name or email. Update profile and retry.");
+      toast.error("Your profile is missing name or email. Update profile and retry.");
       return;
     }
 
@@ -120,7 +118,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         },
       });
 
-      setSuccess(response.data?.message || "Message sent successfully.");
+      toast.success(response.data?.message || "Message sent successfully.");
       setSubject("");
       setMessage("");
 
@@ -140,7 +138,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         ]);
       }
     } catch (submitError) {
-      setError(submitError.response?.data?.message || "Unable to send message.");
+      toast.error(submitError.response?.data?.message || "Unable to send message.");
     }
   };
 
@@ -188,16 +186,6 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                   className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
               </div>
-
-              {error && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/15 dark:text-red-300">{error}</p>
-              )}
-              {success && (
-                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  {success}
-                </p>
-              )}
-
               <button
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"

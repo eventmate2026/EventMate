@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { storeAuth } from "../lib/auth";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const yearOptions = ["1st", "2nd", "3rd", "4th"];
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -70,6 +71,7 @@ export default function Profile() {
   const [loading, setLoading] = useState({ profile: true, save: false, avatar: false });
   const [message, setMessage] = useState(null);
   const avatarInputRef = useRef(null);
+  useToastFeedback(message);
 
   const role = profile?.role || "";
   const isStudent = role === "STUDENT";
@@ -321,18 +323,6 @@ export default function Profile() {
             </div>
           </div>
         </section>
-
-        {message && (
-          <p
-            className={`text-sm rounded-lg py-2 px-3 ${
-              message.type === "success"
-                ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
 
         <div className="grid lg:grid-cols-[1fr_2fr] gap-6">
           <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">

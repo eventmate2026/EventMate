@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -260,6 +261,9 @@ export default function CoordinatorAttendanceScanner() {
   const [cameraError, setCameraError] = useState(null);
   const [cameraSupported, setCameraSupported] = useState(true);
   const [scannerEngineLabel, setScannerEngineLabel] = useState("Auto");
+  useToastFeedback(message);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(cameraError, { defaultType: "error" });
 
   const [pendingScan, setPendingScan] = useState(null);
   const [lastResult, setLastResult] = useState(null);

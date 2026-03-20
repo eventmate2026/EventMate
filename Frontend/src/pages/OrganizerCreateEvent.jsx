@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
 import { resolveUserDepartment } from "../lib/userDepartment";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const initialForm = {
   title: "",
@@ -57,6 +58,7 @@ export default function OrganizerCreateEvent() {
   const [message, setMessage] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  useToastFeedback(message);
   const [previewUrl, setPreviewUrl] = useState("");
   const resourceInputRef = useRef(null);
   const [resourceError, setResourceError] = useState("");

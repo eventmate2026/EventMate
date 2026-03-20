@@ -22,6 +22,7 @@ import { getStoredUser } from "../lib/auth";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -137,6 +138,8 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(message);
 
   const [registrationType, setRegistrationType] = useState("INDIVIDUAL");
   const [teamName, setTeamName] = useState("");
@@ -687,17 +690,6 @@ export default function StudentEventDetails({ mode = "details" }) {
           <div className={isRegistrationMode ? "px-4 py-5 sm:px-6" : ""}>
             {isRegistrationMode ? (
               <>
-                {message && (
-                  <p
-                    className={`mb-4 rounded-lg px-3 py-2 text-sm ${
-                      message.type === "success"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                        : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-                    }`}
-                  >
-                    {message.text}
-                  </p>
-                )}
                 {message?.type === "success" && (
                   <div className="mb-4 flex flex-wrap gap-3">
                     {pendingTeamRegistrationId && (

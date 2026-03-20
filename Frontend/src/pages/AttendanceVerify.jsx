@@ -4,6 +4,7 @@ import { ArrowLeft, CheckCircle2, Loader2, XCircle } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredToken, getStoredUser } from "../lib/auth";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const parseToken = (value) => String(value || "").trim();
 
@@ -19,6 +20,7 @@ export default function AttendanceVerify() {
   const [success, setSuccess] = useState(false);
   const [message, setMessage] = useState("");
   const [eventName, setEventName] = useState("");
+  useToastFeedback(message, { defaultType: success ? "success" : "error" });
 
   useEffect(() => {
     const markFromToken = async () => {

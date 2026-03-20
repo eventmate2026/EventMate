@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, RefreshCcw, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   ACCEPTED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -31,6 +32,8 @@ export default function StudentTeamRegistration() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(null);
   const [registration, setRegistration] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(notice);
 
   const loadStatus = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -203,18 +206,6 @@ export default function StudentTeamRegistration() {
                 </div>
               </div>
             </section>
-
-            {notice && (
-              <section
-                className={`rounded-xl border px-4 py-3 text-sm ${
-                  notice.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
-                    : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
-                }`}
-              >
-                {notice.text}
-              </section>
-            )}
 
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">

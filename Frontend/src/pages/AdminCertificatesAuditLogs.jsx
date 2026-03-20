@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const toList = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -90,6 +91,8 @@ export default function AdminCertificatesAuditLogs() {
   const [verifyMessage, setVerifyMessage] = useState("");
   const [verifyResult, setVerifyResult] = useState(null);
   const [revokingId, setRevokingId] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(verifyMessage);
 
   const loadData = useCallback(
     async ({ silent = false } = {}) => {

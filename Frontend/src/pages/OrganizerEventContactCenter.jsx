@@ -16,6 +16,7 @@ import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractEventItem, extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { resolveUserDepartment } from "../lib/userDepartment";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const ROLE_LABELS = {
   STUDENT_COORDINATOR: "Coordinator",
@@ -109,6 +110,10 @@ export default function OrganizerEventContactCenter() {
   const [receipts, setReceipts] = useState([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [receiptsError, setReceiptsError] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(feedback);
+  useToastFeedback(groupsError, { defaultType: "error" });
+  useToastFeedback(receiptsError, { defaultType: "error" });
   const eventStatus = String(eventData?.status || "").trim().toUpperCase();
   const isMessagingDisabled =
     eventStatus === "COMPLETED" || eventStatus === "CANCELLED" || eventStatus === "CANCELED";
@@ -811,18 +816,6 @@ export default function OrganizerEventContactCenter() {
                     </div>
 
                     <div>
-                      {feedback && (
-                        <p
-                          className={`mb-3 rounded-lg px-3 py-2 text-sm ${
-                            feedback.type === "success"
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                              : "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-                          }`}
-                        >
-                          {feedback.text}
-                        </p>
-                      )}
-
                       <button
                         type="submit"
                         disabled={sending || isMessagingDisabled}

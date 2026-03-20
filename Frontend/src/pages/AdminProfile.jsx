@@ -17,6 +17,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser, storeAuth } from "../lib/auth";
 import { logoutUser } from "../lib/logout";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const DEFAULT_AVATAR =
   "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=facearea&w=120&q=80";
@@ -36,6 +37,8 @@ export default function AdminProfile() {
   const [notice, setNotice] = useState(null);
   const [forcingLogout, setForcingLogout] = useState(false);
   const [terminatingSessionId, setTerminatingSessionId] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(notice);
 
   const displayName = profile?.fullName || "Admin";
   const department = profile?.professionalProfile?.department || "Department of IT";
@@ -269,19 +272,6 @@ export default function AdminProfile() {
           <div className="eventmate-panel rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 inline-flex items-center gap-2">
             <AlertTriangle size={14} />
             {error}
-          </div>
-        )}
-
-        {notice && (
-          <div
-            className={`eventmate-panel rounded-2xl border p-4 text-sm inline-flex items-center gap-2 ${
-              notice.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
-            }`}
-          >
-            {notice.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-            {notice.text}
           </div>
         )}
 

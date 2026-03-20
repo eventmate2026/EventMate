@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Clock3, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const formatDateLabel = (value) => {
   const parsed = new Date(value || "");
@@ -232,6 +233,8 @@ export default function MyCertificates() {
   const [certificateRows, setCertificateRows] = useState([]);
   const [notice, setNotice] = useState(null);
   const [downloadingRowId, setDownloadingRowId] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(notice, { defaultType: "error" });
 
   useEffect(() => {
     const fetchCertificates = async () => {

@@ -15,6 +15,7 @@ import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractEventList, extractUsersList } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -109,6 +110,10 @@ export default function AdminContactCenter() {
   const [receipts, setReceipts] = useState([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [receiptsError, setReceiptsError] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(feedback);
+  useToastFeedback(groupsError, { defaultType: "error" });
+  useToastFeedback(receiptsError, { defaultType: "error" });
 
   const loadDirectory = async () => {
     setLoading(true);
