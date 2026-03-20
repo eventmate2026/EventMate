@@ -272,7 +272,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
       : "fixed inset-x-0 top-0 z-[110] bg-white/85 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.6)]";
   const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
-  const showPublicMobileAuthActions = isPublic && location.pathname === "/";
+  const showPublicMobileQuickActions = isPublic && location.pathname === "/";
   const isAdminUsersRoute =
     location.pathname.startsWith("/admin-dashboard/user-management") ||
     location.pathname.startsWith("/admin-dashboard/organizer-management") ||
@@ -871,16 +871,30 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-1 flex shrink-0 items-center gap-1.5 sm:-mr-2 ${mobileVisibilityClass}`}>
-            {isPublic && (
-              <button
-                type="button"
-                aria-label="Toggle theme"
-                onClick={toggleTheme}
-                className="public-theme-toggle inline-flex shrink-0 items-center justify-center rounded-full p-2 text-gray-700 dark:text-gray-200"
-              >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </button>
+          <div className={`-mr-2 flex shrink-0 items-center gap-1.5 ${mobileVisibilityClass}`}>
+            {showPublicMobileQuickActions && (
+              <div className="flex items-center gap-1.5">
+                <Link
+                  to="/login"
+                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+                >
+                  Sign Up
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Toggle theme"
+                  onClick={toggleTheme}
+                  className="inline-flex shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+              </div>
             )}
             {isAuthenticated && !isPublic && currentNotificationsPath && !hideNavExtras && (
               <Link
@@ -994,26 +1008,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="pt-2 pb-3 space-y-1">
             {isPublic ? (
               <>
-                {showPublicMobileAuthActions && (
-                  <div className="px-3 pb-3 pt-1">
-                    <div className="grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
-                      <Link
-                        to="/signup"
-                        onClick={closeMenus}
-                        className="public-signup-cta inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20"
-                      >
-                        Sign Up
-                      </Link>
-                      <Link
-                        to="/login"
-                        onClick={closeMenus}
-                        className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:border-indigo-400/50"
-                      >
-                        Login
-                      </Link>
-                    </div>
-                  </div>
-                )}
                 <Link
                   to="/"
                   onClick={handlePublicHomeClick}
