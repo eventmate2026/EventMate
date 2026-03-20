@@ -108,14 +108,10 @@ export const fetchMyRegistrations = async (options = {}) => {
       const response = await api({ ...SummaryApi.get_my_registered_events, cacheTTL: REG_CACHE_TTL_MS });
       const sourceRows = toList(response.data);
       const rows = sourceRows.map(normalizeRegistration).filter(Boolean);
-      const hiddenInvalidCount = Math.max(0, sourceRows.length - rows.length);
       const result = {
         rows,
         supported: true,
-        warning:
-          hiddenInvalidCount > 0
-            ? `${hiddenInvalidCount} registration ${hiddenInvalidCount === 1 ? "entry was" : "entries were"} hidden because the linked event is no longer available.`
-            : null,
+        warning: null,
       };
       if (requestGeneration === cacheGeneration) {
         cachedMyRegistrations = result;
