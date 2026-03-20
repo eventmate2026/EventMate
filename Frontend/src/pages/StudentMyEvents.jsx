@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
 import { isRegistrationEventCompleted } from "../lib/eventSchedule";
+import { getStoredUser } from "../lib/auth";
+import { downloadCertificateAsset } from "../lib/certificateDownload";
+import { useToastFeedback } from "../hooks/useToastFeedback";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 
 const FALLBACK_BANNER =
@@ -174,7 +177,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
             type="button"
             onClick={() => {
               if (row.certificateReady) {
-                onDownloadCertificate(row.certificate?.certificateUrl, row.eventId);
+                void onDownloadCertificate(row);
                 return;
               }
               if (row.canGiveFeedback) {
@@ -216,6 +219,9 @@ export default function StudentMyEvents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+  const [notice, setNotice] = useState(null);
+  useToastFeedback(error, { defaultType: "error" });
+  useToastFeedback(notice, { defaultType: "error" });
 
   const loadMyEvents = useCallback(async ({ silent = false } = {}) => {
     if (!silent) {
@@ -307,16 +313,38 @@ export default function StudentMyEvents() {
     });
   };
 
-  const downloadCertificate = (certificateUrl, eventId) => {
-    const targetUrl = String(certificateUrl || "").trim();
-    if (!targetUrl) {
-      const normalizedEventId = String(eventId || "").trim();
-      navigate("/student-dashboard/my-certificates", {
-        state: normalizedEventId ? { eventId: normalizedEventId } : undefined,
-      });
+  const downloadCertificate = async (row) => {
+    const normalizedEventId = String(row?.eventId || "").trim();
+    const participantEmail = String(
+      row?.certificate?.participantEmail || getStoredUser()?.email || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const result = await downloadCertificateAsset({
+      eventId: normalizedEventId,
+      eventName: row?.eventTitle,
+      certificateType: row?.certificate?.certificateType || "participation",
+      certificateUrl: row?.certificate?.certificateUrl,
+      participantEmail,
+    });
+
+    if (result.ok) {
+      setNotice(null);
       return;
     }
-    window.open(targetUrl, "_blank", "noopener,noreferrer");
+
+    setNotice(result.message);
+    if (!normalizedEventId) {
+      navigate("/student-dashboard/my-certificates");
+      return;
+    }
+
+    if (result.code === "missing" || result.code === "not_found" || result.code === "error") {
+      navigate("/student-dashboard/my-certificates", {
+        state: { eventId: normalizedEventId },
+      });
+    }
   };
 
   return (

@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Clock3, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { downloadCertificateAsset } from "../lib/certificateDownload";
 import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const formatDateLabel = (value) => {
@@ -312,85 +313,13 @@ export default function MyCertificates() {
   );
 
   const handleDownloadClick = async (row) => {
-    const urls = Array.isArray(row?.downloadCandidates)
-      ? row.downloadCandidates.filter((value) => String(value || "").trim().length > 0)
-      : [];
-    const inlineCertificateData = resolveCertificateData(row?.rawCertificateData);
-
-    if (urls.length === 0 && !inlineCertificateData) {
-      setNotice("Certificate download details are missing for this entry.");
-      return;
-    }
-
     setNotice(null);
     setDownloadingRowId(row.id);
-
-    let downloadError = null;
     try {
-      for (const url of urls) {
-        try {
-          const response = await api({
-            method: "get",
-            url,
-            responseType: "blob",
-            skipAuth: true,
-            skipCache: true,
-            headers: {
-              Accept: "application/pdf,application/octet-stream,*/*",
-            },
-          });
-          const blob = response?.data;
-          const contentDisposition = String(response?.headers?.["content-disposition"] || "");
-
-          if (!(blob instanceof Blob) || blob.size === 0) {
-            throw new Error("Received an empty certificate file.");
-          }
-
-          const mimeType = String(blob.type || "").toLowerCase();
-          if (mimeType.includes("application/json") || mimeType.includes("text/html")) {
-            const apiMessage = await extractErrorMessageFromBlob(blob);
-            throw new Error(apiMessage || "Certificate endpoint returned non-PDF response.");
-          }
-
-          const downloaded = triggerBlobDownload(
-            blob,
-            parseFileNameFromHeader(contentDisposition) || buildDefaultFilename(row)
-          );
-          if (!downloaded) throw new Error("Received an empty certificate file.");
-          return;
-        } catch (errorValue) {
-          if (errorValue?.response?.status === 404) {
-            downloadError = new Error("Certificate file not found on download route.");
-            continue;
-          }
-
-          const blobMessage = await extractErrorMessageFromBlob(errorValue?.response?.data);
-          if (blobMessage) {
-            downloadError = new Error(blobMessage);
-            continue;
-          }
-
-          downloadError = errorValue;
-        }
+      const result = await downloadCertificateAsset(row);
+      if (!result.ok) {
+        setNotice(result.message);
       }
-
-      if (inlineCertificateData) {
-        try {
-          const blob = decodeBase64ToBlob(inlineCertificateData);
-          const downloaded = triggerBlobDownload(blob, buildDefaultFilename(row));
-          if (downloaded) return;
-        } catch (errorValue) {
-          downloadError = errorValue;
-        }
-      }
-
-      const errorStatus = Number(downloadError?.response?.status || 0);
-      if (errorStatus === 404 || /status code 404/i.test(String(downloadError?.message || ""))) {
-        setNotice("Certificate is not available on the download route yet. Please try again later.");
-        return;
-      }
-
-      setNotice(downloadError?.message || "Unable to download this certificate right now. Please try again.");
     } finally {
       setDownloadingRowId(null);
     }

@@ -106,8 +106,17 @@ const autoArrangeCertificateSignatures = (customizationValue) => {
 ================================================ */
 export const getMyCertificates = async (req, res, next) => {
   try {
+    const participantEmail = String(req.user?.email || "").trim().toLowerCase();
+    if (!participantEmail) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+
     const certificates = await Certificate.find({
-      participantEmail: req.user.email
+      participantEmail
     }).sort({ issuedAt: -1 });
 
     return res.status(200).json({

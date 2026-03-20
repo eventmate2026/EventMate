@@ -1400,6 +1400,7 @@ export const getMyRegistrations = async (userId) => {
           ? {
               certificateType: certificate.certificateType,
               position: certificate.position,
+              participantEmail: certificate.participantEmail,
               certificateUrl: certificate.certificateUrl,
               issuedAt: certificate.issuedAt,
               verificationCode: certificate.verificationCode
