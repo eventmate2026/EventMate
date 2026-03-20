@@ -58,7 +58,6 @@ export default function Signup() {
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      toast.error("Please correct the highlighted fields and try again.");
       return;
     }
 

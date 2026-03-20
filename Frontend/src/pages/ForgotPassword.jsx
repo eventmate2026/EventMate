@@ -38,7 +38,6 @@ export default function ForgotPassword() {
   const submitEmail = async () => {
     if (!formData.email) {
       setErrors({ email: "Email is required" });
-      toast.error("Please enter your email address.");
       return;
     }
 
@@ -68,7 +67,6 @@ export default function ForgotPassword() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error("Please complete the OTP and password fields correctly.");
       return;
     }
 

@@ -77,7 +77,6 @@ export default function Login() {
         email: !data.email ? "Email is required" : "",
         password: !data.password ? "Password is required" : "",
       });
-      toast.error("Please enter both email and password.");
       return;
     }
 
