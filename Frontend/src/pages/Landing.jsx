@@ -6,6 +6,7 @@ import { motion, useReducedMotion, useScroll } from "framer-motion";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
+import { buildScheduleDateTime } from "../lib/eventSchedule";
 
 // --- Icons ---
 const SearchIcon = () => (
@@ -33,41 +34,22 @@ const fallbackImages = {
 const EVENTS_CACHE_KEY = "eventmate:public-events-cache";
 const EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-const parseDateValue = (value) => {
-  if (!value) return null;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-
-  const text = String(value || "").trim();
-  if (!text) return null;
-
-  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dateOnlyMatch) {
-    const [, year, month, day] = dateOnlyMatch;
-    return new Date(Number(year), Number(month) - 1, Number(day));
-  }
-
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-};
-
-const toLocalDate = (value) => {
-  const parsed = parseDateValue(value);
-  if (!parsed) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
-};
-
 const isUpcomingEvent = (event) => {
   const workflowStatus = String(event?.status || "").trim().toLowerCase();
   if (workflowStatus === "completed" || workflowStatus === "cancelled" || workflowStatus === "canceled") {
     return false;
   }
 
-  const startDate = toLocalDate(event?.schedule?.startDate || event?.startDate || event?.createdAt);
-  const endDate = toLocalDate(event?.schedule?.endDate || event?.endDate || event?.schedule?.startDate || event?.startDate || event?.createdAt);
-  const now = toLocalDate(new Date());
+  const eventEndDateTime = buildScheduleDateTime(
+    event?.schedule?.endDate || event?.endDate || event?.schedule?.startDate || event?.startDate || event?.createdAt,
+    event?.schedule?.endTime || event?.endTime,
+    { fallbackToEndOfDay: true }
+  );
 
-  if (endDate && now && now > endDate) return false;
+  if (eventEndDateTime && Date.now() > eventEndDateTime.getTime()) {
+    return false;
+  }
+
   return true;
 };
 

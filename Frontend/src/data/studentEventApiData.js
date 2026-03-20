@@ -1,4 +1,5 @@
 import { resolveUserDepartment } from "../lib/userDepartment";
+import { buildScheduleDateTime } from "../lib/eventSchedule";
 
 const DEFAULT_EVENT_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80";
@@ -53,12 +54,22 @@ export const deriveEventStatus = (event) => {
   const workflowStatus = String(event?.status || "");
   if (workflowStatus === "Completed" || workflowStatus === "Cancelled") return "completed";
 
-  const startDate = toLocalDate(event?.schedule?.startDate || event?.createdAt || 0);
-  const endDate = toLocalDate(event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0);
-  const now = toLocalDate(new Date());
+  const startDateTime = buildScheduleDateTime(
+    event?.schedule?.startDate || event?.createdAt || 0,
+    event?.schedule?.startTime
+  );
+  const endDateTime = buildScheduleDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0,
+    event?.schedule?.endTime,
+    { fallbackToEndOfDay: true }
+  );
+  const nowTime = Date.now();
 
-  if (endDate && now && now > endDate) return "completed";
-  if (startDate && endDate && now && now >= startDate && now <= endDate) return "current";
+  if (endDateTime && nowTime > endDateTime.getTime()) return "completed";
+  if (startDateTime && endDateTime && nowTime >= startDateTime.getTime() && nowTime <= endDateTime.getTime()) {
+    return "current";
+  }
+
   return "upcoming";
 };
 
