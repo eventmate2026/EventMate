@@ -352,7 +352,7 @@ export default function OrganizerEventScanQR() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const queuePendingToken = useCallback((rawValue, sourceLabel) => {
+  const queuePendingToken = useCallback(async (rawValue, sourceLabel) => {
     const token = parseAttendanceToken(rawValue);
     if (!token) {
       setMessage({ type: "error", text: "QR detected, but attendance token could not be parsed." });
@@ -369,7 +369,7 @@ export default function OrganizerEventScanQR() {
     duplicateScanGuardRef.current = { token, at: now };
 
     const participant = lookupRef.current.get(token);
-    setPendingScan({
+    const initialPendingScan = {
       token,
       sourceLabel,
       participantName: participant?.participantName || "Unknown participant",
@@ -377,8 +377,44 @@ export default function OrganizerEventScanQR() {
       participantDepartment: participant?.participantDepartment || "",
       registrationStatus: participant?.registrationStatus || "Unknown",
       alreadyMarked: Boolean(participant?.attendanceMarked),
-    });
+    };
+    pendingScanRef.current = initialPendingScan;
+    setPendingScan(initialPendingScan);
     setMessage(null);
+
+    try {
+      const response = await api({
+        ...SummaryApi.preview_attendance_by_token,
+        url: SummaryApi.preview_attendance_by_token.url.replace(":token", encodeURIComponent(token)),
+      });
+      const preview = response?.data?.data || {};
+
+      setPendingScan((current) => {
+        if (String(current?.token || "").trim() !== token) return current;
+        return {
+          ...current,
+          participantName: preview?.participantName || current.participantName,
+          participantEmail: preview?.email || current.participantEmail,
+          participantDepartment: preview?.participantDepartment || current.participantDepartment,
+          registrationStatus: preview?.registrationStatus || current.registrationStatus,
+          alreadyMarked: Boolean(preview?.attendanceMarked),
+        };
+      });
+    } catch (previewError) {
+      const previewMessage =
+        previewError?.response?.data?.message || "Unable to verify this QR code right now.";
+      const hasFallbackDetails =
+        Boolean(initialPendingScan.participantEmail) ||
+        initialPendingScan.participantName !== "Unknown participant";
+
+      if (!hasFallbackDetails) {
+        pendingScanRef.current = null;
+        setPendingScan(null);
+        setMessage({ type: "error", text: previewMessage });
+        return false;
+      }
+    }
+
     return true;
   }, []);
 
@@ -490,7 +526,7 @@ export default function OrganizerEventScanQR() {
             rawValue = await decodeSourceWithJsQr(videoNode, resolvedDecoder, decodeCanvasRef);
           }
 
-          if (rawValue) queuePendingToken(rawValue, "Live camera");
+          if (rawValue) void queuePendingToken(rawValue, "Live camera");
         } catch {
           // Swallow scanner frame errors to keep loop alive.
         } finally {
@@ -712,7 +748,7 @@ export default function OrganizerEventScanQR() {
         return;
       }
 
-      queuePendingToken(rawValue, "Image upload");
+      await queuePendingToken(rawValue, "Image upload");
     } catch {
       setMessage({ type: "error", text: "Unable to scan QR from image. Try another image." });
     }

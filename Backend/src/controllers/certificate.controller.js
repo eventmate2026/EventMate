@@ -39,6 +39,16 @@ const writeCertificateAuditLog = async (payload) => {
   }
 };
 
+const triggerBackgroundCertificateSync = (event) => {
+  if (!event?._id) return;
+  if (String(event?.status || "").trim() !== "Completed") return;
+  if (!event?.certificate?.isEnabled) return;
+
+  generateCertificatesForEvent(event._id).catch((error) => {
+    console.error("Certificate sync trigger failed:", error.message);
+  });
+};
+
 const sanitizeFileName = (value, fallback) => {
   const normalized = String(value || "").trim();
   const safe = normalized.replace(/[^a-z0-9-_]+/gi, "_").replace(/_+/g, "_").replace(/^_+|_+$/g, "");
@@ -223,7 +233,7 @@ export const generateSelectedCertificates = async (req, res, next) => {
 export const updateEventCertificateCustomization = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    const event = await Event.findById(eventId).select("_id createdBy status certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -246,6 +256,7 @@ export const updateEventCertificateCustomization = async (req, res, next) => {
     }
 
     await event.save();
+    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -266,7 +277,7 @@ export const updateEventCertificateCustomization = async (req, res, next) => {
 export const uploadEventCertificateBackground = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    const event = await Event.findById(eventId).select("_id createdBy status certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -304,6 +315,7 @@ export const uploadEventCertificateBackground = async (req, res, next) => {
     }
 
     await event.save();
+    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -325,7 +337,7 @@ export const uploadEventCertificateBackground = async (req, res, next) => {
 export const uploadEventCertificateLogo = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    const event = await Event.findById(eventId).select("_id createdBy status certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -364,6 +376,7 @@ export const uploadEventCertificateLogo = async (req, res, next) => {
     }
 
     await event.save();
+    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -385,7 +398,7 @@ export const uploadEventCertificateLogo = async (req, res, next) => {
 export const uploadEventCertificateAccreditationLogo = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    const event = await Event.findById(eventId).select("_id createdBy status certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -424,6 +437,7 @@ export const uploadEventCertificateAccreditationLogo = async (req, res, next) =>
     }
 
     await event.save();
+    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -445,7 +459,7 @@ export const uploadEventCertificateAccreditationLogo = async (req, res, next) =>
 export const uploadEventCertificateSignature = async (req, res, next) => {
   try {
     const { eventId, role } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy certificate");
+    const event = await Event.findById(eventId).select("_id createdBy status certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -505,6 +519,7 @@ export const uploadEventCertificateSignature = async (req, res, next) => {
     }
 
     await event.save();
+    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,

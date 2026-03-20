@@ -62,6 +62,22 @@ export const getEventRegistrations = async (req, res, next) => {
   }
 };
 
+// Organizer/Coordinator — preview QR token before marking attendance
+export const previewAttendance = async (req, res, next) => {
+  try {
+    const result = await registrationService.previewAttendance(
+      req.params.token,
+      req.user
+    );
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Organizer/Coordinator — scan QR token
 export const markAttendance = async (req, res, next) => {
   try {

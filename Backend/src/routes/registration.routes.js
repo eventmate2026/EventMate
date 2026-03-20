@@ -13,6 +13,7 @@ import {
   updateTeamMemberEmail,
   getMyRegistrations,
   getEventRegistrations,
+  previewAttendance,
   markAttendanceManual,
   markAttendance,
   tagWinner,
@@ -58,6 +59,13 @@ router.get(
 );
 
 // Organizer/Coordinator scans QR
+router.get(
+  "/attendance/:token/preview",
+  authMiddleware,
+  roleMiddleware("ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"),
+  previewAttendance
+);
+
 router.patch(
   "/attendance/:token",
   authMiddleware,

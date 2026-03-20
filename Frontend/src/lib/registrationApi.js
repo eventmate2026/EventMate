@@ -51,6 +51,7 @@ const normalizeRegistration = (item) => {
   const eventEndDate = eventDoc?.schedule?.endDate || eventDoc?.schedule?.startDate || null;
   const eventStartTime = String(eventDoc?.schedule?.startTime || "").trim();
   const eventEndTime = String(eventDoc?.schedule?.endTime || "").trim();
+  const certificate = item?.certificate && typeof item.certificate === "object" ? item.certificate : null;
   return {
     id: String(item?._id || item?.id || "").trim(),
     eventId: resolveEventId(item),
@@ -67,11 +68,15 @@ const normalizeRegistration = (item) => {
     totalParticipants: Number(item?.totalParticipants || 0) || 0,
     createdAt: item?.createdAt || null,
     isTeamLeader: Boolean(item?.isTeamLeader),
+    isTeamEvent: Boolean(eventDoc?.isTeamEvent),
+    feedbackSubmitted: Boolean(item?.feedbackSubmitted),
+    certificate,
     qr: qrImageUrl
       ? {
           qrImageUrl,
           role: String(item?.qr?.role || "").trim(),
           attendanceMarked: Boolean(item?.qr?.attendanceMarked),
+          attendanceMarkedAt: item?.qr?.attendanceMarkedAt || null,
         }
       : null,
   };

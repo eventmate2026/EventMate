@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isRegistrationEventCompleted } from "../lib/eventSchedule";
-import { fetchMyRegistrations } from "../lib/registrationApi";
+import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
@@ -88,6 +88,7 @@ export default function StudentFeedbackPending() {
         setRows(
           response.rows
             .filter((row) => isRegistrationEventCompleted(row))
+            .filter((row) => !row?.feedbackSubmitted)
             .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
@@ -188,11 +189,13 @@ export default function StudentFeedbackPending() {
         },
       });
       toast.success(response.data?.message || "Feedback submitted successfully.");
+      invalidateMyRegistrationsCache();
       markEventAsSubmitted(eventId);
     } catch (submitError) {
       const backendMessage = submitError?.response?.data?.message || "Unable to submit feedback.";
       if (/already submitted/i.test(backendMessage)) {
         toast.success("Feedback for this event was already submitted. Removed from pending queue.");
+        invalidateMyRegistrationsCache();
         markEventAsSubmitted(eventId);
       } else {
         toast.error(backendMessage);

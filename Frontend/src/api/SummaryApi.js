@@ -220,6 +220,10 @@ const SummaryApi = {
     url: "/api/registrations/attendance/:token",
     method: "patch",
   },
+  preview_attendance_by_token: {
+    url: "/api/registrations/attendance/:token/preview",
+    method: "get",
+  },
 
   get_event_registrations: {
     url: "/api/registrations/:eventId/all",

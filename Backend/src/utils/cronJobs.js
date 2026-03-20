@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import Event from "../models/Event.model.js";
+import { generateCertificatesForEvent } from "../services/certificate.service.js";
 import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "./eventTime.js";
 
 const autoCompleteEvents = async () => {
@@ -21,6 +22,13 @@ const autoCompleteEvents = async () => {
           status: "Completed",
           updatedAt: now
         });
+        if (event?.certificate?.isEnabled) {
+          generateCertificatesForEvent(event._id).catch((certificateError) => {
+            console.error(
+              `[AUTO_COMPLETE] Certificate sync failed for ${event.title}: ${certificateError.message}`
+            );
+          });
+        }
         console.log(`[AUTO_COMPLETE] Event marked completed: ${event.title}`);
       }
     }

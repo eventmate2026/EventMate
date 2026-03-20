@@ -109,6 +109,10 @@ const NotificationSchema = new mongoose.Schema(
         type: Date,
         default: null
       },
+      nextAttemptAt: {
+        type: Date,
+        default: null
+      },
       acceptedAt: {
         type: Date,
         default: null

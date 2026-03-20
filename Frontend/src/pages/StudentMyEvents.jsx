@@ -64,7 +64,14 @@ const mapToUiRow = (registration) => {
   const phase = deriveEventPhase(registration);
   const registrationStatus = normalizeStatus(registration?.status);
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
-  const canGiveFeedback = attendanceMarked && phase === "completed" && Boolean(registration?.eventId);
+  const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
+  const certificateReady = Boolean(registration?.certificate);
+  const canGiveFeedback =
+    attendanceMarked &&
+    phase === "completed" &&
+    Boolean(registration?.eventId) &&
+    !feedbackSubmitted &&
+    Boolean(registration?.isTeamLeader);
 
   const primaryLabel = attendanceMarked
     ? "Attended"
@@ -85,12 +92,14 @@ const mapToUiRow = (registration) => {
     primaryLabel,
     primaryLabelClass,
     hasQr: Boolean(registration?.qr?.qrImageUrl),
+    feedbackSubmitted,
+    certificateReady,
     canGiveFeedback,
     monthDay: formatMonthDay(registration?.eventStartDate),
   };
 };
 
-const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback }) => (
+const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadCertificate }) => (
   <article className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-3 sm:p-4">
     <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
       <div className="relative h-28 sm:h-28 overflow-hidden rounded-xl">
@@ -113,9 +122,17 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback }) => (
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
             {row.eventCategory || "Event"}
           </span>
-          {row.canGiveFeedback ? (
+          {row.certificateReady ? (
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+              Certificate Ready
+            </span>
+          ) : row.canGiveFeedback ? (
             <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
               Feedback Ready
+            </span>
+          ) : row.feedbackSubmitted ? (
+            <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
+              Feedback Submitted
             </span>
           ) : row.hasQr ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
@@ -141,8 +158,12 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback }) => (
         </div>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
-          {row.canGiveFeedback
+          {row.certificateReady
+            ? "Your certificate is ready to download."
+            : row.canGiveFeedback
             ? "Your event is completed and feedback is now available."
+            : row.feedbackSubmitted
+            ? "Feedback is submitted. Your certificate will appear once the organizer finishes certificate setup."
             : row.qr?.attendanceMarked
             ? "Attendance has been marked for this event."
             : "Use your QR code at check-in when the event starts."}
@@ -151,11 +172,27 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback }) => (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
           <button
             type="button"
-            onClick={() => (row.canGiveFeedback ? onGiveFeedback(row.eventId) : onViewQr(row.id))}
-            disabled={!row.canGiveFeedback && !row.hasQr}
+            onClick={() => {
+              if (row.certificateReady) {
+                onDownloadCertificate(row.certificate?.certificateUrl, row.eventId);
+                return;
+              }
+              if (row.canGiveFeedback) {
+                onGiveFeedback(row.eventId);
+                return;
+              }
+              onViewQr(row.id);
+            }}
+            disabled={!row.certificateReady && !row.canGiveFeedback && !row.hasQr}
             className="rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
           >
-            {row.canGiveFeedback ? "Give Feedback" : row.hasQr ? "View QR" : "QR Pending"}
+            {row.certificateReady
+              ? "Download Certificate"
+              : row.canGiveFeedback
+              ? "Give Feedback"
+              : row.hasQr
+              ? "View QR"
+              : "QR Pending"}
           </button>
           <button
             type="button"
@@ -250,6 +287,18 @@ export default function StudentMyEvents() {
     navigate("/student-dashboard/feedback-pending", {
       state: normalizedId ? { eventId: normalizedId, expandFeedback: true } : undefined,
     });
+  };
+
+  const downloadCertificate = (certificateUrl, eventId) => {
+    const targetUrl = String(certificateUrl || "").trim();
+    if (!targetUrl) {
+      const normalizedEventId = String(eventId || "").trim();
+      navigate("/student-dashboard/my-certificates", {
+        state: normalizedEventId ? { eventId: normalizedEventId } : undefined,
+      });
+      return;
+    }
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -353,6 +402,7 @@ export default function StudentMyEvents() {
                 onViewQr={openQr}
                 onViewDetails={openEventDetails}
                 onGiveFeedback={openFeedback}
+                onDownloadCertificate={downloadCertificate}
               />
             ))}
           </div>

@@ -1472,6 +1472,53 @@ const certificateEmailTemplate = ({
   return { subject, html };
 };
 
+const sendCertificateIssuedNotification = async ({
+  certificateRecord,
+  registration,
+  event,
+  participantName,
+  participantEmail,
+  certificateType,
+  position,
+  messageText
+}) => {
+  const { subject, html } = certificateEmailTemplate({
+    participantName,
+    eventName: event.title,
+    certificateType,
+    position,
+    certificateUrl: certificateRecord?.certificateUrl,
+    verificationCode: certificateRecord?.verificationCode
+  });
+
+  const participantUser = await User.findOne({ email: participantEmail }).select(
+    "_id fullName role email"
+  );
+  const notificationRecipientId = participantUser?._id || registration.registeredBy;
+  const notificationRecipientName =
+    participantUser?.fullName || participantName || registration?.teamLeader?.name || "Student";
+  const notificationRecipientRole = participantUser?.role || "STUDENT";
+  const notificationRecipientEmail = participantUser?.email || participantEmail;
+
+  await sendNotification({
+    recipientId: notificationRecipientId,
+    recipientName: notificationRecipientName,
+    recipientRole: notificationRecipientRole,
+    recipientEmail: notificationRecipientEmail,
+    title: "Certificate Issued!",
+    message:
+      messageText ||
+      `Your certificate for ${event.title} is ready on the website and has been queued for email delivery.`,
+    type: "CERTIFICATE",
+    refId: event._id,
+    sendEmailCopy: true,
+    emailPayload: {
+      subject,
+      html
+    }
+  });
+};
+
 const issueCertificateForParticipant = async ({
   participant,
   registration,
@@ -1491,23 +1538,38 @@ const issueCertificateForParticipant = async ({
     eventId: event._id,
     participantEmail
   });
-  if (existing) {
-    return { status: "exists", reason: "Certificate already issued." };
+
+  if (existing?.verificationStatus === "REVOKED") {
+    return {
+      status: "skipped",
+      reason: "Certificate is revoked and cannot be re-issued automatically."
+    };
   }
 
   const resolvedType = normalizeCertificateType(certificateType) || "participation";
   const resolvedPosition = resolvedType === "winner" ? position || null : null;
+  const existingMatchesRequestedCertificate =
+    existing &&
+    existing.certificateType === resolvedType &&
+    String(existing.position || "") === String(resolvedPosition || "") &&
+    Boolean(existing.certificateData);
+
+  if (existingMatchesRequestedCertificate) {
+    return { status: "exists", reason: "Certificate already issued." };
+  }
+
   const eventDate = event.schedule?.startDate
     ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
   const certificateUrl = buildCertificateDownloadUrl(event._id, participantEmail);
   let certificateRecord = null;
-  let verificationCode = null;
   let duplicateParticipantCertificate = false;
+  let operationLabel = "issued";
 
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    verificationCode = await generateUniqueVerificationCode();
+  if (existing) {
+    operationLabel = "updated";
+    const verificationCode = existing.verificationCode || (await generateUniqueVerificationCode());
     const pdfBuffer = await generateCertificatePDF({
       participantName,
       eventName: event.title,
@@ -1519,32 +1581,59 @@ const issueCertificateForParticipant = async ({
       verificationCode
     });
 
-    const base64PDF = pdfBuffer.toString("base64");
-
-    try {
-      certificateRecord = await Certificate.create({
-        eventId: event._id,
+    existing.eventName = event.title;
+    existing.eventDate = eventDate;
+    existing.registrationId = registration._id;
+    existing.participantName = participantName;
+    existing.participantEmail = participantEmail;
+    existing.certificateType = resolvedType;
+    existing.position = resolvedPosition;
+    existing.certificateUrl = certificateUrl;
+    existing.certificateData = pdfBuffer.toString("base64");
+    existing.verificationCode = verificationCode;
+    existing.issuedAt = new Date();
+    certificateRecord = await existing.save();
+  } else {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const verificationCode = await generateUniqueVerificationCode();
+      const pdfBuffer = await generateCertificatePDF({
+        participantName,
         eventName: event.title,
         eventDate,
-        registrationId: registration._id,
-        participantName,
-        participantEmail,
+        venue,
         certificateType: resolvedType,
         position: resolvedPosition,
-        certificateUrl,
-        certificateData: base64PDF,
+        customization,
         verificationCode
       });
-      break;
-    } catch (creationError) {
-      if (isDuplicateParticipantCertificateError(creationError)) {
-        duplicateParticipantCertificate = true;
+
+      const base64PDF = pdfBuffer.toString("base64");
+
+      try {
+        certificateRecord = await Certificate.create({
+          eventId: event._id,
+          eventName: event.title,
+          eventDate,
+          registrationId: registration._id,
+          participantName,
+          participantEmail,
+          certificateType: resolvedType,
+          position: resolvedPosition,
+          certificateUrl,
+          certificateData: base64PDF,
+          verificationCode
+        });
         break;
+      } catch (creationError) {
+        if (isDuplicateParticipantCertificateError(creationError)) {
+          duplicateParticipantCertificate = true;
+          break;
+        }
+        if (isDuplicateVerificationCodeError(creationError)) {
+          continue;
+        }
+        throw creationError;
       }
-      if (isDuplicateVerificationCodeError(creationError)) {
-        continue;
-      }
-      throw creationError;
     }
   }
 
@@ -1555,38 +1644,18 @@ const issueCertificateForParticipant = async ({
     throw new Error("Unable to generate a unique verification code for certificate.");
   }
 
-  const { subject, html } = certificateEmailTemplate({
+  await sendCertificateIssuedNotification({
+    certificateRecord,
+    registration,
+    event,
     participantName,
-    eventName: event.title,
+    participantEmail,
     certificateType: resolvedType,
     position: resolvedPosition,
-    certificateUrl,
-    verificationCode: certificateRecord.verificationCode
-  });
-
-  const participantUser = await User.findOne({ email: participantEmail }).select(
-    "_id fullName role email"
-  );
-  const notificationRecipientId = participantUser?._id || registration.registeredBy;
-  const notificationRecipientName =
-    participantUser?.fullName || participantName || registration?.teamLeader?.name || "Student";
-  const notificationRecipientRole = participantUser?.role || "STUDENT";
-  const notificationRecipientEmail = participantUser?.email || participantEmail;
-
-  await sendNotification({
-    recipientId: notificationRecipientId,
-    recipientName: notificationRecipientName,
-    recipientRole: notificationRecipientRole,
-    recipientEmail: notificationRecipientEmail,
-    title: "Certificate Issued!",
-    message: `Your certificate for ${event.title} is ready on the website and has been queued for email delivery.`,
-    type: "CERTIFICATE",
-    refId: event._id,
-    sendEmailCopy: true,
-    emailPayload: {
-      subject,
-      html
-    }
+    messageText:
+      operationLabel === "updated"
+        ? `Your certificate for ${event.title} has been updated and re-queued for email delivery.`
+        : undefined
   });
 
   await createCertificateAuditLog({
@@ -1603,16 +1672,20 @@ const issueCertificateForParticipant = async ({
     actorName: "System",
     actorRole: "SYSTEM",
     source: "SYSTEM",
-    message: "Certificate issued and queued for email delivery.",
+    message:
+      operationLabel === "updated"
+        ? "Certificate updated and queued for email delivery."
+        : "Certificate issued and queued for email delivery.",
     metadata: {
       registrationId: registration._id,
       certificateType: resolvedType,
       position: resolvedPosition || null,
-      emailQueued: true
+      emailQueued: true,
+      operation: operationLabel
     }
   });
 
-  return { status: "issued", certificateId: certificateRecord._id };
+  return { status: operationLabel, certificateId: certificateRecord._id };
 };
 
 /* ================================================
@@ -1689,7 +1762,7 @@ export const generateCertificatesForRegistration = async (registration, event) =
         customization
       });
 
-      if (result?.status === "issued") {
+      if (result?.status === "issued" || result?.status === "updated") {
         issuedCount += 1;
       }
     }
@@ -1868,7 +1941,7 @@ export const generateCertificatesForSelection = async (event, selections = []) =
         customization
       });
 
-      if (result?.status === "issued") {
+      if (result?.status === "issued" || result?.status === "updated") {
         results.issued += 1;
       } else if (result?.status === "exists" || result?.status === "skipped") {
         recordSkipped(selection, result.reason || "Certificate already issued.");

@@ -127,6 +127,7 @@ export const buildNotificationEmailDeliveryState = ({
       attempts: 0,
       queuedAt: null,
       lastAttemptAt: null,
+      nextAttemptAt: null,
       acceptedAt: null,
       deliveredAt: null,
       lastError: ""
@@ -142,6 +143,7 @@ export const buildNotificationEmailDeliveryState = ({
       attempts: 0,
       queuedAt,
       lastAttemptAt: null,
+      nextAttemptAt: null,
       acceptedAt: null,
       deliveredAt: null,
       lastError: "Recipient email missing."
@@ -155,6 +157,7 @@ export const buildNotificationEmailDeliveryState = ({
     attempts: 0,
     queuedAt,
     lastAttemptAt: null,
+    nextAttemptAt: queuedAt,
     acceptedAt: null,
     deliveredAt: null,
     lastError: ""
@@ -196,6 +199,48 @@ const dispatchNotificationEmail = async (notification) => {
   );
 };
 
+const isRetryableEmailFailure = (error) => {
+  const text = String(error?.message || "")
+    .trim()
+    .toLowerCase();
+
+  if (!text) return false;
+
+  return [
+    "421",
+    "4.7.32",
+    "rate limit",
+    "rate limited",
+    "temporarily unavailable",
+    "temporary",
+    "timeout",
+    "timed out",
+    "too many requests",
+    "try again later",
+    "connection reset",
+    "econnreset",
+    "etimedout",
+    "ehostunreach",
+    "econnrefused",
+    "service unavailable"
+  ].some((pattern) => text.includes(pattern));
+};
+
+const getRetryDelayMs = (attempts, error) => {
+  const safeAttempts = Math.max(1, Number(attempts || 1));
+  const retryable = isRetryableEmailFailure(error);
+  if (!retryable) return null;
+
+  const message = String(error?.message || "").toLowerCase();
+  if (message.includes("4.7.32") || message.includes("dmarc") || message.includes("rate limited")) {
+    const dmarcBackoffMinutes = [30, 60, 180, 360, 720];
+    return (dmarcBackoffMinutes[Math.min(safeAttempts - 1, dmarcBackoffMinutes.length - 1)] || 720) * 60 * 1000;
+  }
+
+  const genericBackoffMinutes = [5, 15, 30, 60, 180];
+  return (genericBackoffMinutes[Math.min(safeAttempts - 1, genericBackoffMinutes.length - 1)] || 180) * 60 * 1000;
+};
+
 export const processPendingNotificationEmails = async ({
   batchSize = 20,
   maxAttempts = 5
@@ -209,7 +254,11 @@ export const processPendingNotificationEmails = async ({
       "emailDelivery.status": {
         $in: [EMAIL_DELIVERY_STATUS.PENDING, EMAIL_DELIVERY_STATUS.FAILED]
       },
-      "emailDelivery.attempts": { $lt: maxAttempts }
+      "emailDelivery.attempts": { $lt: maxAttempts },
+      $or: [
+        { "emailDelivery.nextAttemptAt": null },
+        { "emailDelivery.nextAttemptAt": { $lte: new Date() } }
+      ]
     })
       .sort({ createdAt: 1 })
       .limit(batchSize);
@@ -224,12 +273,17 @@ export const processPendingNotificationEmails = async ({
           "emailDelivery.status": {
             $in: [EMAIL_DELIVERY_STATUS.PENDING, EMAIL_DELIVERY_STATUS.FAILED]
           },
-          "emailDelivery.attempts": { $lt: maxAttempts }
+          "emailDelivery.attempts": { $lt: maxAttempts },
+          $or: [
+            { "emailDelivery.nextAttemptAt": null },
+            { "emailDelivery.nextAttemptAt": { $lte: new Date() } }
+          ]
         },
         {
           $set: {
             "emailDelivery.status": EMAIL_DELIVERY_STATUS.PROCESSING,
-            "emailDelivery.lastAttemptAt": new Date()
+            "emailDelivery.lastAttemptAt": new Date(),
+            "emailDelivery.nextAttemptAt": null
           },
           $inc: {
             "emailDelivery.attempts": 1
@@ -249,17 +303,26 @@ export const processPendingNotificationEmails = async ({
               "emailDelivery.status": EMAIL_DELIVERY_STATUS.SENT,
               "emailDelivery.acceptedAt": new Date(),
               "emailDelivery.providerMessageId": resolveProviderMessageId(providerResponse),
-              "emailDelivery.lastError": ""
+              "emailDelivery.lastError": "",
+              "emailDelivery.nextAttemptAt": null
             }
           }
         );
       } catch (emailError) {
+        const attemptCount = Number(claimed?.emailDelivery?.attempts || 0);
+        const nextRetryDelayMs = getRetryDelayMs(attemptCount, emailError);
+        const nextAttemptAt =
+          Number.isFinite(nextRetryDelayMs) && nextRetryDelayMs > 0
+            ? new Date(Date.now() + nextRetryDelayMs)
+            : null;
+
         await Notification.updateOne(
           { _id: claimed._id },
           {
             $set: {
               "emailDelivery.status": EMAIL_DELIVERY_STATUS.FAILED,
-              "emailDelivery.lastError": String(emailError?.message || "Unknown error").slice(0, 500)
+              "emailDelivery.lastError": String(emailError?.message || "Unknown error").slice(0, 500),
+              "emailDelivery.nextAttemptAt": nextAttemptAt
             }
           }
         );

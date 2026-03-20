@@ -1,3 +1,5 @@
+export const COMPLETION_GRACE_MS = 6 * 60 * 60 * 1000;
+
 const extractYMD = (value) => {
   if (!value) return null;
 
@@ -57,5 +59,5 @@ export const isRegistrationEventCompleted = (registration) => {
 
   const endDateTime = buildRegistrationEventEndDateTime(registration);
   if (!endDateTime) return false;
-  return Date.now() >= endDateTime.getTime();
+  return Date.now() >= endDateTime.getTime() + COMPLETION_GRACE_MS;
 };

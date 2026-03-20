@@ -3,6 +3,7 @@ import User from "../models/User.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
+import { generateCertificatesForEvent } from "../services/certificate.service.js";
 import { buildEventEndDateTime, buildEventStartDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -303,6 +304,12 @@ export const cancelEvent = async (req, res, next) => {
     event.updatedBy = req.user._id;
 
     await event.save();
+
+    if (event?.certificate?.isEnabled) {
+      generateCertificatesForEvent(event._id).catch((certificateError) => {
+        console.error("Post-completion certificate sync error:", certificateError.message);
+      });
+    }
 
     return res.status(200).json({
       success: true,

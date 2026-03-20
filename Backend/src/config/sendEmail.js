@@ -65,6 +65,9 @@ const extractDomainFromEmail = (value) => {
   return atIndex >= 0 ? normalized.slice(atIndex + 1) : "";
 };
 
+const isConsumerMailboxDomain = (email) =>
+  CONSUMER_MAILBOX_DOMAINS.has(extractDomainFromEmail(email));
+
 const warnIfSenderLooksUnsafe = (senderEmail, replyTo) => {
   if (senderConfigurationWarningShown) return;
 
@@ -189,12 +192,11 @@ const createSmtpTransporter = () => {
     connectionTimeout: smtpConfig.connectionTimeout,
     greetingTimeout: smtpConfig.greetingTimeout,
     socketTimeout: smtpConfig.socketTimeout,
-    pool: {
-      maxConnections: smtpConfig.maxConnections,
-      maxMessages: 100,
-      rateDelta: 1000,
-      rateLimit: 14, // 14 messages per second max
-    },
+    pool: smtpConfig.pool,
+    maxConnections: smtpConfig.maxConnections,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 14, // 14 messages per second max
     auth: {
       user: smtpConfig.user,
       pass: smtpConfig.pass,
@@ -319,8 +321,12 @@ const sendEmail = async (to, subject, html, options = {}) => {
     throw err;
   }
 
-  // Respect an explicit SMTP provider selection instead of always preferring SendGrid.
-  const shouldUseSendGrid = emailProvider === "sendgrid" || (!explicitProvider && canUseSendGrid());
+  const senderUsesConsumerMailbox = isConsumerMailboxDomain(senderEmail);
+  const shouldUseSendGrid = emailProvider === "sendgrid";
+
+  if (shouldUseSendGrid && senderUsesConsumerMailbox) {
+    warnIfSenderLooksUnsafe(senderEmail, replyTo);
+  }
 
   if (shouldUseSendGrid) {
     try {
@@ -360,7 +366,6 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
   }
 
-  // Use SMTP as fallback or primary provider
   if (emailProvider === "smtp") {
     try {
       const transporter = createSmtpTransporter();
@@ -396,7 +401,13 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
   }
 
-  // Fallback: Try SendGrid one more time if not already attempted
+  // Final fallback: use SendGrid only when it is the only configured provider.
+  if (!canUseSendGrid()) {
+    const err = new Error("Missing email provider configuration");
+    err.statusCode = 500;
+    throw err;
+  }
+
   try {
     const [fallbackResponse] = await sendWithSendGrid({
       to,

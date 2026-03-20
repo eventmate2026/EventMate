@@ -5,11 +5,14 @@ import MemberVerification from "../models/MemberVerification.model.js";
 import TeamInvitation from "../models/TeamInvitation.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import User from "../models/User.model.js";
+import Feedback from "../models/Feedback.model.js";
+import Certificate from "../models/Certificate.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 import { buildEventEndDateTime, buildEventStartDateTime } from "../utils/eventTime.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
+import { generateCertificatesForRegistration } from "./certificate.service.js";
 
 const notifyAssignedCoordinators = async (event, payloadBuilder) => {
   const coordinators = event?.studentCoordinators || [];
@@ -38,6 +41,7 @@ const refreshEventAttendanceTotal = async (eventId) => {
 
 const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
 const normalizeDepartment = (value = "") => String(value || "").trim().toLowerCase();
+const normalizeId = (value = "") => String(value || "").trim();
 const isMidnightUtc = (date) =>
   date.getUTCHours() === 0 &&
   date.getUTCMinutes() === 0 &&
@@ -77,6 +81,73 @@ const formatEventDate = (event) => {
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) return "TBA";
   return parsed.toDateString();
+};
+
+const ensureAttendanceWindowOpen = (event) => {
+  const eventStartDateTime = buildEventStartDateTime(
+    event?.schedule?.startDate,
+    event?.schedule?.startTime
+  );
+  const eventEndDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
+
+  if (!eventStartDateTime || !eventEndDateTime) {
+    throw new Error("Event schedule is incomplete for attendance marking");
+  }
+
+  const now = Date.now();
+  if (now < eventStartDateTime.getTime() || now > eventEndDateTime.getTime()) {
+    throw new Error("Attendance can only be marked between the event start and end time");
+  }
+};
+
+const canManageAttendanceForEvent = (event, requester) => {
+  const requesterId = normalizeId(requester?._id);
+  if (!requesterId) return false;
+
+  const isOrganizer = normalizeId(event?.createdBy) === requesterId;
+  const isAssignedCoordinator = Array.isArray(event?.studentCoordinators)
+    ? event.studentCoordinators.some(
+        (coordinator) => normalizeId(coordinator?.coordinatorId) === requesterId
+      )
+    : false;
+
+  return isOrganizer || isAssignedCoordinator;
+};
+
+const resolveParticipantMetaFromRegistration = (registration, email, fallbackName = "") => {
+  const participantEmail = normalizeEmail(email);
+  const participants = [
+    registration?.teamLeader,
+    ...(Array.isArray(registration?.teamMembers) ? registration.teamMembers : [])
+  ].filter(Boolean);
+
+  const match = participants.find(
+    (participant) => normalizeEmail(participant?.email) === participantEmail
+  );
+
+  return {
+    participantName:
+      String(match?.name || fallbackName || "Participant").trim() || "Participant",
+    participantEmail,
+    participantDepartment: String(match?.branch || match?.department || "").trim(),
+    participantCollege: String(match?.college || "").trim(),
+    participantYear: String(match?.year || "").trim()
+  };
+};
+
+const loadAttendanceContext = async (token) => {
+  const qr = await ParticipantQR.findOne({ token });
+  if (!qr) throw new Error("Invalid QR code");
+
+  const event = await Event.findById(qr.eventId);
+  if (!event) throw new Error("Event not found");
+
+  const registration = await EventRegistration.findById(qr.registration);
+
+  return { qr, event, registration };
 };
 
 const buildTeamInviteLink = (token, action) => {
@@ -1287,8 +1358,18 @@ export const getMyRegistrations = async (userId) => {
     : { registeredBy: userId };
 
   const registrations = await EventRegistration.find(registrationQuery)
-    .populate("event", "title category schedule venue status posterUrl")
+    .populate("event", "title category schedule venue status posterUrl certificate isTeamEvent")
     .sort({ createdAt: -1 });
+
+  const registrationIds = registrations.map((registration) => registration._id);
+  const feedbackRows = registrationIds.length
+    ? await Feedback.find({
+        registration: { $in: registrationIds }
+      }).select("registration")
+    : [];
+  const feedbackByRegistrationId = new Set(
+    feedbackRows.map((feedback) => normalizeId(feedback?.registration))
+  );
 
   const result = await Promise.all(
     registrations.map(async (reg) => {
@@ -1300,13 +1381,30 @@ export const getMyRegistrations = async (userId) => {
         ? await ParticipantQR.findOne({
             registration: reg._id,
             email: lookupEmail
-          }).select("qrImageUrl role attendanceMarked")
+          }).select("qrImageUrl role attendanceMarked attendanceMarkedAt")
         : null;
+      const certificate = lookupEmail
+        ? await Certificate.findOne({
+            eventId: reg?.event?._id || reg?.event,
+            participantEmail: lookupEmail
+          }).select("certificateType position certificateUrl issuedAt verificationCode")
+        : null;
+      const feedbackSubmitted = feedbackByRegistrationId.has(normalizeId(reg?._id));
 
       return {
         ...reg.toObject(),
         qr: qr || null,
-        isTeamLeader
+        isTeamLeader,
+        feedbackSubmitted,
+        certificate: certificate
+          ? {
+              certificateType: certificate.certificateType,
+              position: certificate.position,
+              certificateUrl: certificate.certificateUrl,
+              issuedAt: certificate.issuedAt,
+              verificationCode: certificate.verificationCode
+            }
+          : null
       };
     })
   );
@@ -1417,54 +1515,55 @@ const sendMemberVerificationEmails = async (registration, participants) => {
 };
 
 /* ================================================
+   PREVIEW ATTENDANCE VIA QR TOKEN
+   Resolve participant details before confirming entry
+================================================ */
+
+export const previewAttendance = async (token, requester) => {
+  const { qr, event, registration } = await loadAttendanceContext(token);
+
+  ensureAttendanceWindowOpen(event);
+
+  if (!canManageAttendanceForEvent(event, requester)) {
+    throw new Error("Not authorized to mark attendance for this event");
+  }
+
+  const participantMeta = resolveParticipantMetaFromRegistration(
+    registration,
+    qr.email,
+    qr.name
+  );
+
+  return {
+    participantName: participantMeta.participantName,
+    email: participantMeta.participantEmail || qr.email,
+    role: qr.role,
+    participantDepartment: participantMeta.participantDepartment,
+    participantCollege: participantMeta.participantCollege,
+    participantYear: participantMeta.participantYear,
+    registrationStatus: String(registration?.status || "").trim() || "Pending",
+    attendanceMarked: Boolean(qr.attendanceMarked),
+    attendanceMarkedAt: qr.attendanceMarkedAt || null,
+    eventId: event._id,
+    eventName: event.title
+  };
+};
+
+/* ================================================
    MARK ATTENDANCE VIA QR TOKEN
    Called when organizer/coordinator scans QR
 ================================================ */
 
 export const markAttendance = async (token, scannedBy) => {
-
-  // Find QR record
-  const qr = await ParticipantQR.findOne({ token });
-  if (!qr) throw new Error("Invalid QR code");
+  const { qr, event, registration } = await loadAttendanceContext(token);
 
   // Already attended check
   if (qr.attendanceMarked)
     throw new Error(`Attendance already marked for ${qr.name}`);
 
-  // Find the event
-  const event = await Event.findById(qr.eventId);
-  if (!event) throw new Error("Event not found");
+  ensureAttendanceWindowOpen(event);
 
-  const eventStartDateTime = buildEventStartDateTime(
-    event?.schedule?.startDate,
-    event?.schedule?.startTime
-  );
-  const eventEndDateTime = buildEventEndDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate,
-    event?.schedule?.endTime
-  );
-
-  if (!eventStartDateTime || !eventEndDateTime) {
-    throw new Error("Event schedule is incomplete for attendance marking");
-  }
-
-  const now = Date.now();
-  if (now < eventStartDateTime.getTime() || now > eventEndDateTime.getTime()) {
-    throw new Error("Attendance can only be marked between the event start and end time");
-  }
-
-
-
-  // Authorization check
-  // Must be the organizer OR an assigned coordinator of THIS event
-  const isOrganizer =
-    event.createdBy.toString() === scannedBy._id.toString();
-
-  const isAssignedCoordinator = event.studentCoordinators.some(
-    (c) => c.coordinatorId.toString() === scannedBy._id.toString()
-  );
-
-  if (!isOrganizer && !isAssignedCoordinator)
+  if (!canManageAttendanceForEvent(event, scannedBy))
     throw new Error("Not authorized to mark attendance for this event");
 
   // Mark attendance
@@ -1474,7 +1573,6 @@ export const markAttendance = async (token, scannedBy) => {
   await qr.save();
   await refreshEventAttendanceTotal(qr.eventId);
 // Notify student
-const registration = await EventRegistration.findById(qr.registration);
 if (registration) {
   await sendNotification({
     recipientId: registration.registeredBy,
@@ -1658,6 +1756,12 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
   registration.winner.position = position;
   await registration.save();
 
+  if (event.status === "Completed" && event?.certificate?.isEnabled) {
+    generateCertificatesForRegistration(registration, event).catch((error) => {
+      console.error("Winner certificate sync error:", error.message);
+    });
+  }
+
   return {
     position,
     name: event.isTeamEvent
@@ -1716,6 +1820,12 @@ export const untagWinner = async (registrationId, taggedBy) => {
   }
 
   await registration.save();
+
+  if (event.status === "Completed" && event?.certificate?.isEnabled) {
+    generateCertificatesForRegistration(registration, event).catch((error) => {
+      console.error("Certificate downgrade sync error:", error.message);
+    });
+  }
 
   return {
     name: event.isTeamEvent
