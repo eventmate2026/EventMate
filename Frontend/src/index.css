@@ -11,11 +11,13 @@
   --ev-accent-a: #0ea5e9;
   --ev-accent-b: #14b8a6;
   --ev-accent-c: #f59e0b;
+  --eventmate-nav-offset: 4rem;
 }
 
 html {
   height: 100%;
   scroll-behavior: smooth;
+  scroll-padding-top: var(--eventmate-nav-offset);
   scrollbar-gutter: stable;
   transition: background-color 0.45s ease, color 0.45s ease;
 }
@@ -47,6 +49,12 @@ body {
   min-height: 100vh;
   height: 100%;
   overflow-x: hidden;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --eventmate-nav-offset: 4.5rem;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -444,7 +452,7 @@ table {
   isolation: isolate;
   z-index: 1;
   min-height: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .eventmate-route-shell > * {
@@ -517,8 +525,18 @@ table {
 
 .eventmate-page {
   position: relative;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   background-color: transparent !important;
+}
+
+.eventmate-app-shell main,
+.eventmate-app-shell .eventmate-route-shell {
+  min-height: 100%;
+}
+
+.eventmate-app-shell main > .eventmate-route-shell > :where(.eventmate-page, .min-h-screen) {
+  min-height: 100%;
 }
 
 .eventmate-page::before {

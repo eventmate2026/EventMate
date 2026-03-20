@@ -447,11 +447,6 @@ function AnimatedOutlet() {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [location.pathname, location.search]);
-
-  useEffect(() => {
     if (prefersReducedMotion) return undefined;
 
     const routeShell = routeShellRef.current;
@@ -562,8 +557,47 @@ function ScrollToTop() {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (location.hash) {
+      const targetId = decodeURIComponent(location.hash.slice(1));
+      let frameA = 0;
+      let frameB = 0;
+
+      const scrollToHashTarget = () => {
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({
+            block: "start",
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+          });
+          return true;
+        }
+
+        return false;
+      };
+
+      if (scrollToHashTarget()) {
+        return;
+      }
+
+      frameA = window.requestAnimationFrame(() => {
+        frameB = window.requestAnimationFrame(() => {
+          if (!scrollToHashTarget()) {
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+          }
+        });
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frameA);
+        window.cancelAnimationFrame(frameB);
+      };
+    }
+
     window.scrollTo({
       top: 0,
+      left: 0,
       behavior: prefersReducedMotion ? "auto" : "smooth",
     });
   }, [location.pathname, location.search, location.hash, prefersReducedMotion]);
