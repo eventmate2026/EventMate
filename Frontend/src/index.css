@@ -12,6 +12,15 @@
   --ev-accent-b: #14b8a6;
   --ev-accent-c: #f59e0b;
   --eventmate-nav-offset: 4rem;
+  --eventmate-scrollbar-size: 18px;
+  --eventmate-scrollbar-size-mobile: 15px;
+  --eventmate-scrollbar-track: rgba(10, 15, 28, 0.96);
+  --eventmate-scrollbar-track-border: rgba(148, 163, 184, 0.18);
+  --eventmate-scrollbar-thumb-start: rgba(226, 232, 240, 0.96);
+  --eventmate-scrollbar-thumb-end: rgba(120, 132, 151, 0.98);
+  --eventmate-scrollbar-thumb-hover-start: rgba(241, 245, 249, 0.98);
+  --eventmate-scrollbar-thumb-hover-end: rgba(148, 163, 184, 0.99);
+  --eventmate-scrollbar-thumb-border: rgba(10, 15, 28, 0.96);
 }
 
 html {
@@ -21,7 +30,7 @@ html {
   scrollbar-gutter: stable both-edges;
   transition: background-color 0.45s ease, color 0.45s ease;
   scrollbar-width: auto;
-  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
+  scrollbar-color: rgba(148, 163, 184, 0.98) var(--eventmate-scrollbar-track);
 }
 
 body {
@@ -36,6 +45,7 @@ body {
     var(--ev-bg-light);
   color: var(--ev-text-light);
   overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior-y: auto;
   -webkit-overflow-scrolling: touch;
   -webkit-user-select: none;
@@ -210,7 +220,7 @@ table {
   [class*="overflow-scroll"]
 ) {
   scrollbar-width: auto;
-  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
+  scrollbar-color: rgba(148, 163, 184, 0.98) var(--eventmate-scrollbar-track);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -226,9 +236,9 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
-  background: rgba(15, 23, 42, 0.84);
+  width: var(--eventmate-scrollbar-size);
+  height: var(--eventmate-scrollbar-size);
+  background: var(--eventmate-scrollbar-track);
 }
 
 :where(
@@ -243,8 +253,8 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.84);
-  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  background: var(--eventmate-scrollbar-track);
+  border-left: 1px solid var(--eventmate-scrollbar-track-border);
 }
 
 :where(
@@ -259,11 +269,11 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(203, 213, 225, 0.9), rgba(100, 116, 139, 0.95));
+  background: linear-gradient(180deg, var(--eventmate-scrollbar-thumb-start), var(--eventmate-scrollbar-thumb-end));
   border-radius: 999px;
-  border: 3px solid rgba(15, 23, 42, 0.84);
+  border: 2px solid var(--eventmate-scrollbar-thumb-border);
   background-clip: padding-box;
-  min-height: 36px;
+  min-height: 68px;
 }
 
 :where(
@@ -278,7 +288,7 @@ table {
   [class*="overflow-auto"],
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(226, 232, 240, 0.96), rgba(148, 163, 184, 0.98));
+  background: linear-gradient(180deg, var(--eventmate-scrollbar-thumb-hover-start), var(--eventmate-scrollbar-thumb-hover-end));
 }
 
 :where(
@@ -294,12 +304,12 @@ table {
   [class*="overflow-scroll"]
 )::-webkit-scrollbar-button {
   display: block;
-  width: 14px;
-  height: 14px;
-  background-color: rgba(15, 23, 42, 0.84);
+  width: var(--eventmate-scrollbar-size);
+  height: var(--eventmate-scrollbar-size);
+  background-color: var(--eventmate-scrollbar-track);
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 8px 8px;
+  background-size: 10px 10px;
 }
 
 :where(
@@ -970,7 +980,7 @@ table {
     [class*="overflow-auto"],
     [class*="overflow-scroll"]
   )::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: var(--eventmate-scrollbar-size-mobile);
+    height: var(--eventmate-scrollbar-size-mobile);
   }
 }

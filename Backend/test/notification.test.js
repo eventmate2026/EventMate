@@ -13,7 +13,11 @@ import {
   buildTeamNoticeRecipientMap,
   collectOrganizerEventAudience
 } from "../src/controllers/notification.controller.js";
-import { getAllowedFrontendOrigins, getPrimaryFrontendUrl } from "../src/config/clientOrigins.js";
+import {
+  createCorsOriginValidator,
+  getAllowedFrontendOrigins,
+  getPrimaryFrontendUrl
+} from "../src/config/clientOrigins.js";
 import errorMiddleware from "../src/middleware/error.middleware.js";
 
 const createMockResponse = () => {
@@ -265,4 +269,28 @@ test("error middleware hides provider outage details from clients", () => {
     success: false,
     message: "This service is temporarily unavailable. Please try again."
   });
+});
+
+test("createCorsOriginValidator returns 403 for blocked origins", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  process.env.FRONTEND_URLS = "https://eventmate-app.vercel.app";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("https://blocked.example.com", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  assert.equal(result.allowed, undefined);
+  assert.ok(result.error instanceof Error);
+  assert.equal(result.error.message, "Origin not allowed by CORS");
+  assert.equal(result.error.statusCode, 403);
 });
