@@ -97,6 +97,29 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     };
   }, [user?._id, user?.id]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const shouldLockScroll = isMobileMenuOpen || isMobileProfileOpen;
+    if (!shouldLockScroll) {
+      return undefined;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    body.style.overflow = "hidden";
+    documentElement.style.overflow = "hidden";
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isMobileMenuOpen, isMobileProfileOpen]);
+
   // Handle route navigation for student dashboard pages
   const handleNavClick = (pageName) => {
     if (typeof setActivePage === "function") {
@@ -343,8 +366,15 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
-          <div className="pt-2 pb-3 space-y-1">
+        <>
+          <button
+            type="button"
+            aria-label="Close mobile menu"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-x-0 top-16 bottom-0 z-[105] bg-slate-950/35 backdrop-blur-[1px] sm:hidden"
+          />
+          <div className="fixed inset-x-0 top-16 bottom-0 z-[109] overflow-y-auto border-b border-gray-200 bg-white/98 pb-6 shadow-2xl dark:border-white/10 dark:bg-gray-900/98 sm:hidden">
+            <div className="pt-2 pb-3 space-y-1">
             <button
               onClick={() => handleNavClick('home')}
               className={mobileLinkClass("home")}
@@ -370,8 +400,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             >
               Contact us
             </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </nav>
     <div aria-hidden="true" className="h-16 shrink-0" />

@@ -16,6 +16,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
 import { useToastFeedback } from "../hooks/useToastFeedback";
+import { canSubmitRegistrationFeedback, getEligibleFeedbackRegistrations } from "../lib/feedbackEligibility";
 
 const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
 
@@ -86,9 +87,7 @@ export default function StudentFeedbackPending() {
         const response = await fetchMyRegistrations();
         setWarning(response.warning);
         setRows(
-          response.rows
-            .filter((row) => isRegistrationEventCompleted(row))
-            .filter((row) => !row?.feedbackSubmitted)
+          getEligibleFeedbackRegistrations(response.rows, { submittedEventIds })
             .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
@@ -116,11 +115,11 @@ export default function StudentFeedbackPending() {
           ...row,
           attended,
           confirmed,
-          canSubmit: attended && confirmed && Boolean(row?.eventId),
+          canSubmit: canSubmitRegistrationFeedback(row, { submittedEventIds }),
           badgeDate: formatMonthDay(row?.eventStartDate),
         };
       }),
-    [rows]
+    [rows, submittedEventIds]
   );
 
   useEffect(() => {

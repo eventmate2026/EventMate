@@ -8,6 +8,7 @@ import { extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
+import { countEligibleFeedbackRegistrations } from "../lib/feedbackEligibility";
 
 const StatCard = ({ label, value, color = "bg-purple-100 text-purple-700 dark:bg-indigo-500/20 dark:text-indigo-200" }) => (
   <div className={`eventmate-kpi flex flex-col items-center p-6 rounded-2xl ${color} shadow-sm`}>
@@ -55,20 +56,6 @@ const countCertificateRows = (payload) => {
   if (Array.isArray(payload?.certificates)) return payload.certificates.length;
   if (Array.isArray(payload?.data?.certificates)) return payload.data.certificates.length;
   return Number(payload?.count || payload?.data?.count || 0) || 0;
-};
-
-const countPendingFeedbackRows = (rows) => {
-  const submittedEventIds = loadSubmittedFeedbackEventIds();
-  return rows.filter((row) => {
-    const normalizedEventId = String(row?.eventId || "").trim();
-    if (!normalizedEventId || submittedEventIds.has(normalizedEventId)) return false;
-
-    const status = String(row?.eventStatus || "").trim().toLowerCase();
-    if (status === "completed") return true;
-
-    const eventDate = new Date(row?.eventStartDate || 0).getTime();
-    return Number.isFinite(eventDate) && eventDate > 0 && Date.now() > eventDate;
-  }).length;
 };
 
 const resolveDashboardStatus = (event) => {
@@ -167,6 +154,7 @@ export default function StudentDashboard() {
   const [user, setUser] = useState(() => getStoredUser());
   const [events, setEvents] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
+  const [registrationCount, setRegistrationCount] = useState(0);
   const [assignedEventsCount, setAssignedEventsCount] = useState(0);
   const [certificateCount, setCertificateCount] = useState(0);
   const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
@@ -187,8 +175,12 @@ export default function StudentDashboard() {
       ]);
       const registrationRows = Array.isArray(registrationInfo?.rows) ? registrationInfo.rows : [];
       const registeredIds = new Set(registrationRows.map((row) => String(row?.eventId || "").trim()).filter(Boolean));
+      const submittedEventIds = loadSubmittedFeedbackEventIds();
       setRegistrationWarning(registrationInfo.warning);
-      setPendingFeedbackCount(countPendingFeedbackRows(registrationRows));
+      setRegistrationCount(registrationRows.length);
+      setPendingFeedbackCount(
+        countEligibleFeedbackRegistrations(registrationRows, { submittedEventIds })
+      );
       const publicEvents = extractEventList(publicResponse.data);
 
       const allMapped = publicEvents
@@ -211,6 +203,7 @@ export default function StudentDashboard() {
       setError(err.response?.data?.message || "Unable to load dashboard events.");
       setEvents([]);
       setMyEvents([]);
+      setRegistrationCount(0);
       setPendingFeedbackCount(0);
     } finally {
       setLoading(false);
@@ -329,7 +322,7 @@ export default function StudentDashboard() {
     {
       id: "my-events",
       title: "My Events",
-      subtitle: `${myEvents.length} registered`,
+      subtitle: `${registrationCount} registered`,
       icon: CalendarDays,
       iconClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
       path: "/student-dashboard/my-events",
