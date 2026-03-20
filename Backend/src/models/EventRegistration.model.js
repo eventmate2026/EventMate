@@ -101,6 +101,12 @@ const EventRegistrationSchema = new mongoose.Schema(
         type: String // Cloudinary URL
       },
 
+      rejectionReason: {
+        type: String,
+        trim: true,
+        default: ""
+      },
+
       paymentStatus: {
         type: String,
         enum: ["NotRequired", "Pending", "UnderReview", "Verified", "Rejected"],
@@ -186,9 +192,15 @@ EventRegistrationSchema.pre("save", async function () {
   }
 
   /* ===== PAYMENT (DISPLAY ONLY) ===== */
-  this.payment.method = "FREE";
-  this.payment.amount = Number(event.registration?.fee || 0);
-  this.payment.paymentStatus = "NotRequired";
+  const fee = Number(event.registration?.fee || 0);
+  const requiresPayment = fee > 0;
+  const configuredMethod = String(event?.registration?.paymentConfig?.method || "").trim();
+  this.payment.method = requiresPayment
+    ? (configuredMethod || "PHONEPE_QR")
+    : "FREE";
+  this.payment.amount = fee;
+  this.payment.paymentStatus = requiresPayment ? "Pending" : "NotRequired";
+  this.payment.rejectionReason = "";
 });
 
 /* ================= UNIQUE INDEX ================= */

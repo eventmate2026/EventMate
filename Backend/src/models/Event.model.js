@@ -93,6 +93,33 @@ const EventSchema = new mongoose.Schema(
       fee: {
         type: Number,
         default: 0
+      },
+      paymentConfig: {
+        method: {
+          type: String,
+          enum: ["FREE", "PHONEPE_QR"],
+          default: "FREE"
+        },
+        accountName: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        upiId: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        qrImageUrl: {
+          type: String,
+          trim: true,
+          default: ""
+        },
+        instructions: {
+          type: String,
+          trim: true,
+          default: ""
+        }
       }
     },
 
