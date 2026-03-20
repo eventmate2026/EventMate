@@ -30,7 +30,7 @@ body {
     radial-gradient(circle at 50% 110%, rgba(245, 158, 11, 0.1), transparent 38%),
     var(--ev-bg-light);
   color: var(--ev-text-light);
-  overflow: hidden;
+  overflow-x: hidden;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -44,7 +44,7 @@ body {
 #root {
   min-height: 100vh;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -303,9 +303,6 @@ table {
 }
 
 .eventmate-app-shell {
-  height: 100dvh;
-  min-height: 100dvh;
-  overflow: hidden;
   background:
     linear-gradient(160deg, rgba(248, 250, 252, 0.86) 8%, rgba(239, 246, 255, 0.86) 56%, rgba(236, 253, 245, 0.8) 100%);
 }
@@ -316,6 +313,9 @@ table {
 }
 
 .eventmate-app-shell-dashboard {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
   background:
     linear-gradient(160deg, rgba(248, 250, 252, 0.88) 4%, rgba(224, 242, 254, 0.7) 52%, rgba(236, 253, 245, 0.72) 100%);
 }
@@ -446,6 +446,21 @@ table {
   z-index: 1;
   min-height: 100%;
   overflow: hidden;
+}
+
+.eventmate-scroll-region {
+  -webkit-overflow-scrolling: touch;
+}
+
+.eventmate-scroll-region > .eventmate-route-shell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.eventmate-scroll-region > .eventmate-route-shell > .eventmate-page,
+.eventmate-scroll-region > .eventmate-page {
+  min-height: 100% !important;
 }
 
 .eventmate-route-shell > * {

@@ -47,7 +47,7 @@ export default function StudentLayout() {
       <StudentNavbar activePage={activePage} user={user} onLogout={handleLogout} />
       <main
         ref={contentRef}
-        className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+        className="eventmate-scroll-region flex-1 min-h-0 overflow-y-auto overscroll-contain"
       >
         <Outlet />
       </main>

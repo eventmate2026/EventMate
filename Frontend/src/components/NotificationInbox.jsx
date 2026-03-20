@@ -83,7 +83,7 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
     try {
       const response = await api({
         ...SummaryApi.get_my_notifications,
-        params: { all: true },
+        params: { page: 1, limit: 100 },
         cacheTTL: 6000,
         skipDedupe: true
       });

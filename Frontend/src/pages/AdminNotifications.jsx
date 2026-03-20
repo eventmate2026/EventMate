@@ -107,7 +107,7 @@ export default function AdminNotifications() {
       const [notificationResponse, contactResponse, eventsResponse] = await Promise.all([
         api({
           ...SummaryApi.get_my_notifications,
-          params: { all: true },
+          params: { page: 1, limit: 100 },
           cacheTTL: 6000,
           skipDedupe: true
         }),

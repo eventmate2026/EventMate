@@ -12,6 +12,8 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 const normalizeId = (value) => String(value || "").trim();
 const normalizeName = (value, fallback) =>
   String(value || "").trim() || fallback;
+const INBOX_NOTIFICATION_FIELDS =
+  "_id title message type refId sender recipient.userId recipient.name recipient.role isRead readAt createdAt updatedAt emailDelivery.status emailDelivery.acceptedAt emailDelivery.deliveredAt emailDelivery.lastError";
 
 export const collectOrganizerEventAudience = (registrations = [], isTeamEvent = false) => {
   const allowedIds = new Set();
@@ -131,7 +133,10 @@ export const getMyNotifications = async (req, res, next) => {
     const includeAll = String(req.query.all || "").toLowerCase() === "true";
     const baseFilter = { "recipient.userId": req.user._id };
 
-    const query = Notification.find(baseFilter).sort({ createdAt: -1 });
+    const query = Notification.find(baseFilter)
+      .select(INBOX_NOTIFICATION_FIELDS)
+      .sort({ createdAt: -1 })
+      .lean();
     if (!includeAll) {
       query.skip((page - 1) * limit).limit(limit);
     }

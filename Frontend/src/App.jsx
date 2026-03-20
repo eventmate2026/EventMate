@@ -559,25 +559,14 @@ function AnimatedOutlet() {
 
 function MainLayout() {
   const location = useLocation();
-  const mainContentRef = useRef(null);
   const showSharedFooter = location.pathname !== "/";
 
-  useEffect(() => {
-    const scroller = mainContentRef.current;
-    if (scroller) {
-      scroller.scrollTo({ top: 0, behavior: "auto" });
-    }
-  }, [location.pathname, location.search, location.hash]);
-
   return (
-    <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-0 flex-col overflow-hidden transition-colors duration-500">
+    <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-screen flex-col overflow-x-hidden transition-colors duration-500">
       <ScrollProgressBeam />
       <AmbientBackdrop variant="public" />
       <Navbar variant="public" />
-      <main
-        ref={mainContentRef}
-        className="relative z-[1] flex-1 min-h-0 overflow-y-auto overscroll-contain"
-      >
+      <main className="relative z-[1] flex-1">
         <AnimatedOutlet />
       </main>
       {showSharedFooter && <Footer />}
@@ -624,7 +613,7 @@ function DashboardLayout() {
       )}
       <main
         ref={mainContentRef}
-        className={`relative z-[1] flex-1 min-h-0 ${
+        className={`eventmate-scroll-region relative z-[1] flex-1 min-h-0 ${
           hideTopNav ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
         }`}
       >
