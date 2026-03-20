@@ -1,8 +1,18 @@
 import sgMail from "@sendgrid/mail";
 import nodemailer from "nodemailer";
 
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+const getSendGridApiKey = () => {
+  const rawKey = String(process.env.SENDGRID_API_KEY || "").trim();
+  if (!rawKey) return "";
+
+  // Strip accidental surrounding quotes and whitespace/newlines.
+  return rawKey.replace(/^"|"$/g, "").replace(/^'|'$/g, "").trim();
+};
+
+const SENDGRID_API_KEY = getSendGridApiKey();
+
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
 }
 
 const CONSUMER_MAILBOX_DOMAINS = new Set([
@@ -87,7 +97,7 @@ const getSendGridErrorMessage = (error) => {
   return String(error?.message || "").trim();
 };
 
-const canUseSendGrid = () => Boolean(String(process.env.SENDGRID_API_KEY || "").trim());
+const canUseSendGrid = () => Boolean(SENDGRID_API_KEY);
 
 const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === "boolean") return value;
