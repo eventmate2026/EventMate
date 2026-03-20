@@ -87,6 +87,8 @@ const getSendGridErrorMessage = (error) => {
   return String(error?.message || "").trim();
 };
 
+const canUseSendGrid = () => Boolean(String(process.env.SENDGRID_API_KEY || "").trim());
+
 const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === "boolean") return value;
   const normalized = String(value || "").trim().toLowerCase();
@@ -96,59 +98,137 @@ const normalizeBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+const normalizeNumber = (value, fallback) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const getSmtpConfig = () => {
+  const legacyUser = String(process.env.EMAIL_USERNAME || "").trim();
+  const legacyPass = String(process.env.EMAIL_PASSWORD || "").trim();
+  const host = String(process.env.SMTP_HOST || "").trim();
+  const service = String(
+    process.env.SMTP_SERVICE ||
+      process.env.EMAIL_SERVICE ||
+      (!host && legacyUser && legacyPass ? "gmail" : "")
+  ).trim();
+  const user = String(process.env.SMTP_USER || legacyUser).trim();
+  const pass = String(process.env.SMTP_PASS || legacyPass).trim();
+  const port = normalizeNumber(process.env.SMTP_PORT, 465);
+  const secure = normalizeBoolean(process.env.SMTP_SECURE, port === 465);
+  const family = normalizeNumber(process.env.SMTP_FAMILY, 4);
+  const connectionTimeout = normalizeNumber(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000);
+  const greetingTimeout = normalizeNumber(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
+  const socketTimeout = normalizeNumber(process.env.SMTP_SOCKET_TIMEOUT_MS, 15000);
+
+  return {
+    host,
+    service,
+    user,
+    pass,
+    port,
+    secure,
+    family,
+    connectionTimeout,
+    greetingTimeout,
+    socketTimeout,
+  };
+};
+
 const getEmailProvider = () => {
   const explicitProvider = String(process.env.EMAIL_PROVIDER || "").trim().toLowerCase();
-  if (explicitProvider) return explicitProvider;
+  if (["smtp", "gmail", "googlemail", "outlook", "hotmail"].includes(explicitProvider)) {
+    return "smtp";
+  }
+  if (explicitProvider === "sendgrid") return "sendgrid";
 
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const smtpConfig = getSmtpConfig();
+  if ((smtpConfig.host || smtpConfig.service) && smtpConfig.user && smtpConfig.pass) {
     return "smtp";
   }
 
-  return process.env.SENDGRID_API_KEY ? "sendgrid" : "";
+  return canUseSendGrid() ? "sendgrid" : "";
 };
 
 const createSmtpTransporter = () => {
   if (smtpTransporter) return smtpTransporter;
 
-  const smtpHost = String(process.env.SMTP_HOST || "").trim();
-  const smtpPort = Number(process.env.SMTP_PORT || 465);
-  const smtpUser = String(process.env.SMTP_USER || "").trim();
-  const smtpPass = String(process.env.SMTP_PASS || "").trim();
-  const smtpSecure = normalizeBoolean(process.env.SMTP_SECURE, smtpPort === 465);
-  const smtpFamily = Number(process.env.SMTP_FAMILY || 4);
+  const smtpConfig = getSmtpConfig();
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+  if ((!smtpConfig.host && !smtpConfig.service) || !smtpConfig.user || !smtpConfig.pass) {
     const err = new Error("Missing SMTP configuration");
     err.statusCode = 500;
     throw err;
   }
 
-  smtpTransporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpSecure,
-    family: Number.isFinite(smtpFamily) ? smtpFamily : 4,
-    connectionTimeout: 15000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000,
-    tls: {
-      servername: smtpHost,
-    },
+  const transportOptions = {
+    port: smtpConfig.port,
+    secure: smtpConfig.secure,
+    family: smtpConfig.family,
+    connectionTimeout: smtpConfig.connectionTimeout,
+    greetingTimeout: smtpConfig.greetingTimeout,
+    socketTimeout: smtpConfig.socketTimeout,
     auth: {
-      user: smtpUser,
-      pass: smtpPass,
+      user: smtpConfig.user,
+      pass: smtpConfig.pass,
     },
-  });
+  };
+
+  if (smtpConfig.service) {
+    transportOptions.service = smtpConfig.service;
+  } else {
+    transportOptions.host = smtpConfig.host;
+    transportOptions.tls = {
+      servername: smtpConfig.host,
+    };
+  }
+
+  smtpTransporter = nodemailer.createTransport(transportOptions);
 
   return smtpTransporter;
 };
 
-const getSmtpErrorMessage = (error) => String(error?.message || "").trim();
+const getSmtpErrorMessage = (error) => {
+  if (error?.code === "ETIMEDOUT") {
+    return "SMTP connection timed out. Check your SMTP host, port, firewall/network access, or switch to an API-based provider.";
+  }
+  return String(error?.message || "").trim();
+};
+
+const sendWithSendGrid = async ({
+  to,
+  subject,
+  text,
+  html,
+  attachments,
+  senderEmail,
+  senderName,
+  replyTo,
+}) => {
+  warnIfSenderLooksUnsafe(senderEmail, replyTo);
+
+  await sgMail.send({
+    to,
+    from: {
+      email: senderEmail,
+      name: senderName,
+    },
+    replyTo,
+    subject,
+    text,
+    html,
+    attachments,
+  });
+};
 
 const sendEmail = async (to, subject, html, options = {}) => {
   const emailProvider = getEmailProvider();
   const senderName = process.env.EMAIL_FROM_NAME || "EventMate";
-  const senderEmail = process.env.EMAIL_FROM_EMAIL || process.env.EMAIL_USERNAME;
+  const senderEmail =
+    process.env.EMAIL_FROM_EMAIL ||
+    process.env.SMTP_FROM_EMAIL ||
+    process.env.EMAIL_USERNAME ||
+    process.env.SMTP_USER;
   const replyTo = process.env.EMAIL_REPLY_TO || senderEmail;
   const attachments = Array.isArray(options?.attachments) ? options.attachments : [];
   const text = String(options?.text || htmlToPlainText(html)).trim();
@@ -184,6 +264,25 @@ const sendEmail = async (to, subject, html, options = {}) => {
     } catch (error) {
       console.error("SMTP Error:", error);
 
+      if (canUseSendGrid()) {
+        console.warn("SMTP delivery failed. Falling back to SendGrid.");
+        try {
+          await sendWithSendGrid({
+            to,
+            subject,
+            text,
+            html,
+            attachments,
+            senderEmail,
+            senderName,
+            replyTo,
+          });
+          return;
+        } catch (fallbackError) {
+          console.error("SendGrid Fallback Error:", fallbackError.response?.body || fallbackError);
+        }
+      }
+
       const providerMessage = getSmtpErrorMessage(error);
       const err = new Error(
         providerMessage
@@ -195,20 +294,16 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
   }
 
-  warnIfSenderLooksUnsafe(senderEmail, replyTo);
-
   try {
-    await sgMail.send({
+    await sendWithSendGrid({
       to,
-      from: {
-        email: senderEmail,
-        name: senderName,
-      },
-      replyTo,
       subject,
       text,
       html,
       attachments,
+      senderEmail,
+      senderName,
+      replyTo,
     });
   } catch (error) {
     console.error("SendGrid Error:", error.response?.body || error);
