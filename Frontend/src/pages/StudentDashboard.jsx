@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BadgeCheck, CalendarDays, Loader2, MapPin, MessageSquareMore, Search, Users2 } from "lucide-react";
 import api from "../lib/api";
@@ -174,14 +174,16 @@ export default function StudentDashboard() {
   const [error, setError] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
 
-  const fetchDashboardEvents = async () => {
-    setLoading(true);
+  const fetchDashboardEvents = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     setRegistrationWarning(null);
     try {
       const [publicResponse, registrationInfo] = await Promise.all([
         api({ ...SummaryApi.get_public_events, cacheTTL: 90000 }),
-        fetchMyRegistrations(),
+        fetchMyRegistrations({ bypassCache: true }),
       ]);
       const registrationRows = Array.isArray(registrationInfo?.rows) ? registrationInfo.rows : [];
       const registeredIds = new Set(registrationRows.map((row) => String(row?.eventId || "").trim()).filter(Boolean));
@@ -213,11 +215,27 @@ export default function StudentDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDashboardEvents();
-  }, []);
+
+    const refreshOnFocus = () => {
+      void fetchDashboardEvents({ silent: true });
+    };
+    const intervalId = window.setInterval(() => {
+      void fetchDashboardEvents({ silent: true });
+    }, 15000);
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [fetchDashboardEvents]);
 
   useEffect(() => {
     const fetchAssignedEvents = async () => {
@@ -233,18 +251,30 @@ export default function StudentDashboard() {
     fetchAssignedEvents();
   }, [user?._id]);
 
-  useEffect(() => {
-    const fetchCertificateCount = async () => {
-      try {
-        const response = await api({ ...SummaryApi.get_my_certificates, cacheTTL: 90000 });
-        setCertificateCount(countCertificateRows(response?.data));
-      } catch {
-        setCertificateCount(0);
-      }
-    };
+  const fetchCertificateCount = useCallback(async () => {
+    try {
+      const response = await api({
+        ...SummaryApi.get_my_certificates,
+        cacheTTL: 0,
+        skipCache: true,
+      });
+      setCertificateCount(countCertificateRows(response?.data));
+    } catch {
+      setCertificateCount(0);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchCertificateCount();
-  }, [user?._id]);
+
+    const intervalId = window.setInterval(() => {
+      void fetchCertificateCount();
+    }, 15000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchCertificateCount, user?._id]);
 
   useEffect(() => {
     return subscribeAuthUpdates(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
 import { isRegistrationEventCompleted } from "../lib/eventSchedule";
@@ -217,28 +217,46 @@ export default function StudentMyEvents() {
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
 
-  useEffect(() => {
-    const loadMyEvents = async () => {
+  const loadMyEvents = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
       setLoading(true);
-      setError(null);
-      setWarning(null);
-      try {
-        const response = await fetchMyRegistrations();
-        setWarning(response.warning);
-        const nextRows = response.rows
-          .map(mapToUiRow)
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setRows(nextRows);
-      } catch (fetchError) {
-        setError(fetchError?.response?.data?.message || "Unable to load your registrations.");
-        setRows([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadMyEvents();
+    }
+    setError(null);
+    setWarning(null);
+    try {
+      const response = await fetchMyRegistrations({ bypassCache: true });
+      setWarning(response.warning);
+      const nextRows = response.rows
+        .map(mapToUiRow)
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setRows(nextRows);
+    } catch (fetchError) {
+      setError(fetchError?.response?.data?.message || "Unable to load your registrations.");
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadMyEvents();
+
+    const refreshOnFocus = () => {
+      void loadMyEvents({ silent: true });
+    };
+    const intervalId = window.setInterval(() => {
+      void loadMyEvents({ silent: true });
+    }, 15000);
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [loadMyEvents]);
 
   const filteredRows = useMemo(() => {
     const term = String(searchTerm || "").trim().toLowerCase();

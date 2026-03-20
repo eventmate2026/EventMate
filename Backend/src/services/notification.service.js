@@ -243,7 +243,7 @@ const getRetryDelayMs = (attempts, error) => {
 
 export const processPendingNotificationEmails = async ({
   batchSize = 20,
-  maxAttempts = 5
+  maxAttempts = 8
 } = {}) => {
   if (workerBusy) return { processed: 0 };
   workerBusy = true;
@@ -360,7 +360,7 @@ const schedulePendingNotificationEmailProcessing = (delayMs = 250) => {
 export const startNotificationEmailWorker = ({
   intervalMs = 5000,
   batchSize = 20,
-  maxAttempts = 5
+  maxAttempts = 8
 } = {}) => {
   if (workerIntervalId) return workerIntervalId;
 

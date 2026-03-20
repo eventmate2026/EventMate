@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarDays, Clock3, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
@@ -236,27 +236,51 @@ export default function MyCertificates() {
   useToastFeedback(error, { defaultType: "error" });
   useToastFeedback(notice, { defaultType: "error" });
 
-  useEffect(() => {
-    const fetchCertificates = async () => {
+  const fetchCertificates = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
       setLoading(true);
-      setError(null);
+    }
+    setError(null);
+    if (!silent) {
       setNotice(null);
-      try {
-        const response = await api({ ...SummaryApi.get_my_certificates, cacheTTL: 90000 });
-        const rows = toCertificateRows(response.data).sort(
-          (a, b) => new Date(b?.issuedAt || 0).getTime() - new Date(a?.issuedAt || 0).getTime()
-        );
-        setCertificateRows(rows);
-      } catch (fetchError) {
-        setCertificateRows([]);
-        setError(fetchError.response?.data?.message || "Unable to load certificate records.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCertificates();
+    }
+    try {
+      const response = await api({
+        ...SummaryApi.get_my_certificates,
+        cacheTTL: 0,
+        skipCache: true,
+      });
+      const rows = toCertificateRows(response.data).sort(
+        (a, b) => new Date(b?.issuedAt || 0).getTime() - new Date(a?.issuedAt || 0).getTime()
+      );
+      setCertificateRows(rows);
+    } catch (fetchError) {
+      setCertificateRows([]);
+      setError(fetchError.response?.data?.message || "Unable to load certificate records.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchCertificates();
+
+    const refreshOnFocus = () => {
+      void fetchCertificates({ silent: true });
+    };
+    const intervalId = window.setInterval(() => {
+      void fetchCertificates({ silent: true });
+    }, 15000);
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, [fetchCertificates]);
 
   const mappedRows = useMemo(
     () =>
