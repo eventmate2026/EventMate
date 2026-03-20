@@ -2,17 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import api from "../lib/api";
+import { useToast } from "../context/ToastContext";
 
 export default function VerifyRegistration() {
   const [params] = useSearchParams();
   const token = params.get("token");
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState({ type: "info", text: "Verifying registration..." });
 
   useEffect(() => {
     const verify = async () => {
       if (!token) {
-        setMessage({ type: "error", text: "Missing verification token." });
+        const nextMessage = { type: "error", text: "Missing verification token." };
+        setMessage(nextMessage);
+        toast.error(nextMessage.text);
         setLoading(false);
         return;
       }
@@ -27,11 +31,14 @@ export default function VerifyRegistration() {
           type: "success",
           text: response.data?.message || "Registration verified successfully.",
         });
+        toast.success(response.data?.message || "Registration verified successfully.");
       } catch (error) {
-        setMessage({
+        const nextMessage = {
           type: "error",
           text: error.response?.data?.message || "Unable to verify registration.",
-        });
+        };
+        setMessage(nextMessage);
+        toast.error(nextMessage.text);
       } finally {
         setLoading(false);
       }

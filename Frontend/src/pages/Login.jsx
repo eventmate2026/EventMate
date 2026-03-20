@@ -6,6 +6,7 @@ import api from "../lib/api";
 import { storeAuth } from "../lib/auth";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
+import { useToast } from "../context/ToastContext";
 
 const dashboardRoutes = {
   MAIN_ADMIN: "/admin-dashboard",
@@ -17,6 +18,7 @@ const dashboardRoutes = {
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
+  const toast = useToast();
   const [data, setData] = useState({
     email: "",
     password: "",
@@ -75,6 +77,7 @@ export default function Login() {
         email: !data.email ? "Email is required" : "",
         password: !data.password ? "Password is required" : "",
       });
+      toast.error("Please enter both email and password.");
       return;
     }
 
@@ -82,6 +85,7 @@ export default function Login() {
     try {
       const response = await api({ ...SummaryApi.login, data });
       const { accessToken, refreshToken, role, token, user } = response.data || {};
+      toast.success("Login successful. Redirecting to your dashboard...");
       finalizeLogin({ accessToken: accessToken || token, refreshToken, role, user });
     } catch (error) {
       const status = error.response?.status;
@@ -107,13 +111,14 @@ export default function Login() {
         const pendingEmail = String(data.email || "").trim().toLowerCase();
         if (pendingEmail) {
           storePendingVerificationEmail(pendingEmail);
+          toast.info("Please verify your email before logging in.");
           navigate(`/verify-email?email=${encodeURIComponent(pendingEmail)}`, {
             state: { email: pendingEmail, message: backendMessage },
           });
           return;
         }
       }
-      setErrors({ submit: rateLimitMessage || networkMessage });
+      toast.error(rateLimitMessage || networkMessage);
     } finally {
       setIsLoading(false);
     }
@@ -272,13 +277,6 @@ export default function Login() {
                   Admins, Organizers, Coordinators, and Students login here. Access is provided by role after
                   authentication.
                 </p>
-
-                {errors.submit && (
-                  <p className="rounded-lg bg-red-50 py-2 text-center text-sm text-red-600">
-                    {errors.submit}
-                  </p>
-                )}
-
                 <button
                   disabled={!isValid || isLoading}
                   className={`w-full rounded-xl py-3 text-sm font-semibold uppercase tracking-[0.14em] text-white transition ${

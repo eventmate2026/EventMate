@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { useToast } from "../context/ToastContext";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState("email");
   const [formData, setFormData] = useState({
     email: "",
@@ -13,7 +15,6 @@ export default function ForgotPassword() {
     newPassword: "",
     confirmPassword: "",
   });
-  const [message, setMessage] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -37,6 +38,7 @@ export default function ForgotPassword() {
   const submitEmail = async () => {
     if (!formData.email) {
       setErrors({ email: "Email is required" });
+      toast.error("Please enter your email address.");
       return;
     }
 
@@ -48,13 +50,10 @@ export default function ForgotPassword() {
       });
       const apiMessage = response.data?.message || "OTP sent to your email.";
       const otp = response.data?.otp;
-      setMessage({ type: "success", text: otp ? `${apiMessage} OTP: ${otp}` : apiMessage });
+      toast.success(otp ? `${apiMessage} OTP: ${otp}` : apiMessage, { duration: 4200 });
       setStep("reset");
     } catch (error) {
-      setMessage({
-        type: "error",
-        text: getErrorMessage(error, "Unable to send OTP. Try again."),
-      });
+      toast.error(getErrorMessage(error, "Unable to send OTP. Try again."));
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +68,7 @@ export default function ForgotPassword() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      toast.error("Please complete the OTP and password fields correctly.");
       return;
     }
 
@@ -82,13 +82,10 @@ export default function ForgotPassword() {
           newPassword: formData.newPassword,
         },
       });
-      setMessage({ type: "success", text: response.data?.message || "Password reset successful." });
+      toast.success(response.data?.message || "Password reset successful.");
       setTimeout(() => navigate("/login"), 900);
     } catch (error) {
-      setMessage({
-        type: "error",
-        text: getErrorMessage(error, "Unable to reset password. Try again."),
-      });
+      toast.error(getErrorMessage(error, "Unable to reset password. Try again."));
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +93,7 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(null);
+    setErrors({});
     if (step === "email") {
       await submitEmail();
     } else {
@@ -192,18 +189,6 @@ export default function ForgotPassword() {
                 {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
               </div>
             </>
-          )}
-
-          {message && (
-            <p
-              className={`text-sm text-center rounded-lg py-2 ${
-                message.type === "success"
-                  ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
-            </p>
           )}
 
           <button

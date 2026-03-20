@@ -2,6 +2,10 @@ const USER_KEY = "user";
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
 const AUTH_UPDATED_EVENT = "eventmate:auth-updated";
+const USER_COOKIE_KEY = "eventmate_user";
+const ACCESS_TOKEN_COOKIE_KEY = "eventmate_access_token";
+const REFRESH_TOKEN_COOKIE_KEY = "eventmate_refresh_token";
+const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 const getStorage = () => {
   if (typeof window === "undefined") return null;
@@ -30,6 +34,33 @@ const writeStorage = (key, value) => {
   } catch {
     // Ignore storage write failures and keep the in-memory UI responsive.
   }
+};
+
+const readCookie = (key) => {
+  if (typeof document === "undefined") return null;
+  const pattern = `${encodeURIComponent(key)}=`;
+  const cookie = document.cookie
+    .split(";")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(pattern));
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice(pattern.length));
+  } catch {
+    return cookie.slice(pattern.length);
+  }
+};
+
+const writeCookie = (key, value, maxAgeSeconds = COOKIE_MAX_AGE_SECONDS) => {
+  if (typeof document === "undefined") return;
+  const encodedKey = encodeURIComponent(key);
+  const encodedValue = encodeURIComponent(value);
+  document.cookie = `${encodedKey}=${encodedValue}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+};
+
+const removeCookie = (key) => {
+  if (typeof document === "undefined") return;
+  document.cookie = `${encodeURIComponent(key)}=; path=/; max-age=0; SameSite=Lax`;
 };
 
 const removeStorage = (key) => {
@@ -65,21 +96,28 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   const finalAccessToken = accessToken || token;
   if (finalAccessToken) {
     writeStorage(ACCESS_TOKEN_KEY, finalAccessToken);
+    writeCookie(ACCESS_TOKEN_COOKIE_KEY, finalAccessToken);
   } else if (accessToken === null || token === null) {
     removeStorage(ACCESS_TOKEN_KEY);
+    removeCookie(ACCESS_TOKEN_COOKIE_KEY);
   }
 
   if (refreshToken) {
     writeStorage(REFRESH_TOKEN_KEY, refreshToken);
+    writeCookie(REFRESH_TOKEN_COOKIE_KEY, refreshToken);
   } else if (refreshToken === null) {
     removeStorage(REFRESH_TOKEN_KEY);
+    removeCookie(REFRESH_TOKEN_COOKIE_KEY);
   }
 
   const normalized = normalizeUser(user);
   if (normalized) {
-    writeStorage(USER_KEY, JSON.stringify(normalized));
+    const serializedUser = JSON.stringify(normalized);
+    writeStorage(USER_KEY, serializedUser);
+    writeCookie(USER_COOKIE_KEY, serializedUser);
   } else if (user === null) {
     removeStorage(USER_KEY);
+    removeCookie(USER_COOKIE_KEY);
   }
 
   emitAuthUpdated();
@@ -87,20 +125,41 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
 
 export const getStoredUser = () => {
   try {
-    const parsed = JSON.parse(readStorage(USER_KEY) || "null");
-    return normalizeUser(parsed);
+    const raw = readStorage(USER_KEY) || readCookie(USER_COOKIE_KEY) || "null";
+    const parsed = JSON.parse(raw);
+    const normalized = normalizeUser(parsed);
+    if (normalized && !readStorage(USER_KEY)) {
+      writeStorage(USER_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
   } catch {
     return null;
   }
 };
 
-export const getStoredToken = () => readStorage(ACCESS_TOKEN_KEY);
-export const getStoredRefreshToken = () => readStorage(REFRESH_TOKEN_KEY);
+export const getStoredToken = () => {
+  const value = readStorage(ACCESS_TOKEN_KEY) || readCookie(ACCESS_TOKEN_COOKIE_KEY);
+  if (value && !readStorage(ACCESS_TOKEN_KEY)) {
+    writeStorage(ACCESS_TOKEN_KEY, value);
+  }
+  return value;
+};
+
+export const getStoredRefreshToken = () => {
+  const value = readStorage(REFRESH_TOKEN_KEY) || readCookie(REFRESH_TOKEN_COOKIE_KEY);
+  if (value && !readStorage(REFRESH_TOKEN_KEY)) {
+    writeStorage(REFRESH_TOKEN_KEY, value);
+  }
+  return value;
+};
 
 export const clearAuth = () => {
   removeStorage(ACCESS_TOKEN_KEY);
   removeStorage(REFRESH_TOKEN_KEY);
   removeStorage(USER_KEY);
+  removeCookie(ACCESS_TOKEN_COOKIE_KEY);
+  removeCookie(REFRESH_TOKEN_COOKIE_KEY);
+  removeCookie(USER_COOKIE_KEY);
   emitAuthUpdated();
 };
 

@@ -279,7 +279,7 @@ export default function Landing() {
   const viewportOnce = { once: true, amount: 0.25 };
 
   return (
-    <div className="min-h-screen relative bg-white dark:bg-[#030712] text-gray-900 dark:text-white overflow-x-hidden selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-300">
+    <div className="min-h-[100svh] relative bg-white dark:bg-[#030712] text-gray-900 dark:text-white overflow-x-hidden selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-300">
       
       {/* --- SCROLL PROGRESS BAR --- */}
       <motion.div
@@ -300,7 +300,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION (Synced Animation) --- */}
-      <section className="relative z-10 pt-24 pb-12 px-4 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
+      <section className="relative z-10 flex min-h-[calc(100svh-4rem)] items-center px-4 pt-20 pb-10 sm:min-h-0 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="hero-spotlight hero-spotlight--one" />
           <div className="hero-spotlight hero-spotlight--two" />
@@ -320,7 +320,7 @@ export default function Landing() {
               {/* Badge */}
               <motion.span
                 variants={textReveal}
-                className="inline-block py-1 px-4 rounded-full bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/10 text-indigo-600 dark:text-indigo-300 text-xs font-bold uppercase tracking-[0.2em] mb-8 backdrop-blur-md"
+                className="mb-6 inline-block rounded-full border border-indigo-100 bg-indigo-50 px-4 py-1 text-xs font-bold uppercase tracking-[0.2em] text-indigo-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 sm:mb-8"
               >
                 Campus Event Management
               </motion.span>
@@ -328,7 +328,7 @@ export default function Landing() {
               {/* Main Title (Word by word effect) */}
               <motion.h1
                 variants={textReveal}
-                className="hero-title text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
+                className="hero-title mb-6 text-[clamp(3rem,12vw,4.8rem)] font-black leading-[1.05] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40 sm:mb-8 sm:text-5xl md:text-7xl lg:text-8xl"
               >
                 Manage Campus Events <br />
                 <motion.span
@@ -342,12 +342,12 @@ export default function Landing() {
               </motion.h1>
 
               {/* Description */}
-              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+              <motion.p variants={textReveal} className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-gray-600 dark:text-gray-300 sm:mt-6 sm:text-lg md:text-xl">
                 The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
               </motion.p>
 
               {/* Buttons */}
-              <motion.div variants={textReveal} className="mt-10 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
+              <motion.div variants={textReveal} className="mt-8 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
                 <Link
                   to="/signup"
                   className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 cta-glow"

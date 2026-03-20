@@ -5,9 +5,11 @@ import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
 import api from "../lib/api";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
+import { useToast } from "../context/ToastContext";
 
 export default function Signup() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -17,7 +19,6 @@ export default function Signup() {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -53,10 +54,11 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSuccessMessage("");
+    setErrors({});
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      toast.error("Please correct the highlighted fields and try again.");
       return;
     }
 
@@ -75,7 +77,7 @@ export default function Signup() {
       const apiMessage =
         response.data?.message || "Registration successful. Check your email for the OTP.";
       const otp = response.data?.otp;
-      setSuccessMessage(otp ? `${apiMessage} OTP: ${otp}` : apiMessage);
+      toast.success(otp ? `${apiMessage} OTP: ${otp}` : apiMessage, { duration: 4200 });
       storePendingVerificationEmail(email);
       setFormData({
         fullName: "",
@@ -97,7 +99,8 @@ export default function Signup() {
         error.response?.data?.errors?.[0] ||
         error.response?.data?.message ||
         "Registration failed. Please try again.";
-      setErrors({ submit: apiError });
+      setErrors((prev) => ({ ...prev, submit: apiError }));
+      toast.error(apiError);
     } finally {
       setIsLoading(false);
     }
@@ -291,17 +294,6 @@ export default function Signup() {
                 >
                   {isLoading ? "Signing up..." : "Sign Up"}
                 </button>
-
-                {errors.submit && (
-                  <p className="text-sm text-red-600 dark:text-red-300 text-center bg-red-50 dark:bg-red-500/15 py-2 rounded-lg">
-                    {errors.submit}
-                  </p>
-                )}
-                {successMessage && (
-                  <p className="text-sm text-green-700 dark:text-emerald-300 text-center bg-green-50 dark:bg-emerald-500/15 py-2 rounded-lg">
-                    {successMessage}
-                  </p>
-                )}
               </form>
 
               <div className="flex items-center my-6">
