@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Clock3, Loader2, UploadCloud, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock3,
+  Copy,
+  ExternalLink,
+  Loader2,
+  UploadCloud,
+  XCircle,
+} from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { invalidateMyRegistrationsCache } from "../lib/registrationApi";
@@ -13,6 +22,7 @@ const STATUS_STYLES = {
   Verified: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   NotRequired: "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300",
 };
+const MAX_SCREENSHOT_SIZE_MB = 5;
 
 const formatStatus = (value) => {
   const text = String(value || "").trim();
@@ -26,6 +36,32 @@ const formatCurrency = (value) => {
   return `Rs ${amount}`;
 };
 
+const buildUpiPaymentUrl = (details) => {
+  const upiId = String(details?.paymentConfig?.upiId || "").trim();
+  if (!upiId) return "";
+
+  const params = new URLSearchParams();
+  params.set("pa", upiId);
+
+  const accountName = String(details?.paymentConfig?.accountName || "").trim();
+  if (accountName) {
+    params.set("pn", accountName);
+  }
+
+  const amount = Number(details?.payment?.amount || 0);
+  if (Number.isFinite(amount) && amount > 0) {
+    params.set("am", amount.toFixed(2));
+    params.set("cu", "INR");
+  }
+
+  const note = String(details?.event?.title || "Event registration").trim();
+  if (note) {
+    params.set("tn", note);
+  }
+
+  return `upi://pay?${params.toString()}`;
+};
+
 export default function StudentRegistrationPayment() {
   const { registrationId } = useParams();
   const navigate = useNavigate();
@@ -36,6 +72,8 @@ export default function StudentRegistrationPayment() {
   const [details, setDetails] = useState(null);
   const [transactionId, setTransactionId] = useState("");
   const [paymentScreenshot, setPaymentScreenshot] = useState(null);
+  const [paymentScreenshotPreviewUrl, setPaymentScreenshotPreviewUrl] = useState("");
+  const paymentScreenshotInputRef = useRef(null);
 
   useToastFeedback(error, { defaultType: "error" });
   useToastFeedback(notice);
@@ -68,6 +106,70 @@ export default function StudentRegistrationPayment() {
     loadDetails();
   }, [loadDetails]);
 
+  useEffect(() => {
+    if (!paymentScreenshot) {
+      setPaymentScreenshotPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(paymentScreenshot);
+    setPaymentScreenshotPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [paymentScreenshot]);
+
+  const handleCopy = async (label, value) => {
+    const text = String(value || "").trim();
+    if (!text) {
+      setNotice({ type: "error", text: `${label} is not available.` });
+      return;
+    }
+
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      setNotice({ type: "error", text: "Clipboard is not available in this browser." });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice({ type: "success", text: `${label} copied.` });
+    } catch {
+      setNotice({ type: "error", text: `Unable to copy ${label.toLowerCase()}.` });
+    }
+  };
+
+  const handlePaymentScreenshotChange = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+
+    if (!nextFile) {
+      setPaymentScreenshot(null);
+      if (paymentScreenshotInputRef.current) {
+        paymentScreenshotInputRef.current.value = "";
+      }
+      return;
+    }
+
+    if (!String(nextFile.type || "").toLowerCase().startsWith("image/")) {
+      event.target.value = "";
+      setPaymentScreenshot(null);
+      setNotice({ type: "error", text: "Upload a PNG, JPG, or other image screenshot." });
+      return;
+    }
+
+    if (nextFile.size > MAX_SCREENSHOT_SIZE_MB * 1024 * 1024) {
+      event.target.value = "";
+      setPaymentScreenshot(null);
+      setNotice({
+        type: "error",
+        text: `Payment screenshot must be under ${MAX_SCREENSHOT_SIZE_MB}MB.`,
+      });
+      return;
+    }
+
+    setNotice(null);
+    setPaymentScreenshot(nextFile);
+  };
+
   const handleSubmit = async () => {
     if (!details?.canSubmitPayment) return;
     if (!transactionId.trim()) {
@@ -96,6 +198,9 @@ export default function StudentRegistrationPayment() {
       });
       invalidateMyRegistrationsCache();
       setPaymentScreenshot(null);
+      if (paymentScreenshotInputRef.current) {
+        paymentScreenshotInputRef.current.value = "";
+      }
       setNotice({
         type: "success",
         text: response.data?.message || "Payment proof submitted successfully.",
@@ -115,6 +220,7 @@ export default function StudentRegistrationPayment() {
   const isUnderReview = paymentStatus === "UnderReview";
   const isVerified = paymentStatus === "Verified";
   const canUploadProof = Boolean(details?.canSubmitPayment) && !isUnderReview && !isVerified;
+  const upiPaymentUrl = buildUpiPaymentUrl(details);
 
   return (
     <section className="eventmate-page min-h-screen bg-slate-100/80 px-4 pt-4 pb-8 dark:bg-gray-900 sm:px-6">
@@ -211,10 +317,24 @@ export default function StudentRegistrationPayment() {
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">UPI ID</p>
-                    <p className="mt-1 break-all text-sm font-semibold text-slate-900 dark:text-white">
-                      {details?.paymentConfig?.upiId || "Not available"}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">UPI ID</p>
+                        <p className="mt-1 break-all text-sm font-semibold text-slate-900 dark:text-white">
+                          {details?.paymentConfig?.upiId || "Not available"}
+                        </p>
+                      </div>
+                      {details?.paymentConfig?.upiId ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCopy("UPI ID", details.paymentConfig.upiId)}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                        >
+                          <Copy size={12} />
+                          Copy
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 {details?.paymentConfig?.instructions ? (
@@ -222,13 +342,44 @@ export default function StudentRegistrationPayment() {
                     {details.paymentConfig.instructions}
                   </div>
                 ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {upiPaymentUrl ? (
+                    <a
+                      href={upiPaymentUrl}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
+                    >
+                      <ExternalLink size={13} />
+                      Open UPI App
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => handleCopy("Payment amount", formatCurrency(details?.payment?.amount))}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                  >
+                    <Copy size={13} />
+                    Copy Amount
+                  </button>
+                </div>
 
                 {String(details?.payment?.transactionId || "").trim() ? (
                   <div className="mt-4 rounded-xl border border-slate-200 p-3 dark:border-white/10">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Submitted Transaction ID</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
-                      {details.payment.transactionId}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Submitted Transaction ID</p>
+                        <p className="mt-1 break-all text-sm font-semibold text-slate-900 dark:text-white">
+                          {details.payment.transactionId}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy("Transaction ID", details.payment.transactionId)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                      >
+                        <Copy size={12} />
+                        Copy
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 
@@ -263,6 +414,9 @@ export default function StudentRegistrationPayment() {
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Upload a screenshot after you complete the payment.
                   </p>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    Accepted: image files only, up to {MAX_SCREENSHOT_SIZE_MB}MB.
+                  </p>
 
                   <div className="mt-4 space-y-3">
                     <label className="block">
@@ -284,13 +438,36 @@ export default function StudentRegistrationPayment() {
                         {paymentScreenshot ? paymentScreenshot.name : "Choose payment screenshot"}
                       </span>
                       <input
+                        ref={paymentScreenshotInputRef}
                         type="file"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/webp,image/jpg"
                         disabled={!canUploadProof}
-                        onChange={(event) => setPaymentScreenshot(event.target.files?.[0] || null)}
+                        onChange={handlePaymentScreenshotChange}
                         className="hidden"
                       />
                     </label>
+                    {paymentScreenshotPreviewUrl ? (
+                      <div className="rounded-xl border border-slate-200 p-3 dark:border-white/10">
+                        <img
+                          src={paymentScreenshotPreviewUrl}
+                          alt="Payment proof preview"
+                          className="w-full rounded-lg object-contain"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaymentScreenshot(null);
+                            if (paymentScreenshotInputRef.current) {
+                              paymentScreenshotInputRef.current.value = "";
+                            }
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                        >
+                          <XCircle size={12} />
+                          Remove Screenshot
+                        </button>
+                      </div>
+                    ) : null}
 
                     <button
                       type="button"

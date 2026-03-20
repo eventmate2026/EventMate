@@ -21,6 +21,12 @@ const formatStatus = (status) =>
 const formatRole = (role) =>
   String(role || "").trim().toLowerCase() === "leader" ? "Leader" : "Member";
 
+const formatCurrency = (value) => {
+  const amount = Number(value || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return "Free";
+  return `Rs ${amount}`;
+};
+
 export default function StudentTeamRegistration() {
   const { registrationId } = useParams();
   const navigate = useNavigate();
@@ -145,6 +151,8 @@ export default function StudentTeamRegistration() {
   const canEditMembers = registration?.status === "PendingMemberVerification";
   const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim();
   const paymentRequired = Boolean(registration?.payment?.required);
+  const paymentAmount = Number(registration?.payment?.amount || 0) || 0;
+  const paymentRejectionReason = String(registration?.payment?.rejectionReason || "").trim();
   const needsPayment = paymentRequired && (paymentStatus === "Pending" || paymentStatus === "Rejected");
   const paymentUnderReview = paymentRequired && paymentStatus === "UnderReview";
 
@@ -339,34 +347,44 @@ export default function StudentTeamRegistration() {
                           : "Waiting for team members to accept the invitation."}
                 </div>
                 {paymentRequired ? (
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        paymentStatus === "Verified"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                          : paymentStatus === "UnderReview"
-                            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
-                            : paymentStatus === "Rejected"
-                              ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-                      }`}
-                    >
-                      Payment: {formatStatus(paymentStatus)}
-                    </span>
-                    {(needsPayment || paymentUnderReview) && registration?.registrationId ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate(
-                            `/student-dashboard/my-events/payment/${encodeURIComponent(
-                              registration.registrationId
-                            )}`
-                          )
-                        }
-                        className="rounded-md bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-indigo-700"
+                  <div className="flex flex-col items-start gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          paymentStatus === "Verified"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                            : paymentStatus === "UnderReview"
+                              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
+                              : paymentStatus === "Rejected"
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                        }`}
                       >
-                        {needsPayment ? "Complete Payment" : "View Payment"}
-                      </button>
+                        Payment: {formatStatus(paymentStatus)}
+                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-300">
+                        Amount: {formatCurrency(paymentAmount)}
+                      </span>
+                      {(needsPayment || paymentUnderReview) && registration?.registrationId ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/student-dashboard/my-events/payment/${encodeURIComponent(
+                                registration.registrationId
+                              )}`
+                            )
+                          }
+                          className="rounded-md bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-indigo-700"
+                        >
+                          {needsPayment ? "Complete Payment" : "View Payment"}
+                        </button>
+                      ) : null}
+                    </div>
+                    {paymentStatus === "Rejected" && paymentRejectionReason ? (
+                      <p className="text-xs text-rose-600 dark:text-rose-300">
+                        {paymentRejectionReason}
+                      </p>
                     ) : null}
                   </div>
                 ) : null}

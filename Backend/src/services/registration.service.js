@@ -884,7 +884,7 @@ export const verifyMember = async (token) => {
 export const getTeamRegistrationStatus = async (registrationId, requesterId) => {
   const registration = await EventRegistration.findById(registrationId).populate(
     "event",
-    "title schedule venue status isTeamEvent"
+    "title schedule venue status isTeamEvent registration"
   );
 
   if (!registration) throw new Error("Registration not found");

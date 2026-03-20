@@ -13,7 +13,7 @@ import {
   buildTeamNoticeRecipientMap,
   collectOrganizerEventAudience
 } from "../src/controllers/notification.controller.js";
-import { getAllowedFrontendOrigins } from "../src/config/clientOrigins.js";
+import { getAllowedFrontendOrigins, getPrimaryFrontendUrl } from "../src/config/clientOrigins.js";
 
 test("buildNotificationEmailDeliveryState returns NOT_REQUESTED when email copy is disabled", () => {
   const result = buildNotificationEmailDeliveryState({
@@ -176,4 +176,37 @@ test("getAllowedFrontendOrigins falls back to Vercel deployment URL", () => {
   }
 
   assert.ok(result.includes("https://eventmate-app.vercel.app"));
+});
+
+test("getPrimaryFrontendUrl prefers deployed https origins over localhost", () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  const previousFrontendUrl = process.env.FRONTEND_URL;
+  const previousVercelUrl = process.env.VERCEL_URL;
+
+  process.env.FRONTEND_URLS =
+    "http://localhost:5173,http://127.0.0.1:4173,https://eventmate-app.vercel.app";
+  process.env.FRONTEND_URL = "";
+  process.env.VERCEL_URL = "eventmate-app.vercel.app";
+
+  const result = getPrimaryFrontendUrl();
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  if (previousFrontendUrl === undefined) {
+    delete process.env.FRONTEND_URL;
+  } else {
+    process.env.FRONTEND_URL = previousFrontendUrl;
+  }
+
+  if (previousVercelUrl === undefined) {
+    delete process.env.VERCEL_URL;
+  } else {
+    process.env.VERCEL_URL = previousVercelUrl;
+  }
+
+  assert.equal(result, "https://eventmate-app.vercel.app");
 });

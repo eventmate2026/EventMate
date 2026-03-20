@@ -1,4 +1,25 @@
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/+$/, "");
+const getOriginHostname = (value) => {
+  const normalized = normalizeOrigin(value);
+  if (!normalized) return "";
+
+  try {
+    return new URL(normalized).hostname.trim().toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
+const isLocalOrigin = (value) => {
+  const hostname = getOriginHostname(value);
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1"
+  );
+};
+
+const isHttpsOrigin = (value) => /^https:\/\//i.test(normalizeOrigin(value));
 
 const normalizeDeployUrl = (value) => {
   const normalized = normalizeOrigin(value);
@@ -26,7 +47,16 @@ export const getAllowedFrontendOrigins = () =>
     normalizeDeployUrl(process.env.VERCEL_URL)
   );
 
-export const getPrimaryFrontendUrl = () => getAllowedFrontendOrigins()[0] || "";
+export const getPrimaryFrontendUrl = () => {
+  const allowedOrigins = getAllowedFrontendOrigins();
+
+  return (
+    allowedOrigins.find((origin) => isHttpsOrigin(origin) && !isLocalOrigin(origin)) ||
+    allowedOrigins.find((origin) => !isLocalOrigin(origin)) ||
+    allowedOrigins[0] ||
+    ""
+  );
+};
 
 export const createCorsOriginValidator = () => {
   const allowedOrigins = getAllowedFrontendOrigins();
