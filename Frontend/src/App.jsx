@@ -559,14 +559,25 @@ function AnimatedOutlet() {
 
 function MainLayout() {
   const location = useLocation();
+  const mainContentRef = useRef(null);
   const showSharedFooter = location.pathname !== "/";
 
+  useEffect(() => {
+    const scroller = mainContentRef.current;
+    if (scroller) {
+      scroller.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [location.pathname, location.search, location.hash]);
+
   return (
-    <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-screen flex-col overflow-x-hidden transition-colors duration-500">
+    <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-0 flex-col overflow-hidden transition-colors duration-500">
       <ScrollProgressBeam />
       <AmbientBackdrop variant="public" />
       <Navbar variant="public" />
-      <main className="relative z-[1] flex-1">
+      <main
+        ref={mainContentRef}
+        className="relative z-[1] flex-1 min-h-0 overflow-y-auto overscroll-contain"
+      >
         <AnimatedOutlet />
       </main>
       {showSharedFooter && <Footer />}
@@ -577,6 +588,7 @@ function MainLayout() {
 function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const mainContentRef = useRef(null);
   const [user, setUser] = useState(() => getStoredUser());
   const hideTopNav = location.pathname.startsWith("/student-dashboard");
 
@@ -592,8 +604,15 @@ function DashboardLayout() {
     navigate("/login", { replace: true });
   };
 
+  useEffect(() => {
+    const scroller = mainContentRef.current;
+    if (scroller) {
+      scroller.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [location.pathname, location.search, location.hash]);
+
   return (
-    <div className="eventmate-app-shell eventmate-app-shell-dashboard relative isolate flex min-h-screen flex-col overflow-x-hidden">
+    <div className="eventmate-app-shell eventmate-app-shell-dashboard relative isolate flex min-h-0 flex-col overflow-hidden">
       <AmbientBackdrop variant="dashboard" />
       {!hideTopNav && (
         <Navbar
@@ -603,7 +622,12 @@ function DashboardLayout() {
           onLogout={handleLogout}
         />
       )}
-      <main className="relative z-[1] flex-1">
+      <main
+        ref={mainContentRef}
+        className={`relative z-[1] flex-1 min-h-0 ${
+          hideTopNav ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+        }`}
+      >
         <AnimatedOutlet />
       </main>
       <Footer />
