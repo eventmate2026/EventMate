@@ -26,7 +26,12 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Profile from "./pages/Profile";
 import ProfileCustomization from "./pages/ProfileCustomization";
 import NotFound from "./pages/NotFound";
-import DeveloperTeam from "./pages/DeveloperTeam";
+
+const DeveloperTeam = lazy(() =>
+  import("./pages/DeveloperTeam").catch(() => ({
+    default: () => <div>Developer team loading...</div>,
+  }))
+);
 
 const AdminDashboard = lazy(() =>
   import("./pages/AdminDashboard").catch(() => ({
@@ -685,7 +690,14 @@ export default function App() {
         />
         <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/developers" element={<DeveloperTeam />} />
+          <Route
+            path="/developers"
+            element={
+              <Suspense fallback={<div className="p-8 text-center">Loading developer team...</div>}>
+                <DeveloperTeam />
+              </Suspense>
+            }
+          />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/verify-registration" element={<VerifyRegistration />} />
           <Route path="/team-invite" element={<TeamInvite />} />

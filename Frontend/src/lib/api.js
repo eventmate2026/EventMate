@@ -2,6 +2,7 @@ import axios from "axios";
 import SummaryApi from "../api/SummaryApi";
 import { clearAuth, getStoredRefreshToken, getStoredToken, storeAuth } from "./auth";
 import { API_BASE_URL } from "./backendUrl";
+import { sanitizeApiPayload } from "./safeMessage";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -350,6 +351,11 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => {
+    sanitizeApiPayload(response?.data, {
+      status: Number(response?.status || 0),
+      kind: "success",
+    });
+
     const method = getRequestMethod(response?.config);
 
     if (method !== "get") {
@@ -396,9 +402,14 @@ api.interceptors.response.use(
     ) {
       error.response.data = {
         success: false,
-        message: "Backend is unreachable. Start the backend server and try again.",
+        message: "",
       };
     }
+
+    sanitizeApiPayload(error?.response?.data, {
+      status: Number(status || 0),
+      kind: "error",
+    });
 
     if (!original || original.skipAuth || original._retry || isRefreshRequest(original) || status !== 401) {
       throw error;

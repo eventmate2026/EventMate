@@ -4,6 +4,7 @@ import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
+import { getSafeApiErrorText } from "../lib/safeMessage";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -21,10 +22,7 @@ export default function ForgotPassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const getErrorMessage = (error, fallback) => {
-    const apiMessage = error.response?.data?.message;
-    if (apiMessage) return apiMessage;
-    if (error.request) return "Backend not reachable. Start the backend server and try again.";
-    return fallback;
+    return getSafeApiErrorText(error, fallback);
   };
 
   const handleChange = (e) => {

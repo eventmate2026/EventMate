@@ -32,7 +32,7 @@ export default function AttendanceVerify() {
         return;
       }
 
-      if (!["ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"].includes(user.role)) {
+      if (!["ORGANIZER", "STUDENT_COORDINATOR"].includes(user.role)) {
         toast.error("Only organizers or assigned coordinators can verify attendance.");
         return;
       }
@@ -96,12 +96,6 @@ export default function AttendanceVerify() {
             </p>
           ) : null}
         </div>
-
-        {!token ? null : (
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400 break-all">
-            Token: {token}
-          </p>
-        )}
       </article>
     </section>
   );

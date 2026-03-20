@@ -7,6 +7,7 @@ import { storeAuth } from "../lib/auth";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
+import { getSafeApiErrorText } from "../lib/safeMessage";
 
 const dashboardRoutes = {
   MAIN_ADMIN: "/admin-dashboard",
@@ -89,24 +90,14 @@ export default function Login() {
     } catch (error) {
       const status = error.response?.status;
       const retryAfter = Number(error.response?.data?.retryAfterSeconds);
-      const responseData = error.response?.data;
-      const backendMessage =
-        typeof responseData?.message === "string" && responseData.message.trim()
-          ? responseData.message
-          : null;
-      const isLikelyProxyHtmlError =
-        status === 500 &&
-        typeof responseData === "string" &&
-        responseData.toLowerCase().includes("<!doctype html");
+      const backendMessage = getSafeApiErrorText(error, "");
       const rateLimitMessage =
         status === 429 && Number.isFinite(retryAfter)
           ? `Too many attempts. Try again in ${retryAfter} seconds.`
           : backendMessage;
-      const fallbackMessage = isLikelyProxyHtmlError
-        ? "Backend is unreachable. Start the backend server and try again."
-        : "Login failed. Please try again.";
-      const networkMessage = status ? fallbackMessage : (error.message || fallbackMessage);
-      if (status === 403 && backendMessage === "Verify email first") {
+      const fallbackMessage = "Login failed. Please try again.";
+      const networkMessage = fallbackMessage;
+      if (status === 403 && /verify your email/i.test(backendMessage)) {
         const pendingEmail = String(data.email || "").trim().toLowerCase();
         if (pendingEmail) {
           storePendingVerificationEmail(pendingEmail);

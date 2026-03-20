@@ -387,7 +387,7 @@ export default function AdminCoordinatorManagement() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{formMode === "create" ? "Create Coordinator" : "Edit Coordinator"}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-                  {formMode === "create" ? "Backend supports fullName, email, password during coordinator creation." : "Update basic account details."}
+                  {formMode === "create" ? "Create a coordinator with name, email, and password." : "Update basic account details."}
                 </p>
               </div>
               <button type="button" onClick={closeForm} disabled={submitting} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 disabled:opacity-60" aria-label="Close form">

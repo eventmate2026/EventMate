@@ -14,6 +14,24 @@ import {
   collectOrganizerEventAudience
 } from "../src/controllers/notification.controller.js";
 import { getAllowedFrontendOrigins, getPrimaryFrontendUrl } from "../src/config/clientOrigins.js";
+import errorMiddleware from "../src/middleware/error.middleware.js";
+
+const createMockResponse = () => {
+  const record = { statusCode: 200, payload: null };
+  return {
+    record,
+    res: {
+      status(code) {
+        record.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        record.payload = payload;
+        return this;
+      }
+    }
+  };
+};
 
 test("buildNotificationEmailDeliveryState returns NOT_REQUESTED when email copy is disabled", () => {
   const result = buildNotificationEmailDeliveryState({
@@ -209,4 +227,42 @@ test("getPrimaryFrontendUrl prefers deployed https origins over localhost", () =
   }
 
   assert.equal(result, "https://eventmate-app.vercel.app");
+});
+
+test("error middleware hides internal 500 details from clients", () => {
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  const error = new Error("MongoServerError: E11000 duplicate key error collection: eventmate.users");
+  error.statusCode = 500;
+
+  const { res, record } = createMockResponse();
+  errorMiddleware(error, {}, res, () => {});
+
+  console.error = originalConsoleError;
+
+  assert.equal(record.statusCode, 500);
+  assert.deepEqual(record.payload, {
+    success: false,
+    message: "Something went wrong. Please try again."
+  });
+});
+
+test("error middleware hides provider outage details from clients", () => {
+  const originalConsoleError = console.error;
+  console.error = () => {};
+
+  const error = new Error("SendGrid rejected sender because of DMARC alignment failure");
+  error.statusCode = 503;
+
+  const { res, record } = createMockResponse();
+  errorMiddleware(error, {}, res, () => {});
+
+  console.error = originalConsoleError;
+
+  assert.equal(record.statusCode, 503);
+  assert.deepEqual(record.payload, {
+    success: false,
+    message: "This service is temporarily unavailable. Please try again."
+  });
 });

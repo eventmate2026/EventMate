@@ -117,7 +117,7 @@ export default function AdminSecurityReports() {
       }
       setNotice({
         type: "success",
-        text: response.data?.message || "JWT secret rotated. Current sessions now require fresh login.",
+        text: response.data?.message || "Security settings updated. Everyone will need to sign in again.",
       });
     } catch (err) {
       setNotice({

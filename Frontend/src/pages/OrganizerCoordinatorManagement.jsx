@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { useToast } from "../context/ToastContext";
 import { extractCreatedUser, extractEventList } from "../lib/backendAdapters";
+import { getSafeApiErrorText } from "../lib/safeMessage";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
 const formDefaults = {
@@ -229,7 +230,7 @@ export default function OrganizerCoordinatorManagement() {
 
       await refreshWorkspace({ silent: true });
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Unable to create coordinator.");
+      toast.error(getSafeApiErrorText(error, "Unable to create coordinator."));
     } finally {
       setCreating(false);
     }

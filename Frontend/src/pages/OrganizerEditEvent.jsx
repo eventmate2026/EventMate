@@ -344,7 +344,7 @@ export default function OrganizerEditEvent() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Edit Event</h1>
               <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-                Backend allows editing only while status is Draft.
+                Events can be edited only while their status is Draft.
               </p>
             </div>
             <div className="flex items-center gap-2">
