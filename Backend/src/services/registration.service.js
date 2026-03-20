@@ -7,6 +7,7 @@ import ParticipantQR from "../models/ParticipantQR.model.js";
 import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
+import { buildEventEndDateTime, buildEventStartDateTime } from "../utils/eventTime.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
 
@@ -62,11 +63,12 @@ const resolveRegistrationDeadline = (value) => {
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
-  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
-  if (!endValue) return false;
-  const endTime = new Date(endValue).getTime();
-  if (Number.isNaN(endTime)) return false;
-  return Date.now() > endTime;
+  const endDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
+  if (!endDateTime) return false;
+  return Date.now() > endDateTime.getTime();
 };
 
 const formatEventDate = (event) => {
@@ -1433,18 +1435,25 @@ export const markAttendance = async (token, scannedBy) => {
   const event = await Event.findById(qr.eventId);
   if (!event) throw new Error("Event not found");
 
-// Event must be happening today
-const today = new Date();
-const eventStart = new Date(event.schedule.startDate);
-const eventEnd = new Date(event.schedule.endDate);
+  const eventStartDateTime = buildEventStartDateTime(
+    event?.schedule?.startDate,
+    event?.schedule?.startTime
+  );
+  const eventEndDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
 
-// Strip time — compare dates only
-today.setHours(0, 0, 0, 0);
-eventStart.setHours(0, 0, 0, 0);
-eventEnd.setHours(0, 0, 0, 0);
+  if (!eventStartDateTime || !eventEndDateTime) {
+    throw new Error("Event schedule is incomplete for attendance marking");
+  }
 
-if (today < eventStart || today > eventEnd)
-  throw new Error("Attendance can only be marked on the event day");
+  const now = Date.now();
+  if (now < eventStartDateTime.getTime() || now > eventEndDateTime.getTime()) {
+    throw new Error("Attendance can only be marked between the event start and end time");
+  }
+
+
 
   // Authorization check
   // Must be the organizer OR an assigned coordinator of THIS event

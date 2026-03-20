@@ -3,7 +3,7 @@ import User from "../models/User.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
-import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
+import { buildEventEndDateTime, buildEventStartDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
@@ -12,11 +12,12 @@ const resolveUserDepartment = (user) =>
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
-  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
-  if (!endValue) return false;
-  const endTime = new Date(endValue).getTime();
-  if (Number.isNaN(endTime)) return false;
-  return Date.now() > endTime;
+  const endDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
+  if (!endDateTime) return false;
+  return Date.now() > endDateTime.getTime();
 };
 
 const parseVisibilityPayload = (raw) => {
@@ -627,7 +628,7 @@ export const completeEvent = async (req, res, next) => {
     }
 
     const now = new Date();
-    const eventStartDateTime = buildEventEndDateTime(
+    const eventStartDateTime = buildEventStartDateTime(
       event.schedule?.startDate,
       event.schedule?.startTime
     );

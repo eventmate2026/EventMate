@@ -48,6 +48,7 @@ const normalizeRegistration = (item) => {
   const eventDoc = item?.event && typeof item.event === "object" ? item.event : {};
   const eventLocation = resolveEventLocation(eventDoc, item);
   const eventStartDate = eventDoc?.schedule?.startDate || null;
+  const eventEndDate = eventDoc?.schedule?.endDate || eventDoc?.schedule?.startDate || null;
   const eventStartTime = String(eventDoc?.schedule?.startTime || "").trim();
   const eventEndTime = String(eventDoc?.schedule?.endTime || "").trim();
   return {
@@ -59,6 +60,7 @@ const normalizeRegistration = (item) => {
     eventPosterUrl: String(eventDoc?.posterUrl || "").trim(),
     eventLocation,
     eventStartDate,
+    eventEndDate,
     eventStartTime,
     eventEndTime,
     status: String(item?.status || "").trim(),

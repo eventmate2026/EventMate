@@ -9,7 +9,8 @@ import {
   MessageSquarePlus,
   Star,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { isRegistrationEventCompleted } from "../lib/eventSchedule";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
@@ -48,15 +49,6 @@ const formatTimeRange = (startTime, endTime) => {
   return "Time TBD";
 };
 
-const isEventCompleted = (row) => {
-  const status = String(row?.eventStatus || "").trim();
-  if (status === "Completed") return true;
-
-  const eventDate = new Date(row?.eventStartDate || 0).getTime();
-  if (Number.isNaN(eventDate)) return false;
-  return Date.now() > eventDate;
-};
-
 const loadSubmittedEventIds = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(FEEDBACK_SUBMITTED_KEY) || "[]");
@@ -72,6 +64,7 @@ const saveSubmittedEventIds = (ids) => {
 
 export default function StudentFeedbackPending() {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,6 +75,7 @@ export default function StudentFeedbackPending() {
   const [drafts, setDrafts] = useState({});
   const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedEventIds());
   useToastFeedback(error, { defaultType: "error" });
+  const requestedEventId = String(location.state?.eventId || "").trim();
 
   useEffect(() => {
     const loadRows = async () => {
@@ -93,7 +87,7 @@ export default function StudentFeedbackPending() {
         setWarning(response.warning);
         setRows(
           response.rows
-            .filter((row) => isEventCompleted(row))
+            .filter((row) => isRegistrationEventCompleted(row))
             .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
@@ -127,6 +121,14 @@ export default function StudentFeedbackPending() {
       }),
     [rows]
   );
+
+  useEffect(() => {
+    if (!requestedEventId) return;
+    const hasRequestedRow = feedbackRows.some((row) => String(row?.eventId || "").trim() === requestedEventId);
+    if (hasRequestedRow) {
+      setExpandedEventId(requestedEventId);
+    }
+  }, [feedbackRows, requestedEventId]);
 
   const markEventAsSubmitted = (eventId) => {
     const normalized = String(eventId || "").trim();

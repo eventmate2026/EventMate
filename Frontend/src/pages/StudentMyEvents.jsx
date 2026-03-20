@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
+import { isRegistrationEventCompleted } from "../lib/eventSchedule";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 
 const FALLBACK_BANNER =
@@ -56,19 +57,14 @@ const normalizeStatus = (value) => {
 };
 
 const deriveEventPhase = (registration) => {
-  const explicitStatus = String(registration?.eventStatus || "").trim();
-  if (explicitStatus === "Completed" || explicitStatus === "Cancelled") return "completed";
-
-  const parsedDate = parseDateValue(registration?.eventStartDate);
-  const dateValue = parsedDate ? parsedDate.getTime() : Number.NaN;
-  if (Number.isNaN(dateValue)) return "upcoming";
-  return Date.now() > dateValue ? "completed" : "upcoming";
+  return isRegistrationEventCompleted(registration) ? "completed" : "upcoming";
 };
 
 const mapToUiRow = (registration) => {
   const phase = deriveEventPhase(registration);
   const registrationStatus = normalizeStatus(registration?.status);
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
+  const canGiveFeedback = attendanceMarked && phase === "completed" && Boolean(registration?.eventId);
 
   const primaryLabel = attendanceMarked
     ? "Attended"
@@ -89,11 +85,12 @@ const mapToUiRow = (registration) => {
     primaryLabel,
     primaryLabelClass,
     hasQr: Boolean(registration?.qr?.qrImageUrl),
+    canGiveFeedback,
     monthDay: formatMonthDay(registration?.eventStartDate),
   };
 };
 
-const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
+const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback }) => (
   <article className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-3 sm:p-4">
     <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
       <div className="relative h-28 sm:h-28 overflow-hidden rounded-xl">
@@ -116,7 +113,11 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
             {row.eventCategory || "Event"}
           </span>
-          {row.hasQr ? (
+          {row.canGiveFeedback ? (
+            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
+              Feedback Ready
+            </span>
+          ) : row.hasQr ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
               QR Ready
             </span>
@@ -140,7 +141,9 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
         </div>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
-          {row.qr?.attendanceMarked
+          {row.canGiveFeedback
+            ? "Your event is completed and feedback is now available."
+            : row.qr?.attendanceMarked
             ? "Attendance has been marked for this event."
             : "Use your QR code at check-in when the event starts."}
         </p>
@@ -148,11 +151,11 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
           <button
             type="button"
-            onClick={() => onViewQr(row.id)}
-            disabled={!row.hasQr}
+            onClick={() => (row.canGiveFeedback ? onGiveFeedback(row.eventId) : onViewQr(row.id))}
+            disabled={!row.canGiveFeedback && !row.hasQr}
             className="rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
           >
-            {row.hasQr ? "View QR" : "QR Pending"}
+            {row.canGiveFeedback ? "Give Feedback" : row.hasQr ? "View QR" : "QR Pending"}
           </button>
           <button
             type="button"
@@ -240,6 +243,13 @@ export default function StudentMyEvents() {
     const normalizedId = String(eventId || "").trim();
     if (!normalizedId) return;
     navigate(`/student-dashboard/events/${encodeURIComponent(normalizedId)}`);
+  };
+
+  const openFeedback = (eventId) => {
+    const normalizedId = String(eventId || "").trim();
+    navigate("/student-dashboard/feedback-pending", {
+      state: normalizedId ? { eventId: normalizedId, expandFeedback: true } : undefined,
+    });
   };
 
   return (
@@ -342,6 +352,7 @@ export default function StudentMyEvents() {
                 row={row}
                 onViewQr={openQr}
                 onViewDetails={openEventDetails}
+                onGiveFeedback={openFeedback}
               />
             ))}
           </div>
