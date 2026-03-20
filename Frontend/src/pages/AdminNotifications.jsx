@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
-import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { SOCKET_BASE_URL } from "../lib/backendUrl";
-import { getStoredUser } from "../lib/auth";
+import { getStoredToken, getStoredUser } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 
 const parseNotifications = (payload) => {
@@ -84,7 +82,6 @@ export default function AdminNotifications() {
   const [markingAll, setMarkingAll] = useState(false);
   const [warning, setWarning] = useState("");
   const pollRef = useRef(null);
-  const socketRef = useRef(null);
 
   const unreadCount = useMemo(
     () => items.filter((item) => !item?.isRead).length,
@@ -96,6 +93,15 @@ export default function AdminNotifications() {
   }, []);
 
   const fetchNotificationsAndContacts = useCallback(async () => {
+    if (!getStoredToken()) {
+      setItems([]);
+      setContactsMap({});
+      emitUnreadCount(0);
+      setWarning("");
+      setLoading(false);
+      return;
+    }
+
     setWarning("");
     try {
       const [notificationResponse, contactResponse, eventsResponse] = await Promise.all([
@@ -172,10 +178,15 @@ export default function AdminNotifications() {
       setContactsMap(nextContactsMap);
       emitUnreadCount(Number(notificationResponse?.data?.unreadCount ?? rows.filter((item) => !item?.isRead).length));
     } catch (error) {
+      const status = Number(error?.response?.status || 0);
       setItems([]);
       setContactsMap({});
       emitUnreadCount(0);
-      setWarning(error?.response?.data?.message || "Unable to load notifications.");
+      setWarning(
+        status === 401 || status === 403
+          ? ""
+          : error?.response?.data?.message || "Unable to load notifications."
+      );
     } finally {
       setLoading(false);
     }
@@ -188,37 +199,12 @@ export default function AdminNotifications() {
 
   useEffect(() => {
     const userId = getUserId();
-    if (!userId) return undefined;
-
-    if (SOCKET_BASE_URL !== null) {
-      const socket = io(SOCKET_BASE_URL, {
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 800,
-        timeout: 8000,
-      });
-
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join", userId);
-      });
-
-      socket.on("notification", () => {
-        fetchNotificationsAndContacts();
-      });
-    }
+    if (!userId || !getStoredToken()) return undefined;
 
     pollRef.current = setInterval(fetchNotificationsAndContacts, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
     };
   }, [fetchNotificationsAndContacts]);
 

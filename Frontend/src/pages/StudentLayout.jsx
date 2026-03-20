@@ -18,14 +18,12 @@ const resolveActivePage = (pathname) => {
 export default function StudentLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState(
-    () => getStoredUser() || { fullName: "Student", email: "student@college.com", role: "STUDENT" }
-  );
+  const [user, setUser] = useState(() => getStoredUser());
   const activePage = resolveActivePage(location.pathname);
 
   useEffect(() => {
     const unsubscribe = subscribeAuthUpdates(() => {
-      setUser(getStoredUser() || { fullName: "Student", email: "student@college.com", role: "STUDENT" });
+      setUser(getStoredUser());
     });
 
     return unsubscribe;

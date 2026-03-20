@@ -48,8 +48,7 @@ export default function ForgotPassword() {
         data: { email: formData.email },
       });
       const apiMessage = response.data?.message || "OTP sent to your email.";
-      const otp = response.data?.otp;
-      toast.success(otp ? `${apiMessage} OTP: ${otp}` : apiMessage, { duration: 4200 });
+      toast.success(apiMessage, { duration: 4200 });
       setStep("reset");
     } catch (error) {
       toast.error(getErrorMessage(error, "Unable to send OTP. Try again."));

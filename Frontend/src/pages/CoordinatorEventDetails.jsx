@@ -21,6 +21,30 @@ const DEFAULT_POSTER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80";
 
 const normalizeId = (value) => String(value || "").trim();
+const normalizeEventPeople = (entries) => {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.reduce((rows, entry) => {
+    if (typeof entry === "string") {
+      const name = entry.trim();
+      if (name) rows.push({ name, organization: "", department: "", occupation: "" });
+      return rows;
+    }
+
+    if (!entry || typeof entry !== "object") return rows;
+
+    const name = String(entry?.name || entry?.fullName || "").trim();
+    const organization = String(entry?.organization || entry?.college || "").trim();
+    const department = String(entry?.department || entry?.branch || "").trim();
+    const occupation = String(entry?.occupation || entry?.role || "").trim();
+
+    if (name || organization || department || occupation) {
+      rows.push({ name: name || "TBA", organization, department, occupation });
+    }
+
+    return rows;
+  }, []);
+};
 
 const formatDate = (value) => {
   if (!value) return "Date TBD";
@@ -100,9 +124,9 @@ export default function CoordinatorEventDetails() {
         } catch (registrationError) {
           const status = Number(registrationError?.response?.status);
           if (status === 403) {
-            setWarning("Registration list is not available for this event in current permissions.");
+            setWarning("You do not have access to view registration details for this event.");
           } else {
-            setWarning("Detailed registration list is unavailable in this backend build.");
+            setWarning("Registration details are not available right now.");
           }
           setRegistrationSummary({ count: 0, rows: [] });
         }
@@ -136,7 +160,7 @@ export default function CoordinatorEventDetails() {
       title: eventData?.title || "Untitled Event",
       description:
         eventData?.description ||
-        "Event details are shown in read-only mode for coordinator assignments.",
+        "View the event details, venue, and participation summary for your assigned event.",
       category: eventData?.category || "General",
       posterUrl: String(eventData?.posterUrl || "").trim() || DEFAULT_POSTER,
       status: String(eventData?.status || "Draft"),
@@ -146,7 +170,7 @@ export default function CoordinatorEventDetails() {
       endTime: eventData?.schedule?.endTime || "",
       venue: eventData?.venue?.location || "Venue TBD",
       organizedBy,
-      contactEmail: eventData?.organizer?.contactEmail || eventData?.organizer?.email || "eventmate@gmail.com",
+      contactEmail: eventData?.organizer?.contactEmail || eventData?.organizer?.email || "support@eventmate.com",
       contactPhone: eventData?.organizer?.contactPhone || eventData?.organizer?.phone || "Not available",
       isTeamEvent: Boolean(eventData?.isTeamEvent),
       minTeamSize: Number(eventData?.minTeamSize || 1),
@@ -156,10 +180,22 @@ export default function CoordinatorEventDetails() {
       registrationOpen: Boolean(eventData?.registration?.isOpen),
       fee,
       isFree: fee <= 0,
-      mentors: Array.isArray(eventData?.mentors) ? eventData.mentors : [],
-      judges: Array.isArray(eventData?.judges) ? eventData.judges : [],
+      mentors: normalizeEventPeople(eventData?.mentors),
+      judges: normalizeEventPeople(eventData?.judges),
     };
   }, [eventData, eventId]);
+  const hasMentorJudgeSection =
+    Boolean(eventMeta?.mentors?.length) || Boolean(eventMeta?.judges?.length);
+  const visibleTabs = useMemo(
+    () => detailTabs.filter((tab) => tab.id !== "mentors" || hasMentorJudgeSection),
+    [hasMentorJudgeSection]
+  );
+
+  useEffect(() => {
+    if (activeTab === "mentors" && !hasMentorJudgeSection) {
+      setActiveTab("about");
+    }
+  }, [activeTab, hasMentorJudgeSection]);
 
   const requirements = useMemo(() => {
     if (!eventMeta) return [];
@@ -284,7 +320,7 @@ export default function CoordinatorEventDetails() {
             <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_240px] gap-4">
               <div>
                 <div className="border-b border-slate-200 dark:border-white/10 mb-4 flex items-center gap-6">
-                  {detailTabs.map((tab) => (
+                  {visibleTabs.map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
@@ -355,42 +391,58 @@ export default function CoordinatorEventDetails() {
                   </section>
                 )}
 
-                {activeTab === "mentors" && (
+                {activeTab === "mentors" && hasMentorJudgeSection && (
                   <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Mentors & Judges</h2>
 
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <article className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Mentors</p>
-                        {eventMeta.mentors.length > 0 ? (
-                          <ul className="mt-2 space-y-2">
+                    <div className={`mt-4 grid grid-cols-1 gap-3 ${eventMeta.mentors.length > 0 && eventMeta.judges.length > 0 ? "sm:grid-cols-2" : ""}`}>
+                      {eventMeta.mentors.length > 0 ? (
+                        <article className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">Mentors</p>
+                          <ul className="mt-2 space-y-3">
                             {eventMeta.mentors.map((mentor, index) => (
-                              <li key={`mentor-${index}`} className="text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
-                                <UserRound size={13} className="text-indigo-500" />
-                                {String(mentor?.name || mentor || "Mentor")}
+                              <li key={`mentor-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 px-3 py-2">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 inline-flex items-center gap-2">
+                                  <UserRound size={13} className="text-indigo-500" />
+                                  {mentor.name}
+                                </p>
+                                {mentor.occupation ? (
+                                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{mentor.occupation}</p>
+                                ) : null}
+                                {[mentor.organization, mentor.department].filter(Boolean).length > 0 ? (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {[mentor.organization, mentor.department].filter(Boolean).join(" | ")}
+                                  </p>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
-                        ) : (
-                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">Mentor list not published yet.</p>
-                        )}
-                      </article>
+                        </article>
+                      ) : null}
 
-                      <article className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">Judges</p>
-                        {eventMeta.judges.length > 0 ? (
-                          <ul className="mt-2 space-y-2">
+                      {eventMeta.judges.length > 0 ? (
+                        <article className="rounded-xl border border-slate-200 dark:border-white/10 p-3">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">Judges</p>
+                          <ul className="mt-2 space-y-3">
                             {eventMeta.judges.map((judge, index) => (
-                              <li key={`judge-${index}`} className="text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
-                                <UserRound size={13} className="text-indigo-500" />
-                                {String(judge?.name || judge || "Judge")}
+                              <li key={`judge-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 px-3 py-2">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 inline-flex items-center gap-2">
+                                  <UserRound size={13} className="text-indigo-500" />
+                                  {judge.name}
+                                </p>
+                                {judge.occupation ? (
+                                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{judge.occupation}</p>
+                                ) : null}
+                                {[judge.organization, judge.department].filter(Boolean).length > 0 ? (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    {[judge.organization, judge.department].filter(Boolean).join(" | ")}
+                                  </p>
+                                ) : null}
                               </li>
                             ))}
                           </ul>
-                        ) : (
-                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-300">Judge list not published yet.</p>
-                        )}
-                      </article>
+                        </article>
+                      ) : null}
                     </div>
                   </section>
                 )}

@@ -116,7 +116,7 @@ export const fetchMyRegistrations = async (options = {}) => {
         const result = {
           rows: [],
           supported: false,
-          warning: "My registration history endpoint is not available in this backend build.",
+          warning: "Your registration history is not available right now.",
         };
         if (requestGeneration === cacheGeneration) {
           cachedMyRegistrations = result;

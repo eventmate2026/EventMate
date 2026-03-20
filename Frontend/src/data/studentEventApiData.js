@@ -98,6 +98,31 @@ const resolveRegistrationOpen = (event) => {
   return Date.now() <= deadline.getTime();
 };
 
+const mapPersonEntries = (entries) => {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.reduce((rows, entry) => {
+    if (typeof entry === "string") {
+      const name = entry.trim();
+      if (name) rows.push({ name, organization: "", department: "", occupation: "" });
+      return rows;
+    }
+
+    if (!entry || typeof entry !== "object") return rows;
+
+    const name = String(entry?.name || entry?.fullName || "").trim();
+    const organization = String(entry?.organization || entry?.college || "").trim();
+    const department = String(entry?.department || entry?.branch || "").trim();
+    const occupation = String(entry?.occupation || entry?.role || "").trim();
+
+    if (name || organization || department || occupation) {
+      rows.push({ name: name || "TBA", organization, department, occupation });
+    }
+
+    return rows;
+  }, []);
+};
+
 const fallbackRequirements = (event) => {
   const maxParticipants = Number(event?.registration?.maxParticipants || 0);
   const participationMode = event?.isTeamEvent ? "TEAM" : "INDIVIDUAL";
@@ -193,8 +218,8 @@ export const mapApiEventToDetails = (event) => {
     description: event?.description || "No description available.",
     longDescription: event?.description || "No description available.",
     requirements: fallbackRequirements(event),
-    mentors: [],
-    judges: [],
+    mentors: mapPersonEntries(event?.mentors),
+    judges: mapPersonEntries(event?.judges),
     venue: event?.venue?.location || "Venue TBD",
     time: formatTimeRange(event?.schedule),
     startDate: event?.schedule?.startDate || event?.createdAt,

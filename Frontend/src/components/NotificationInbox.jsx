@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
-import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { SOCKET_BASE_URL } from "../lib/backendUrl";
-import { getStoredUser } from "../lib/auth";
+import { getStoredToken, getStoredUser } from "../lib/auth";
 
 const parseNotifications = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -57,7 +55,6 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
   const [warning, setWarning] = useState("");
-  const socketRef = useRef(null);
   const pollRef = useRef(null);
 
   const unreadCount = useMemo(
@@ -74,6 +71,14 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
   );
 
   const fetchNotifications = useCallback(async () => {
+    if (!getStoredToken()) {
+      setItems([]);
+      emitUnreadCount(0);
+      setWarning("");
+      setLoading(false);
+      return;
+    }
+
     setWarning("");
     try {
       const response = await api({
@@ -88,9 +93,14 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
       setItems(rows);
       emitUnreadCount(Number(response?.data?.unreadCount ?? rows.filter((item) => !item?.isRead).length));
     } catch (error) {
+      const status = Number(error?.response?.status || 0);
       setItems([]);
       emitUnreadCount(0);
-      setWarning(error?.response?.data?.message || "Unable to load notifications.");
+      setWarning(
+        status === 401 || status === 403
+          ? ""
+          : error?.response?.data?.message || "Unable to load notifications."
+      );
     } finally {
       setLoading(false);
     }
@@ -103,42 +113,12 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
 
   useEffect(() => {
     const userId = getUserId();
-    if (!userId) return undefined;
-
-    if (SOCKET_BASE_URL !== null) {
-      const socket = io(SOCKET_BASE_URL, {
-        transports: ["websocket", "polling"],
-        withCredentials: true,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 800,
-        timeout: 8000,
-      });
-
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join", userId);
-      });
-
-      socket.on("notification", (payload) => {
-        if (!payload?._id) return;
-        setItems((prev) => {
-          const exists = prev.some((item) => String(item?._id || "") === String(payload._id));
-          if (exists) return prev;
-          return [payload, ...prev];
-        });
-      });
-    }
+    if (!userId || !getStoredToken()) return undefined;
 
     pollRef.current = setInterval(fetchNotifications, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
     };
   }, [fetchNotifications]);
 

@@ -200,11 +200,19 @@ const dispatchNotificationEmail = async (notification) => {
 };
 
 const isRetryableEmailFailure = (error) => {
+  if (String(error?.code || "").trim().toUpperCase() === "EEMAILALIGNMENT") {
+    return false;
+  }
+
   const text = String(error?.message || "")
     .trim()
     .toLowerCase();
 
   if (!text) return false;
+
+  if (text.includes("dmarc alignment") || text.includes("cannot be used as a sendgrid from address")) {
+    return false;
+  }
 
   return [
     "421",

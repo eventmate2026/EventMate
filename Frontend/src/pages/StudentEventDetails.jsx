@@ -72,6 +72,30 @@ const profileToParticipant = (profile) => ({
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeEventPeople = (entries) => {
+  if (!Array.isArray(entries)) return [];
+
+  return entries.reduce((rows, entry) => {
+    if (typeof entry === "string") {
+      const name = entry.trim();
+      if (name) rows.push({ name, organization: "", department: "", occupation: "" });
+      return rows;
+    }
+
+    if (!entry || typeof entry !== "object") return rows;
+
+    const name = String(entry?.name || entry?.fullName || "").trim();
+    const organization = String(entry?.organization || entry?.college || "").trim();
+    const department = String(entry?.department || entry?.branch || "").trim();
+    const occupation = String(entry?.occupation || entry?.role || "").trim();
+
+    if (name || organization || department || occupation) {
+      rows.push({ name: name || "TBA", organization, department, occupation });
+    }
+
+    return rows;
+  }, []);
+};
 
 const getEventId = (event) =>
   normalizeId(event?._id || event?.id || event?.eventId);
@@ -260,6 +284,15 @@ export default function StudentEventDetails({ mode = "details" }) {
     }
     return base;
   }, [isDepartmentEvent, eventVisibilityDepartment]);
+  const mentorEntries = useMemo(() => normalizeEventPeople(event?.mentors), [event?.mentors]);
+  const judgeEntries = useMemo(() => normalizeEventPeople(event?.judges), [event?.judges]);
+  const hasMentorJudgeSection = mentorEntries.length > 0 || judgeEntries.length > 0;
+
+  useEffect(() => {
+    if (activeDetailTab === "mentor" && !hasMentorJudgeSection) {
+      setActiveDetailTab("about");
+    }
+  }, [activeDetailTab, hasMentorJudgeSection]);
 
   useEffect(() => {
     if (!lockedDepartment) return;
@@ -876,17 +909,19 @@ export default function StudentEventDetails({ mode = "details" }) {
                     >
                       Contact
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveDetailTab("mentor")}
-                      className={`pb-2 border-b-2 transition-colors ${
-                        activeDetailTab === "mentor"
-                          ? "border-indigo-600 text-indigo-600 dark:text-indigo-300 dark:border-indigo-300"
-                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                      }`}
-                    >
-                      Mentor & Judge
-                    </button>
+                    {hasMentorJudgeSection ? (
+                      <button
+                        type="button"
+                        onClick={() => setActiveDetailTab("mentor")}
+                        className={`pb-2 border-b-2 transition-colors ${
+                          activeDetailTab === "mentor"
+                            ? "border-indigo-600 text-indigo-600 dark:text-indigo-300 dark:border-indigo-300"
+                            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        }`}
+                      >
+                        Mentor & Judge
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -978,41 +1013,57 @@ export default function StudentEventDetails({ mode = "details" }) {
                       </section>
                     )}
 
-                    {activeDetailTab === "mentor" && (
+                    {activeDetailTab === "mentor" && hasMentorJudgeSection && (
                       <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-4 sm:p-5">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Mentor & Judge</h3>
-                        <div className="mt-4 grid md:grid-cols-2 gap-4">
-                          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">Mentors</p>
-                            <div className="mt-2 space-y-2">
-                              {Array.isArray(event.mentors) && event.mentors.length > 0 ? (
-                                event.mentors.map((mentor, index) => (
-                                  <p key={`mentor-${index}`} className="text-sm text-gray-700 dark:text-gray-200 inline-flex items-center gap-2">
-                                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
-                                    {mentor}
-                                  </p>
-                                ))
-                              ) : (
-                                <p className="text-sm text-gray-600 dark:text-gray-300">Mentors will be announced soon.</p>
-                              )}
+                        <div className={`mt-4 grid gap-4 ${mentorEntries.length > 0 && judgeEntries.length > 0 ? "md:grid-cols-2" : "grid-cols-1"}`}>
+                          {mentorEntries.length > 0 ? (
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400">Mentors</p>
+                              <div className="mt-2 space-y-3">
+                                {mentorEntries.map((mentor, index) => (
+                                  <div key={`mentor-${index}`} className="rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
+                                      <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
+                                      {mentor.name}
+                                    </p>
+                                    {mentor.occupation ? (
+                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{mentor.occupation}</p>
+                                    ) : null}
+                                    {[mentor.organization, mentor.department].filter(Boolean).length > 0 ? (
+                                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {[mentor.organization, mentor.department].filter(Boolean).join(" | ")}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          ) : null}
 
-                          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">Judges</p>
-                            <div className="mt-2 space-y-2">
-                              {Array.isArray(event.judges) && event.judges.length > 0 ? (
-                                event.judges.map((judge, index) => (
-                                  <p key={`judge-${index}`} className="text-sm text-gray-700 dark:text-gray-200 inline-flex items-center gap-2">
-                                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
-                                    {judge}
-                                  </p>
-                                ))
-                              ) : (
-                                <p className="text-sm text-gray-600 dark:text-gray-300">Judges will be announced soon.</p>
-                              )}
+                          {judgeEntries.length > 0 ? (
+                            <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                              <p className="text-[11px] text-gray-500 dark:text-gray-400">Judges</p>
+                              <div className="mt-2 space-y-3">
+                                {judgeEntries.map((judge, index) => (
+                                  <div key={`judge-${index}`} className="rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
+                                      <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
+                                      {judge.name}
+                                    </p>
+                                    {judge.occupation ? (
+                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{judge.occupation}</p>
+                                    ) : null}
+                                    {[judge.organization, judge.department].filter(Boolean).length > 0 ? (
+                                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        {[judge.organization, judge.department].filter(Boolean).join(" | ")}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
+                          ) : null}
                         </div>
                       </section>
                     )}

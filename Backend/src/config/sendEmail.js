@@ -101,6 +101,10 @@ const getSendGridErrorMessage = (error) => {
 };
 
 const canUseSendGrid = () => Boolean(SENDGRID_API_KEY);
+const canUseSmtp = () => {
+  const smtpConfig = getSmtpConfig();
+  return Boolean((smtpConfig.host || smtpConfig.service) && smtpConfig.user && smtpConfig.pass);
+};
 
 const normalizeBoolean = (value, fallback = false) => {
   if (typeof value === "boolean") return value;
@@ -166,12 +170,25 @@ const getEmailProvider = () => {
   const explicitProvider = getExplicitEmailProvider();
   if (explicitProvider) return explicitProvider;
 
-  const smtpConfig = getSmtpConfig();
-  if ((smtpConfig.host || smtpConfig.service) && smtpConfig.user && smtpConfig.pass) {
+  if (canUseSmtp()) {
     return "smtp";
   }
 
   return canUseSendGrid() ? "sendgrid" : "";
+};
+
+const buildUnsafeSendGridSenderError = (senderEmail) => {
+  const senderDomain = extractDomainFromEmail(senderEmail) || "this mailbox domain";
+  const err = new Error(
+    [
+      `Failed to send email: "${senderEmail}" cannot be used as a SendGrid From address.`,
+      `Inbox providers require SPF/DKIM alignment for ${senderDomain}.`,
+      "Use SMTP for this mailbox or switch EMAIL_FROM_EMAIL to an authenticated custom-domain sender such as noreply@yourdomain.com.",
+    ].join(" ")
+  );
+  err.statusCode = 503;
+  err.code = "EEMAILALIGNMENT";
+  return err;
 };
 
 const createSmtpTransporter = () => {
@@ -290,7 +307,7 @@ const sendWithSendGrid = async ({
 
 const sendEmail = async (to, subject, html, options = {}) => {
   const explicitProvider = getExplicitEmailProvider();
-  const emailProvider = getEmailProvider();
+  const configuredProvider = getEmailProvider();
   const senderName = process.env.EMAIL_FROM_NAME || "EventMate";
   const senderEmail =
     process.env.EMAIL_FROM_EMAIL ||
@@ -315,17 +332,32 @@ const sendEmail = async (to, subject, html, options = {}) => {
     throw err;
   }
 
-  if (!emailProvider) {
+  if (!configuredProvider) {
     const err = new Error("Missing email provider configuration");
     err.statusCode = 500;
     throw err;
   }
 
   const senderUsesConsumerMailbox = isConsumerMailboxDomain(senderEmail);
+  const smtpConfigured = canUseSmtp();
+  let emailProvider = configuredProvider;
+
+  // Consumer mailbox domains such as Gmail must not go through SendGrid unless
+  // the sender domain is authenticated there. Prefer SMTP for those mailboxes.
+  if (senderUsesConsumerMailbox && emailProvider === "sendgrid" && smtpConfigured) {
+    emailProvider = "smtp";
+    console.warn(
+      `Consumer mailbox sender "${senderEmail}" detected. Routing email through SMTP instead of SendGrid to avoid DMARC alignment failures.`
+    );
+  }
+
   const shouldUseSendGrid = emailProvider === "sendgrid";
 
   if (shouldUseSendGrid && senderUsesConsumerMailbox) {
     warnIfSenderLooksUnsafe(senderEmail, replyTo);
+    if (!smtpConfigured) {
+      throw buildUnsafeSendGridSenderError(senderEmail);
+    }
   }
 
   if (shouldUseSendGrid) {
@@ -349,12 +381,15 @@ const sendEmail = async (to, subject, html, options = {}) => {
       return response;
     } catch (error) {
       console.error("SendGrid Error (Primary):", error.response?.body || error);
+      const providerMessage = getSendGridErrorMessage(error);
+      const alignmentFailure =
+        providerMessage.includes("4.7.32") ||
+        /dmarc|alignment|spf|dkim/i.test(providerMessage);
 
-      // Fall back to SMTP if SendGrid fails and it's configured
-      if (emailProvider === "smtp") {
-        console.warn("SendGrid delivery failed. Falling back to SMTP.");
+      if (smtpConfigured && alignmentFailure) {
+        console.warn("SendGrid delivery failed due to sender alignment. Falling back to SMTP.");
+        emailProvider = "smtp";
       } else {
-        const providerMessage = getSendGridErrorMessage(error);
         const err = new Error(
           providerMessage
             ? `Failed to send email: ${providerMessage}`
@@ -406,6 +441,11 @@ const sendEmail = async (to, subject, html, options = {}) => {
     const err = new Error("Missing email provider configuration");
     err.statusCode = 500;
     throw err;
+  }
+
+  if (senderUsesConsumerMailbox) {
+    warnIfSenderLooksUnsafe(senderEmail, replyTo);
+    throw buildUnsafeSendGridSenderError(senderEmail);
   }
 
   try {

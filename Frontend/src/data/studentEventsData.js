@@ -362,7 +362,7 @@ export const mapStudentEventToDetails = (event) => {
       event?.longDescription ||
       "Join this event to learn, collaborate, and build practical outcomes with peers.",
     requirements: Array.isArray(event?.requirements) ? event.requirements : [],
-    contact: event?.contact || { email: "eventmate@gmail.com", phone: "+91 90000 00000" },
+    contact: event?.contact || { email: "support@eventmate.com", phone: "+91 90000 00000" },
     mentors: Array.isArray(event?.mentors) ? event.mentors : [],
     judges: Array.isArray(event?.judges) ? event.judges : [],
   };

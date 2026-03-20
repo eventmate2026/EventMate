@@ -406,7 +406,7 @@ export default function StudentDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Event Highlights</h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">Recommended events from database</p>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">Recommended events selected for you</p>
               </div>
               <div className="mt-3 sm:mt-0 flex gap-2">
                 <button

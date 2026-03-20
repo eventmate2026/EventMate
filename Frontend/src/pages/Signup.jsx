@@ -75,8 +75,7 @@ export default function Signup() {
 
       const apiMessage =
         response.data?.message || "Registration successful. Check your email for the OTP.";
-      const otp = response.data?.otp;
-      toast.success(otp ? `${apiMessage} OTP: ${otp}` : apiMessage, { duration: 4200 });
+      toast.success(apiMessage, { duration: 4200 });
       storePendingVerificationEmail(email);
       setFormData({
         fullName: "",

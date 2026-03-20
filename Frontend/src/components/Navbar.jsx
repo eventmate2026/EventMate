@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { getStoredToken } from "../lib/auth";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -121,6 +122,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     let mounted = true;
 
     const fetchUnreadCount = async () => {
+      if (!getStoredToken()) {
+        if (mounted) setRoleUnreadCount(0);
+        return;
+      }
+
       try {
         const response = await api({ ...SummaryApi.get_my_notifications, cacheTTL: 8000 });
         const nextCount = Number(response?.data?.unreadCount || 0);

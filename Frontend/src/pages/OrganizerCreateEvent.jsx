@@ -542,7 +542,7 @@ export default function OrganizerCreateEvent() {
                 <button
                   type="button"
                   onClick={() =>
-                    toast.info("Multi-slot support is not available in this backend build; one schedule is used.")
+                    toast.info("Additional schedule sections will be available soon. Please use the current schedule for now.")
                   }
                   className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                 >
@@ -822,7 +822,7 @@ export default function OrganizerCreateEvent() {
                   </div>
                 ))}
                 {judges.length === 0 && mentors.length === 0 && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Judges and mentors are optional and kept as event notes in frontend.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Judges and mentors are optional. Add them when the event panel is finalized.</p>
                 )}
               </div>
             </section>

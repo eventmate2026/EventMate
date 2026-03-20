@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Bell, 
   Menu, 
@@ -13,8 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { io } from "socket.io-client";
-import { SOCKET_BASE_URL } from "../lib/backendUrl";
+import { getStoredToken } from "../lib/auth";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const navigate = useNavigate();
@@ -23,7 +22,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
-  const socketRef = useRef(null);
   const isStudent = user?.role === "STUDENT";
   const displayName = user?.fullName || user?.name || 'Student';
   const avatarUrl = user?.avatar || "";
@@ -65,6 +63,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     const userId = String(user?._id || user?.id || "").trim();
 
     const syncUnread = async () => {
+      if (!getStoredToken() || !userId) {
+        if (mounted) setUnreadCount(0);
+        return;
+      }
+
       try {
         const response = await api({ ...SummaryApi.get_my_notifications, cacheTTL: 20000 });
         const nextUnread = Number(response?.data?.unreadCount || 0);
@@ -84,38 +87,12 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
     let intervalId = null;
     if (userId) {
-      if (SOCKET_BASE_URL !== null) {
-        const socket = io(SOCKET_BASE_URL, {
-          transports: ["websocket", "polling"],
-          withCredentials: true,
-          reconnection: true,
-          reconnectionAttempts: Infinity,
-          reconnectionDelay: 800,
-          timeout: 8000,
-        });
-
-        socketRef.current = socket;
-
-        socket.on("connect", () => {
-          socket.emit("join", userId);
-        });
-
-        socket.on("notification", () => {
-          if (!mounted) return;
-          setUnreadCount((prev) => prev + 1);
-        });
-      }
-
       intervalId = setInterval(syncUnread, 30000);
     }
 
     return () => {
       mounted = false;
       if (intervalId) clearInterval(intervalId);
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
       window.removeEventListener("eventmate:student-unread-count", onUnreadCount);
     };
   }, [user?._id, user?.id]);
