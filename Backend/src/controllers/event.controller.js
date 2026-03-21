@@ -1,5 +1,6 @@
 import Event from "../models/Event.model.js";
 import User from "../models/User.model.js";
+import EventRegistration from "../models/EventRegistration.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
@@ -8,6 +9,8 @@ import { buildEventEndDateTime, buildEventStartDateTime, COMPLETION_GRACE_MS } f
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
+const normalizeId = (value = "") => String(value || "").trim();
+const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
 const resolveUserDepartment = (user) =>
   normalizeDepartment(user?.academicProfile?.branch || user?.professionalProfile?.department || user?.department);
 const isEventOver = (event) => {
@@ -91,6 +94,62 @@ const validatePaymentConfig = (registrationPayload = {}) => {
   }
   return null;
 };
+
+const EVENT_CONTACT_AUDIENCE_USER_FIELDS = [
+  "_id",
+  "fullName",
+  "email",
+  "role",
+  "avatar",
+  "collegeName",
+  "academicProfile.branch",
+  "professionalProfile.department",
+].join(" ");
+
+const buildEventContactAudienceSignals = (event, registrations = []) => {
+  const allowedIds = new Set();
+  const allowedEmails = new Set();
+  const isTeamEvent = Boolean(event?.isTeamEvent);
+
+  (Array.isArray(event?.studentCoordinators) ? event.studentCoordinators : []).forEach((entry) => {
+    const coordinatorId = normalizeId(entry?.coordinatorId);
+    const coordinatorEmail = normalizeEmail(entry?.email);
+    if (coordinatorId) allowedIds.add(coordinatorId);
+    if (coordinatorEmail) allowedEmails.add(coordinatorEmail);
+  });
+
+  registrations.forEach((registration) => {
+    const registeredById = normalizeId(registration?.registeredBy);
+    const leaderEmail = normalizeEmail(registration?.teamLeader?.email);
+
+    if (registeredById) allowedIds.add(registeredById);
+    if (leaderEmail) allowedEmails.add(leaderEmail);
+
+    if (!isTeamEvent) return;
+
+    (Array.isArray(registration?.teamMembers) ? registration.teamMembers : []).forEach((member) => {
+      const memberEmail = normalizeEmail(member?.email);
+      if (memberEmail) allowedEmails.add(memberEmail);
+    });
+  });
+
+  return { allowedIds, allowedEmails };
+};
+
+const mapEventContactAudienceUser = (user = {}) => ({
+  _id: user?._id || null,
+  fullName: String(user?.fullName || "").trim(),
+  email: String(user?.email || "").trim().toLowerCase(),
+  role: String(user?.role || "").trim(),
+  avatar: user?.avatar || null,
+  collegeName: String(user?.collegeName || "").trim(),
+  academicProfile: {
+    branch: String(user?.academicProfile?.branch || "").trim(),
+  },
+  professionalProfile: {
+    department: String(user?.professionalProfile?.department || "").trim(),
+  },
+});
 
 export const createEventController = asyncHandler(async (req, res) => {
 
@@ -603,6 +662,85 @@ export const getEvent = async (req, res, next) => {
       data: event
     });
     
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getEventContactAudience = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const event = await Event.findById(id).select(
+      "createdBy organizer studentCoordinators isTeamEvent"
+    );
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    const requesterId = normalizeId(req.user?._id);
+    const isAdmin = String(req.user?.role || "").trim().toUpperCase() === "MAIN_ADMIN";
+    const isOrganizer =
+      normalizeId(event?.organizer?.organizerId) === requesterId ||
+      normalizeId(event?.createdBy) === requesterId;
+
+    if (!isAdmin && !isOrganizer) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to view this event audience"
+      });
+    }
+
+    const registrations = await EventRegistration.find({ event: event._id }).select(
+      "registeredBy teamLeader.email teamMembers.email"
+    );
+    const audienceSignals = buildEventContactAudienceSignals(event, registrations);
+    const userQuery = [];
+
+    if (audienceSignals.allowedIds.size > 0) {
+      userQuery.push({ _id: { $in: Array.from(audienceSignals.allowedIds) } });
+    }
+
+    if (audienceSignals.allowedEmails.size > 0) {
+      userQuery.push({ email: { $in: Array.from(audienceSignals.allowedEmails) } });
+    }
+
+    if (!userQuery.length) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+
+    const rows = await User.find({
+      $or: userQuery,
+      role: { $in: ["STUDENT_COORDINATOR", "STUDENT"] }
+    })
+      .select(EVENT_CONTACT_AUDIENCE_USER_FIELDS)
+      .sort({ fullName: 1, email: 1 })
+      .lean();
+
+    const seen = new Set();
+    const users = rows
+      .filter((user) => normalizeId(user?._id) !== requesterId)
+      .map(mapEventContactAudienceUser)
+      .filter((user) => {
+        const userId = normalizeId(user?._id);
+        if (!userId || seen.has(userId)) return false;
+        seen.add(userId);
+        return true;
+      });
+
+    return res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
   } catch (error) {
     next(error);
   }

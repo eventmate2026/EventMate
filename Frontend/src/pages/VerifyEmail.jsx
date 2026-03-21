@@ -92,7 +92,14 @@ export default function VerifyEmail() {
         data: { email: formData.email },
       });
       storePendingVerificationEmail(formData.email);
-      toast.success(response.data?.message || "A new OTP has been sent to your email.");
+      const apiMessage = response.data?.message || "A new OTP has been sent to your email.";
+      const deliveryPending =
+        Boolean(response.data?.deliveryPending) || Number(response.status) === 202;
+      if (deliveryPending) {
+        toast.info(apiMessage);
+      } else {
+        toast.success(apiMessage);
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to resend OTP right now.");
     } finally {
@@ -111,7 +118,7 @@ export default function VerifyEmail() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <div className="mt-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
@@ -124,12 +131,14 @@ export default function VerifyEmail() {
             )}
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
+            <label htmlFor="verify-email-otp" className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
             <input
+              id="verify-email-otp"
               name="otp"
               value={formData.otp}
               onChange={handleChange}
               placeholder="Enter 6 digit code"
+              autoComplete="one-time-code"
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
             />
           </div>

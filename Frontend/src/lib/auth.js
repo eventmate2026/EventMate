@@ -96,7 +96,7 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   const finalAccessToken = accessToken || token;
   if (finalAccessToken) {
     writeStorage(ACCESS_TOKEN_KEY, finalAccessToken);
-    writeCookie(ACCESS_TOKEN_COOKIE_KEY, finalAccessToken);
+    removeCookie(ACCESS_TOKEN_COOKIE_KEY);
   } else if (accessToken === null || token === null) {
     removeStorage(ACCESS_TOKEN_KEY);
     removeCookie(ACCESS_TOKEN_COOKIE_KEY);
@@ -104,7 +104,7 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
 
   if (refreshToken) {
     writeStorage(REFRESH_TOKEN_KEY, refreshToken);
-    writeCookie(REFRESH_TOKEN_COOKIE_KEY, refreshToken);
+    removeCookie(REFRESH_TOKEN_COOKIE_KEY);
   } else if (refreshToken === null) {
     removeStorage(REFRESH_TOKEN_KEY);
     removeCookie(REFRESH_TOKEN_COOKIE_KEY);
@@ -114,7 +114,7 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   if (normalized) {
     const serializedUser = JSON.stringify(normalized);
     writeStorage(USER_KEY, serializedUser);
-    writeCookie(USER_COOKIE_KEY, serializedUser);
+    removeCookie(USER_COOKIE_KEY);
   } else if (user === null) {
     removeStorage(USER_KEY);
     removeCookie(USER_COOKIE_KEY);
@@ -123,9 +123,22 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   emitAuthUpdated();
 };
 
+const migrateLegacyCookieToStorage = (storageKey, cookieKey) => {
+  const storageValue = readStorage(storageKey);
+  if (storageValue) return storageValue;
+
+  const cookieValue = readCookie(cookieKey);
+  if (!cookieValue) return null;
+
+  writeStorage(storageKey, cookieValue);
+  removeCookie(cookieKey);
+  return cookieValue;
+};
+
 export const getStoredUser = () => {
   try {
-    const raw = readStorage(USER_KEY) || readCookie(USER_COOKIE_KEY) || "null";
+    const raw =
+      readStorage(USER_KEY) || migrateLegacyCookieToStorage(USER_KEY, USER_COOKIE_KEY) || "null";
     const parsed = JSON.parse(raw);
     const normalized = normalizeUser(parsed);
     if (normalized && !readStorage(USER_KEY)) {
@@ -138,7 +151,9 @@ export const getStoredUser = () => {
 };
 
 export const getStoredToken = () => {
-  const value = readStorage(ACCESS_TOKEN_KEY) || readCookie(ACCESS_TOKEN_COOKIE_KEY);
+  const value =
+    readStorage(ACCESS_TOKEN_KEY) ||
+    migrateLegacyCookieToStorage(ACCESS_TOKEN_KEY, ACCESS_TOKEN_COOKIE_KEY);
   if (value && !readStorage(ACCESS_TOKEN_KEY)) {
     writeStorage(ACCESS_TOKEN_KEY, value);
   }
@@ -146,7 +161,9 @@ export const getStoredToken = () => {
 };
 
 export const getStoredRefreshToken = () => {
-  const value = readStorage(REFRESH_TOKEN_KEY) || readCookie(REFRESH_TOKEN_COOKIE_KEY);
+  const value =
+    readStorage(REFRESH_TOKEN_KEY) ||
+    migrateLegacyCookieToStorage(REFRESH_TOKEN_KEY, REFRESH_TOKEN_COOKIE_KEY);
   if (value && !readStorage(REFRESH_TOKEN_KEY)) {
     writeStorage(REFRESH_TOKEN_KEY, value);
   }

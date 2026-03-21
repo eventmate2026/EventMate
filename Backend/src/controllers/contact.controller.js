@@ -3,6 +3,8 @@ import { sendNotification } from "../services/notification.service.js";
 import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
 /* ================================================
    POST /api/contact
    Anyone can submit — logged in or not
@@ -100,6 +102,56 @@ export const getContacts = async (req, res, next) => {
       success: true,
       count: contacts.length,
       data: contacts
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMyContacts = async (req, res, next) => {
+  try {
+    const userId = req.user?._id || null;
+    const email = normalizeEmail(req.user?.email);
+    const filters = [];
+
+    if (userId) {
+      filters.push({ "submittedBy.userId": userId });
+    }
+
+    if (email) {
+      filters.push({ email });
+    }
+
+    if (!filters.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Unable to identify the current user."
+      });
+    }
+
+    const query = filters.length === 1 ? filters[0] : { $or: filters };
+    const contacts = await Contact.find(query).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: contacts.length,
+      data: contacts
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAdminContacts = async (req, res, next) => {
+  try {
+    const admins = await User.find({ role: "MAIN_ADMIN" })
+      .select("fullName email role avatar")
+      .sort({ fullName: 1 });
+
+    return res.status(200).json({
+      success: true,
+      count: admins.length,
+      data: admins
     });
   } catch (error) {
     next(error);

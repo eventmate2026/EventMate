@@ -107,17 +107,19 @@ export default function ContactUs({ compactTopSpacing = false }) {
 
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Send us a message</h3>
               
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Full Name</label>
+                    <label htmlFor="contact-name" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Full Name</label>
                     <input
+                      id="contact-name"
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="John Doe"
+                      autoComplete="name"
                       required
                       disabled={isLoading}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all dark:text-white disabled:opacity-50"
@@ -125,13 +127,15 @@ export default function ContactUs({ compactTopSpacing = false }) {
                   </div>
                   {/* Email */}
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
+                    <label htmlFor="contact-email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
                     <input
+                      id="contact-email"
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="john@example.com"
+                      autoComplete="email"
                       required
                       disabled={isLoading}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all dark:text-white disabled:opacity-50"
@@ -141,13 +145,15 @@ export default function ContactUs({ compactTopSpacing = false }) {
 
                 {/* Message */}
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Message</label>
+                  <label htmlFor="contact-message" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Message</label>
                   <textarea
+                    id="contact-message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
                     placeholder="Write your message here..."
                     rows="4"
+                    autoComplete="off"
                     required
                     disabled={isLoading}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-none dark:text-white disabled:opacity-50"

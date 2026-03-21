@@ -111,15 +111,17 @@ export default function ForgotPassword() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
           <div>
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
+            <label htmlFor="forgot-email" className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <input
+              id="forgot-email"
               name="email"
               type="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="you@college.edu"
+              autoComplete="email"
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
               disabled={step === "reset"}
             />
@@ -129,25 +131,29 @@ export default function ForgotPassword() {
           {step === "reset" && (
             <>
               <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
+                <label htmlFor="forgot-otp" className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
                 <input
+                  id="forgot-otp"
                   name="otp"
                   value={formData.otp}
                   onChange={handleChange}
                   placeholder="Enter 6 digit code"
+                  autoComplete="one-time-code"
                   className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                 />
                 {errors.otp && <p className="text-xs text-red-600 mt-1">{errors.otp}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
+                <label htmlFor="forgot-new-password" className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
                 <div className="relative mt-1">
                   <input
+                    id="forgot-new-password"
                     name="newPassword"
                     type={showNewPassword ? "text" : "password"}
                     value={formData.newPassword}
                     onChange={handleChange}
                     placeholder="Minimum 8 characters"
+                    autoComplete="new-password"
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                   />
                   <button
@@ -162,14 +168,16 @@ export default function ForgotPassword() {
                 {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
+                <label htmlFor="forgot-confirm-password" className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
                 <div className="relative mt-1">
                   <input
+                    id="forgot-confirm-password"
                     name="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Re-enter new password"
+                    autoComplete="new-password"
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                   />
                   <button

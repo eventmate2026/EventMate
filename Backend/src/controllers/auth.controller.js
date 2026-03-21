@@ -104,6 +104,11 @@ const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }
   }
 };
 
+const logOtpDeliveryIssue = (context, error) => {
+  const rootCause = error?.cause?.message || error?.message || "Unknown email error";
+  console.error(`${context}: ${rootCause}`);
+};
+
 const isSelfRegisteredStudent = (user) =>
   !user?.createdBy && String(user?.role || "STUDENT").trim().toUpperCase() === "STUDENT";
 
@@ -143,19 +148,30 @@ export const registerUserController = asyncHandler(async (req, res) => {
     existingUser.otpExpiry = otpExpiry;
     await persistAuthUser(existingUser);
 
-    await sendVerificationOtpEmail({
-      email: normalizedEmail,
-      fullName: normalizedFullName,
-      otp,
-      failureMessage:
-        "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
-    });
+    try {
+      await sendVerificationOtpEmail({
+        email: normalizedEmail,
+        fullName: normalizedFullName,
+        otp,
+        failureMessage:
+          "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
+      });
 
-    return res.status(200).json({
-      success: true,
-      message: "Your account already exists. A new OTP has been sent to your email.",
-      nextStep: "verify_email",
-    });
+      return res.status(200).json({
+        success: true,
+        message: "Your account already exists. A new OTP has been sent to your email.",
+        nextStep: "verify_email",
+      });
+    } catch (error) {
+      logOtpDeliveryIssue("Existing account OTP delivery delayed", error);
+      return res.status(202).json({
+        success: true,
+        message:
+          "Your account already exists, but the OTP could not be delivered right now. Please use resend OTP in a few minutes.",
+        nextStep: "verify_email",
+        deliveryPending: true,
+      });
+    }
   }
 
   const user = await User.create({
@@ -174,16 +190,22 @@ export const registerUserController = asyncHandler(async (req, res) => {
       failureMessage:
         "We couldn't deliver the verification OTP right now. Please try signing up again in a moment.",
     });
-  } catch (error) {
-    await User.deleteOne({ _id: user._id });
-    throw error;
-  }
 
-  res.status(201).json({
-    success: true,
-    message: "Registered successfully. OTP sent to email.",
-    nextStep: "verify_email",
-  });
+    return res.status(201).json({
+      success: true,
+      message: "Registered successfully. OTP sent to email.",
+      nextStep: "verify_email",
+    });
+  } catch (error) {
+    logOtpDeliveryIssue("New account OTP delivery delayed", error);
+    return res.status(202).json({
+      success: true,
+      message:
+        "Your account was created, but the OTP could not be delivered right now. Please use resend OTP in a few minutes.",
+      nextStep: "verify_email",
+      deliveryPending: true,
+    });
+  }
 });
 
 export const resendVerificationOtpController = asyncHandler(async (req, res) => {
@@ -206,15 +228,25 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
   user.otpExpiry = otpExpiry;
   await persistAuthUser(user);
 
-  await sendVerificationOtpEmail({
-    email: normalizedEmail,
-    fullName: user.fullName || "User",
-    otp,
-    failureMessage:
-      "We couldn't resend the verification OTP right now. Please try again in a moment.",
-  });
+  try {
+    await sendVerificationOtpEmail({
+      email: normalizedEmail,
+      fullName: user.fullName || "User",
+      otp,
+      failureMessage:
+        "We couldn't resend the verification OTP right now. Please try again in a moment.",
+    });
 
-  res.json({ success: true, message: "A new OTP has been sent to your email." });
+    return res.json({ success: true, message: "A new OTP has been sent to your email." });
+  } catch (error) {
+    logOtpDeliveryIssue("Verification OTP resend delayed", error);
+    return res.status(202).json({
+      success: true,
+      message: "We couldn't send a new OTP right now. Please try again in a few minutes.",
+      nextStep: "verify_email",
+      deliveryPending: true,
+    });
+  }
 });
 
 // ---------------- VERIFY EMAIL ----------------

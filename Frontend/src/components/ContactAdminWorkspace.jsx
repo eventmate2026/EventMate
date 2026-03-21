@@ -45,7 +45,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
     setLoadingMessages(true);
     setApiWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_contacts, cacheTTL: 45000 });
+      const response = await api({ ...SummaryApi.get_my_contacts, cacheTTL: 45000 });
       const rows = parseContactRows(response.data).sort(
         (a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
       );
@@ -68,9 +68,8 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
   const fetchAdminContacts = async () => {
     setContactsWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_all_users, cacheTTL: 90000 });
-      const users = Array.isArray(response.data?.users) ? response.data.users : [];
-      const admins = users.filter((item) => item?.role === "MAIN_ADMIN");
+      const response = await api({ ...SummaryApi.get_contact_admins, cacheTTL: 90000 });
+      const admins = Array.isArray(response.data?.data) ? response.data.data : [];
       setAdminContacts(admins);
 
       if (!admins.length) {

@@ -169,7 +169,7 @@ export default function OrganizerEventContactCenter() {
     setLoading(true);
     setError(null);
     try {
-      const [eventResponse, registrationsResponse, usersResponse] = await Promise.all([
+      const [eventResponse, registrationsResponse, audienceResponse] = await Promise.all([
         api({
           ...SummaryApi.get_public_event_details,
           url: SummaryApi.get_public_event_details.url.replace(":eventId", encodeURIComponent(eventId || "")),
@@ -178,12 +178,16 @@ export default function OrganizerEventContactCenter() {
           ...SummaryApi.get_event_registrations,
           url: SummaryApi.get_event_registrations.url.replace(":eventId", encodeURIComponent(eventId || "")),
         }),
-        api({ ...SummaryApi.get_all_users, cacheTTL: 60000 })
+        api({
+          ...SummaryApi.get_event_contact_audience,
+          url: SummaryApi.get_event_contact_audience.url.replace(":eventId", encodeURIComponent(eventId || "")),
+          cacheTTL: 60000,
+        })
       ]);
 
       setEventData(extractEventItem(eventResponse.data));
       setRegistrations(parseRegistrationRows(registrationsResponse.data));
-      setUsers(extractUsersList(usersResponse?.data));
+      setUsers(extractUsersList(audienceResponse?.data));
     } catch (loadError) {
       setEventData(null);
       setRegistrations([]);

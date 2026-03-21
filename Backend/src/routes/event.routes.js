@@ -11,6 +11,7 @@ import {
   completeEvent,
   updateEvent,
   getEvent,
+  getEventContactAudience,
   assignCoordinator,
   getMyEvents,
   getMyAssignedEvents
@@ -42,6 +43,13 @@ router.get(
   authMiddleware,
   roleMiddleware("STUDENT_COORDINATOR", "STUDENT"),
   getMyAssignedEvents
+);
+
+router.get(
+  "/:id/contact-audience",
+  authMiddleware,
+  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
+  getEventContactAudience
 );
 
 router.patch(

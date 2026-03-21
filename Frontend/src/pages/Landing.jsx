@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { BadgeCheck, Compass, Leaf, ShieldCheck, Zap } from "lucide-react";
 import ContactUs from "../components/ContactUs";
 import Footer from "../components/Footer";
 import { motion, useReducedMotion, useScroll } from "framer-motion";
@@ -143,6 +144,38 @@ const fadeUp = {
 const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+};
+
+const HOW_IT_WORKS_DESCRIPTION = {
+  "Discover Events": "Browse all upcoming campus events with full details.",
+  "Register Securely": "Login -> Select Event -> Confirm Registration",
+  "Attend & Get Certified": "QR Scan -> Attendance Marked -> Certificate Generated",
+};
+
+const renderHowItWorksIcon = (title, className) => {
+  switch (title) {
+    case "Discover Events":
+      return <Compass className={className} />;
+    case "Register Securely":
+      return <ShieldCheck className={className} />;
+    case "Attend & Get Certified":
+      return <BadgeCheck className={className} />;
+    default:
+      return <Compass className={className} />;
+  }
+};
+
+const renderLandingBenefitIcon = (title, className) => {
+  switch (title) {
+    case "QR Check-in":
+      return <BadgeCheck className={className} />;
+    case "Instant Certificates":
+      return <Compass className={className} />;
+    case "Real-time Analytics":
+      return <Zap className={className} />;
+    default:
+      return <BadgeCheck className={className} />;
+  }
 };
 
 export default function Landing() {
@@ -380,11 +413,13 @@ export default function Landing() {
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
               <div className="relative z-10">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-gray-100 bg-gray-50 text-4xl shadow-inner transition-transform duration-500 group-hover:scale-110 dark:border-white/10 dark:bg-white/5 sm:mb-7 sm:h-20 sm:w-20 sm:text-5xl lg:mb-8 lg:h-24 lg:w-24">
-                  {card.icon}
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-gray-100 bg-gray-50 text-indigo-600 shadow-inner transition-transform duration-500 group-hover:scale-110 dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 sm:mb-7 sm:h-20 sm:w-20 lg:mb-8 lg:h-24 lg:w-24">
+                  {renderHowItWorksIcon(card.title, "h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12")}
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{card.title}</h3>
-                <p className="text-gray-600 dark:text-gray-400">{card.desc}</p>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {HOW_IT_WORKS_DESCRIPTION[card.title] || card.desc}
+                </p>
               </div>
             </motion.div>
           ))}
@@ -416,13 +451,15 @@ export default function Landing() {
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100/50 to-transparent dark:from-indigo-600/20 opacity-0 group-hover:opacity-100 transition duration-500"></div>
              <div className="relative z-10 h-full flex flex-col justify-between">
                 <div>
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-indigo-500/20 dark:shadow-none sm:mb-6 sm:h-14 sm:w-14 sm:text-3xl">⚡</div>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-200 dark:shadow-none sm:mb-6 sm:h-14 sm:w-14">
+                    <Zap className="h-6 w-6 sm:h-7 sm:w-7" />
+                  </div>
                   <h3 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-4">Lightning Fast</h3>
                   <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">Automated workflows that save hours of manual admin work. No more Excel sheets.</p>
                 </div>
                 <div className="mt-8">
                   <div className="w-full h-24 sm:h-32 bg-indigo-100 dark:bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
-                    <span className="text-4xl">⚡</span>
+                    <Zap className="h-10 w-10 text-indigo-600 dark:text-indigo-200 sm:h-12 sm:w-12" />
                   </div>
                 </div>
              </div>
@@ -430,14 +467,18 @@ export default function Landing() {
 
           {/* Standard Card 1 */}
           <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
-             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🔐</div>
+             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm dark:text-indigo-200 dark:shadow-none">
+               <ShieldCheck className="h-6 w-6" />
+             </div>
              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Secure Access</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Role-based protection ensures data stays safe.</p>
           </motion.div>
 
           {/* Standard Card 2 */}
           <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
-             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🌱</div>
+             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm dark:text-indigo-200 dark:shadow-none">
+               <Leaf className="h-6 w-6" />
+             </div>
              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Paperless</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Digital tickets and certificates.</p>
           </motion.div>
@@ -600,7 +641,9 @@ export default function Landing() {
               whileHover={reduceMotion ? {} : { y: -6 }}
               className="bg-gray-50 dark:bg-white/5 backdrop-blur-md rounded-3xl border border-gray-200 dark:border-white/10 p-6 sm:p-8 lg:p-10 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-lg dark:shadow-none"
             >
-              <div className="text-4xl sm:text-5xl mb-6">{f.icon}</div>
+              <div className="mb-6 text-indigo-600 dark:text-indigo-300">
+                {renderLandingBenefitIcon(f.title, "h-10 w-10 sm:h-12 sm:w-12")}
+              </div>
               <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{f.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{f.desc}</p>
             </motion.div>

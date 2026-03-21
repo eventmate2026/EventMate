@@ -1,5 +1,12 @@
 import sgMail from "@sendgrid/mail";
+import { promises as dnsPromises, setDefaultResultOrder } from "node:dns";
 import nodemailer from "nodemailer";
+
+try {
+  setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignore when the current Node runtime does not support overriding DNS order.
+}
 
 const getSendGridApiKey = () => {
   const rawKey = String(process.env.SENDGRID_API_KEY || "").trim();
@@ -32,7 +39,17 @@ const CONSUMER_MAILBOX_DOMAINS = new Set([
 ]);
 
 let senderConfigurationWarningShown = false;
-let smtpTransporter = null;
+const smtpTransporters = new Map();
+const SMTP_CONNECTION_ERROR_CODES = new Set([
+  "ECONNABORTED",
+  "ECONNECTION",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ESOCKET",
+  "ETIMEDOUT",
+]);
 
 const decodeHtmlEntities = (value) =>
   String(value || "")
@@ -120,6 +137,13 @@ const normalizeNumber = (value, fallback) => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
+const hasTransientConnectionMessage = (error) => {
+  const message = String(error?.message || "").trim().toLowerCase();
+  return /connection timeout|greeting timeout|connection closed|network timeout|network is unreachable|temporarily unavailable/.test(
+    message
+  );
+};
+
 const getSmtpConfig = () => {
   const legacyUser = String(process.env.EMAIL_USERNAME || "").trim();
   const legacyPass = String(process.env.EMAIL_PASSWORD || "").trim();
@@ -191,10 +215,123 @@ const buildUnsafeSendGridSenderError = (senderEmail) => {
   return err;
 };
 
-const createSmtpTransporter = () => {
-  if (smtpTransporter) return smtpTransporter;
+const buildSmtpTransportCacheKey = (smtpConfig) =>
+  [
+    String(smtpConfig.service || "").trim().toLowerCase(),
+    String(smtpConfig.host || "").trim().toLowerCase(),
+    Number(smtpConfig.port || 0),
+    smtpConfig.secure ? "secure" : "starttls",
+    smtpConfig.requireTLS ? "requiretls" : "optional",
+    String(smtpConfig.user || "").trim().toLowerCase(),
+  ].join("::");
 
+const isGmailSmtpConfig = (smtpConfig) => {
+  const normalizedService = String(smtpConfig?.service || "").trim().toLowerCase();
+  const normalizedHost = String(smtpConfig?.host || "").trim().toLowerCase();
+  return (
+    normalizedService === "gmail" ||
+    normalizedService === "googlemail" ||
+    normalizedHost === "smtp.gmail.com"
+  );
+};
+
+const resolveSmtpProfiles = () => {
   const smtpConfig = getSmtpConfig();
+  const preferredHost = smtpConfig.host || (isGmailSmtpConfig(smtpConfig) ? "smtp.gmail.com" : "");
+  const normalizedConfig = {
+    ...smtpConfig,
+    service: preferredHost ? "" : smtpConfig.service,
+    host: preferredHost,
+  };
+  const profiles = [];
+
+  if (isGmailSmtpConfig(normalizedConfig)) {
+    const gmailHost = normalizedConfig.host || "smtp.gmail.com";
+    profiles.push(
+      {
+        ...normalizedConfig,
+        service: "",
+        host: gmailHost,
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        pool: false,
+        maxConnections: 1,
+        label: "smtp-gmail-starttls-primary",
+        useCache: true,
+      },
+      {
+        ...normalizedConfig,
+        service: "",
+        host: gmailHost,
+        port: 465,
+        secure: true,
+        requireTLS: false,
+        pool: false,
+        maxConnections: 1,
+        label: "smtp-gmail-ssl-fallback",
+        useCache: false,
+      }
+    );
+  } else {
+    profiles.push({
+      ...normalizedConfig,
+      requireTLS: !normalizedConfig.secure,
+      label: normalizedConfig.secure ? "smtp-primary-secure" : "smtp-primary-starttls",
+      useCache: true,
+    });
+  }
+
+  return Array.from(
+    new Map(
+      profiles.map((profile) => [buildSmtpTransportCacheKey(profile), profile])
+    ).values()
+  );
+};
+
+const expandSmtpProfilesForConnection = async (smtpProfiles) => {
+  const expandedProfiles = [];
+
+  for (const profile of smtpProfiles) {
+    const normalizedHost = String(profile?.host || "").trim();
+    const shouldResolveIpv4 = Boolean(normalizedHost) && Number(profile?.family || 0) === 4;
+
+    if (!shouldResolveIpv4) {
+      expandedProfiles.push(profile);
+      continue;
+    }
+
+    try {
+      const ipv4Addresses = await dnsPromises.resolve4(normalizedHost);
+      if (!ipv4Addresses.length) {
+        expandedProfiles.push(profile);
+        continue;
+      }
+
+      expandedProfiles.push(
+        ...ipv4Addresses.map((address, index) => ({
+          ...profile,
+          service: "",
+          host: address,
+          tlsServername: normalizedHost,
+          label: `${profile.label || "smtp"}-ipv4-${index + 1}`,
+          useCache: false,
+        }))
+      );
+      expandedProfiles.push(profile);
+    } catch (error) {
+      console.warn(
+        `Could not resolve IPv4 address for SMTP host "${normalizedHost}". Falling back to hostname lookup.`
+      );
+      expandedProfiles.push(profile);
+    }
+  }
+
+  return expandedProfiles;
+};
+
+const createSmtpTransporter = (smtpProfile = {}, { useCache = true } = {}) => {
+  const smtpConfig = { ...getSmtpConfig(), ...smtpProfile };
 
   if ((!smtpConfig.host && !smtpConfig.service) || !smtpConfig.user || !smtpConfig.pass) {
     const err = new Error("Missing SMTP configuration");
@@ -202,9 +339,15 @@ const createSmtpTransporter = () => {
     throw err;
   }
 
+  const cacheKey = buildSmtpTransportCacheKey(smtpConfig);
+  if (useCache && smtpTransporters.has(cacheKey)) {
+    return smtpTransporters.get(cacheKey);
+  }
+
   const transportOptions = {
     port: smtpConfig.port,
     secure: smtpConfig.secure,
+    requireTLS: Boolean(smtpConfig.requireTLS),
     family: smtpConfig.family,
     connectionTimeout: smtpConfig.connectionTimeout,
     greetingTimeout: smtpConfig.greetingTimeout,
@@ -225,20 +368,34 @@ const createSmtpTransporter = () => {
   } else {
     transportOptions.host = smtpConfig.host;
     transportOptions.tls = {
-      servername: smtpConfig.host,
+      servername: smtpConfig.tlsServername || smtpConfig.host,
     };
   }
 
-  smtpTransporter = nodemailer.createTransport(transportOptions);
+  const transporter = nodemailer.createTransport(transportOptions);
+  if (useCache) {
+    smtpTransporters.set(cacheKey, transporter);
+  }
 
-  return smtpTransporter;
+  return transporter;
 };
 
 const getSmtpErrorMessage = (error) => {
-  if (error?.code === "ETIMEDOUT") {
-    return "SMTP connection timed out. Check your SMTP host, port, firewall/network access, or switch to an API-based provider.";
+  const code = String(error?.code || "").trim().toUpperCase();
+
+  if (code === "ETIMEDOUT") {
+    return "SMTP connection timed out. Please retry in a few minutes.";
+  }
+  if (code === "ENETUNREACH" || code === "EHOSTUNREACH") {
+    return "SMTP network is temporarily unreachable. Please retry in a few minutes.";
   }
   return String(error?.message || "").trim();
+};
+
+const isSmtpConnectionError = (error) => {
+  const code = String(error?.code || "").trim().toUpperCase();
+
+  return SMTP_CONNECTION_ERROR_CODES.has(code) || hasTransientConnectionMessage(error);
 };
 
 /**
@@ -255,12 +412,7 @@ const retryWithBackoff = async (fn, maxAttempts = 3, initialDelayMs = 1000) => {
       return await fn();
     } catch (error) {
       lastError = error;
-      const isTransient =
-        error?.code === "ETIMEDOUT" ||
-        error?.code === "ECONNREFUSED" ||
-        error?.code === "EHOSTUNREACH" ||
-        error?.message?.includes("timeout") ||
-        error?.message?.includes("temporarily unavailable");
+      const isTransient = isSmtpConnectionError(error);
 
       if (!isTransient || attempt === maxAttempts) {
         throw error;
@@ -402,38 +554,57 @@ const sendEmail = async (to, subject, html, options = {}) => {
   }
 
   if (emailProvider === "smtp") {
-    try {
-      const transporter = createSmtpTransporter();
-      const smtpResult = await retryWithBackoff(
-        () =>
-          transporter.sendMail({
-            to,
-            from: {
-              name: senderName,
-              address: senderEmail,
-            },
-            replyTo,
-            subject,
-            text,
-            html,
-            attachments,
-          }),
-        3,
-        2000
-      );
-      return smtpResult;
-    } catch (error) {
-      console.error("SMTP Error:", error);
+    const smtpProfiles = await expandSmtpProfilesForConnection(resolveSmtpProfiles());
+    let lastSmtpError = null;
 
-      const providerMessage = getSmtpErrorMessage(error);
-      const err = new Error(
-        providerMessage
-          ? `Failed to send email: ${providerMessage}`
-          : "Failed to send email"
-      );
-      err.statusCode = 503;
-      throw err;
+    for (let index = 0; index < smtpProfiles.length; index += 1) {
+      const smtpProfile = smtpProfiles[index];
+      try {
+        const transporter = createSmtpTransporter(smtpProfile, {
+          useCache: smtpProfile.useCache !== false,
+        });
+        const smtpResult = await retryWithBackoff(
+          () =>
+            transporter.sendMail({
+              to,
+              from: {
+                name: senderName,
+                address: senderEmail,
+              },
+              replyTo,
+              subject,
+              text,
+              html,
+              attachments,
+            }),
+          index === 0 ? 2 : 1,
+          2000
+        );
+        return smtpResult;
+      } catch (error) {
+        lastSmtpError = error;
+        console.error(`SMTP Error (${smtpProfile.label || `profile-${index + 1}`}):`, error);
+
+        const hasFallbackProfile = index < smtpProfiles.length - 1;
+        if (hasFallbackProfile && isSmtpConnectionError(error)) {
+          console.warn(
+            `SMTP profile "${smtpProfile.label || index + 1}" failed. Trying alternate SMTP settings.`
+          );
+          continue;
+        }
+
+        break;
+      }
     }
+
+    const providerMessage = getSmtpErrorMessage(lastSmtpError);
+    const err = new Error(
+      providerMessage
+        ? `Failed to send email: ${providerMessage}`
+        : "Failed to send email"
+    );
+    err.statusCode = 503;
+    throw err;
   }
 
   // Final fallback: use SendGrid only when it is the only configured provider.

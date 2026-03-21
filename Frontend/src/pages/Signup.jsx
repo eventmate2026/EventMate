@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
@@ -22,6 +22,7 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const submitLockRef = useRef(false);
 
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -55,6 +56,7 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitLockRef.current || isLoading) return;
     setErrors({});
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
@@ -62,9 +64,10 @@ export default function Signup() {
       return;
     }
 
+    const email = String(formData.email || "").trim().toLowerCase();
+    submitLockRef.current = true;
     setIsLoading(true);
     try {
-      const email = String(formData.email || "").trim().toLowerCase();
       const response = await api({
         ...SummaryApi.register,
         data: {
@@ -110,12 +113,49 @@ export default function Signup() {
         800
       );
     } catch (error) {
+      const status = Number(error?.response?.status || 0);
       const apiError =
         error.response?.data?.errors?.[0] ||
         getSafeApiErrorText(error, "Registration failed. Please try again.");
+      const verifyEmailFallbackMessage =
+        "This email is already linked to an account. Continue to email verification to resend the OTP, or log in if your account is already verified.";
+      const delayedOtpMessage =
+        "Your account may already be created, but the verification OTP could not be delivered right now. Continue to email verification and try resend OTP in a few minutes.";
+
+      if (status === 409) {
+        const conflictMessage =
+          /verify|contact admin/i.test(apiError) || !/already registered/i.test(apiError)
+            ? apiError || verifyEmailFallbackMessage
+            : verifyEmailFallbackMessage;
+        storePendingVerificationEmail(email);
+        toast.info(conflictMessage, { duration: 5200 });
+        setTimeout(
+          () =>
+            navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
+              state: { email, message: conflictMessage },
+            }),
+          800
+        );
+        return;
+      }
+
+      if (status === 503) {
+        storePendingVerificationEmail(email);
+        toast.info(delayedOtpMessage, { duration: 5200 });
+        setTimeout(
+          () =>
+            navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
+              state: { email, message: delayedOtpMessage },
+            }),
+          800
+        );
+        return;
+      }
+
       setErrors((prev) => ({ ...prev, submit: apiError }));
       toast.error(apiError);
     } finally {
+      submitLockRef.current = false;
       setIsLoading(false);
     }
   };
@@ -206,14 +246,16 @@ export default function Signup() {
                 Join EventMate to start your journey.
               </p>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+              <form onSubmit={handleSubmit} className="mt-6 space-y-5" autoComplete="on">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
+                  <label htmlFor="signup-full-name" className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
                   <input
+                    id="signup-full-name"
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
                     placeholder="Your Name"
+                    autoComplete="name"
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
@@ -221,13 +263,15 @@ export default function Signup() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Email Address</label>
+                  <label htmlFor="signup-email" className="text-sm font-medium text-gray-700 dark:text-slate-200">Email Address</label>
                   <input
+                    id="signup-email"
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="xyz@gmail.com"
+                    autoComplete="email"
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
@@ -235,13 +279,15 @@ export default function Signup() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Password</label>
+                  <label htmlFor="signup-password" className="text-sm font-medium text-gray-700 dark:text-slate-200">Password</label>
                   <div className="relative mt-1">
                     <input
+                      id="signup-password"
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
+                      autoComplete="new-password"
                       required
                       className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:focus:ring-indigo-500/40"
                     />
@@ -258,13 +304,15 @@ export default function Signup() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Confirm Password</label>
+                  <label htmlFor="signup-confirm-password" className="text-sm font-medium text-gray-700 dark:text-slate-200">Confirm Password</label>
                   <div className="relative mt-1">
                     <input
+                      id="signup-confirm-password"
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
+                      autoComplete="new-password"
                       required
                       className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-12 text-sm text-slate-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-100 dark:focus:ring-indigo-500/40"
                     />
@@ -282,13 +330,15 @@ export default function Signup() {
 
                 <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
                   <input
+                    id="signup-agree"
                     type="checkbox"
                     name="agree"
                     checked={formData.agree}
                     onChange={handleChange}
+                    autoComplete="off"
                     className="w-4 h-4 rounded accent-indigo-600"
                   />
-                  <span>
+                  <label htmlFor="signup-agree">
                     I agree to the{" "}
                     <span className="text-indigo-600 dark:text-indigo-300 font-medium hover:underline cursor-pointer">
                       Terms
@@ -297,14 +347,14 @@ export default function Signup() {
                     <span className="text-indigo-600 dark:text-indigo-300 font-medium hover:underline cursor-pointer">
                       Privacy Policy
                     </span>
-                  </span>
+                  </label>
                 </div>
                 {errors.agree && <p className="text-xs text-red-600">{errors.agree}</p>}
 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-3.5 rounded-xl font-semibold transition-all transform hover:-translate-y-0.5 hover:shadow-lg"
+                  className="w-full mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white py-3.5 rounded-xl font-semibold transition-all transform hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-none"
                 >
                   {isLoading ? "Signing up..." : "Sign Up"}
                 </button>

@@ -76,6 +76,16 @@ const SummaryApi = {
     method: "get",
   },
 
+  get_my_contacts: {
+    url: "/api/contact/my",
+    method: "get",
+  },
+
+  get_contact_admins: {
+    url: "/api/contact/admins",
+    method: "get",
+  },
+
   /* ================= NOTIFICATIONS ================= */
   get_my_notifications: {
     url: "/api/notifications/my",
@@ -155,6 +165,11 @@ const SummaryApi = {
 
   get_public_event_details: {
     url: "/api/events/:eventId",
+    method: "get",
+  },
+
+  get_event_contact_audience: {
+    url: "/api/events/:eventId/contact-audience",
     method: "get",
   },
 
