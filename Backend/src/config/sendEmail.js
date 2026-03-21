@@ -40,7 +40,7 @@ const CONSUMER_MAILBOX_DOMAINS = new Set([
 
 let senderConfigurationWarningShown = false;
 const smtpTransporters = new Map();
-const MAX_RESOLVED_SMTP_ADDRESSES = 2;
+const MAX_RESOLVED_SMTP_ADDRESSES = 1;
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ECONNABORTED",
   "ECONNECTION",
@@ -248,32 +248,20 @@ const resolveSmtpProfiles = () => {
 
   if (isGmailSmtpConfig(normalizedConfig)) {
     const gmailHost = normalizedConfig.host || "smtp.gmail.com";
-    profiles.push(
-      {
-        ...normalizedConfig,
-        service: "",
-        host: gmailHost,
-        port: 587,
-        secure: false,
-        requireTLS: true,
-        pool: false,
-        maxConnections: 1,
-        label: "smtp-gmail-starttls-primary",
-        useCache: true,
-      },
-      {
-        ...normalizedConfig,
-        service: "",
-        host: gmailHost,
-        port: 465,
-        secure: true,
-        requireTLS: false,
-        pool: false,
-        maxConnections: 1,
-        label: "smtp-gmail-ssl-fallback",
-        useCache: false,
-      }
-    );
+    const useSecurePort = Number(normalizedConfig.port || 0) === 465 || normalizedConfig.secure;
+
+    profiles.push({
+      ...normalizedConfig,
+      service: "",
+      host: gmailHost,
+      port: useSecurePort ? 465 : 587,
+      secure: useSecurePort,
+      requireTLS: !useSecurePort,
+      pool: false,
+      maxConnections: 1,
+      label: useSecurePort ? "smtp-gmail-ssl-primary" : "smtp-gmail-starttls-primary",
+      useCache: true,
+    });
   } else {
     profiles.push({
       ...normalizedConfig,
@@ -308,7 +296,9 @@ const expandSmtpProfilesForConnection = async (smtpProfiles) => {
         MAX_RESOLVED_SMTP_ADDRESSES
       );
       if (!ipv4Addresses.length) {
-        expandedProfiles.push(profile);
+        if (!shouldResolveIpv4) {
+          expandedProfiles.push(profile);
+        }
         continue;
       }
 
@@ -322,12 +312,13 @@ const expandSmtpProfilesForConnection = async (smtpProfiles) => {
           useCache: false,
         }))
       );
-      expandedProfiles.push(profile);
     } catch (error) {
       console.warn(
-        `Could not resolve IPv4 address for SMTP host "${normalizedHost}". Falling back to hostname lookup.`
+        `Could not resolve IPv4 address for SMTP host "${normalizedHost}".`
       );
-      expandedProfiles.push(profile);
+      if (!shouldResolveIpv4) {
+        expandedProfiles.push(profile);
+      }
     }
   }
 
@@ -412,14 +403,14 @@ const resolveSmtpDeliveryOptions = (options = {}) => {
 
   if (deliveryProfile === "interactive") {
     return {
-      maxElapsedMs: 12000,
-      maxProfiles: 3,
+      maxElapsedMs: 6500,
+      maxProfiles: 1,
       retryAttempts: 1,
-      retryDelayMs: 750,
+      retryDelayMs: 500,
       smtpOverrides: {
-        connectionTimeout: 5000,
-        greetingTimeout: 5000,
-        socketTimeout: 8000,
+        connectionTimeout: 3500,
+        greetingTimeout: 3500,
+        socketTimeout: 5000,
         pool: false,
         maxConnections: 1,
       },
@@ -602,6 +593,11 @@ const sendEmail = async (to, subject, html, options = {}) => {
     }
     let lastSmtpError = null;
     const startedAt = Date.now();
+
+    if (!smtpProfiles.length) {
+      lastSmtpError = new Error("SMTP host could not be resolved over IPv4.");
+      lastSmtpError.code = "ENETUNREACH";
+    }
 
     for (let index = 0; index < smtpProfiles.length; index += 1) {
       const elapsedMs = Date.now() - startedAt;
