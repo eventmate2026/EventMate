@@ -403,14 +403,16 @@ const resolveSmtpDeliveryOptions = (options = {}) => {
 
   if (deliveryProfile === "interactive") {
     return {
-      maxElapsedMs: 6500,
+      // OTP and password reset emails should still favor responsiveness, but
+      // Render-to-Gmail SMTP handshakes can exceed the previous low ceiling.
+      maxElapsedMs: 20000,
       maxProfiles: 1,
       retryAttempts: 1,
       retryDelayMs: 500,
       smtpOverrides: {
-        connectionTimeout: 3500,
-        greetingTimeout: 3500,
-        socketTimeout: 5000,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         pool: false,
         maxConnections: 1,
       },
