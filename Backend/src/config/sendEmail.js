@@ -40,6 +40,7 @@ const CONSUMER_MAILBOX_DOMAINS = new Set([
 
 let senderConfigurationWarningShown = false;
 const smtpTransporters = new Map();
+const MAX_RESOLVED_SMTP_ADDRESSES = 2;
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ECONNABORTED",
   "ECONNECTION",
@@ -302,7 +303,10 @@ const expandSmtpProfilesForConnection = async (smtpProfiles) => {
     }
 
     try {
-      const ipv4Addresses = await dnsPromises.resolve4(normalizedHost);
+      const ipv4Addresses = (await dnsPromises.resolve4(normalizedHost)).slice(
+        0,
+        MAX_RESOLVED_SMTP_ADDRESSES
+      );
       if (!ipv4Addresses.length) {
         expandedProfiles.push(profile);
         continue;
@@ -396,6 +400,39 @@ const isSmtpConnectionError = (error) => {
   const code = String(error?.code || "").trim().toUpperCase();
 
   return SMTP_CONNECTION_ERROR_CODES.has(code) || hasTransientConnectionMessage(error);
+};
+
+const normalizeOptionalNumber = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
+const resolveSmtpDeliveryOptions = (options = {}) => {
+  const deliveryProfile = String(options?.deliveryProfile || "").trim().toLowerCase();
+
+  if (deliveryProfile === "interactive") {
+    return {
+      maxElapsedMs: 12000,
+      maxProfiles: 3,
+      retryAttempts: 1,
+      retryDelayMs: 750,
+      smtpOverrides: {
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
+        pool: false,
+        maxConnections: 1,
+      },
+    };
+  }
+
+  return {
+    maxElapsedMs: normalizeOptionalNumber(options?.maxElapsedMs),
+    maxProfiles: normalizeOptionalNumber(options?.maxProfiles),
+    retryAttempts: normalizeOptionalNumber(options?.retryAttempts),
+    retryDelayMs: normalizeOptionalNumber(options?.retryDelayMs) || 2000,
+    smtpOverrides: {},
+  };
 };
 
 /**
@@ -554,15 +591,47 @@ const sendEmail = async (to, subject, html, options = {}) => {
   }
 
   if (emailProvider === "smtp") {
-    const smtpProfiles = await expandSmtpProfilesForConnection(resolveSmtpProfiles());
+    const smtpDeliveryOptions = resolveSmtpDeliveryOptions(options);
+    let smtpProfiles = await expandSmtpProfilesForConnection(resolveSmtpProfiles());
+    smtpProfiles = smtpProfiles.map((profile) => ({
+      ...profile,
+      ...smtpDeliveryOptions.smtpOverrides,
+    }));
+    if (smtpDeliveryOptions.maxProfiles) {
+      smtpProfiles = smtpProfiles.slice(0, smtpDeliveryOptions.maxProfiles);
+    }
     let lastSmtpError = null;
+    const startedAt = Date.now();
 
     for (let index = 0; index < smtpProfiles.length; index += 1) {
-      const smtpProfile = smtpProfiles[index];
+      const elapsedMs = Date.now() - startedAt;
+      if (smtpDeliveryOptions.maxElapsedMs && elapsedMs >= smtpDeliveryOptions.maxElapsedMs) {
+        break;
+      }
+
+      const smtpProfile = { ...smtpProfiles[index] };
+      if (smtpDeliveryOptions.maxElapsedMs) {
+        const remainingMs = Math.max(1500, smtpDeliveryOptions.maxElapsedMs - elapsedMs);
+        smtpProfile.connectionTimeout = Math.max(
+          1500,
+          Math.min(Number(smtpProfile.connectionTimeout || 0) || remainingMs, remainingMs)
+        );
+        smtpProfile.greetingTimeout = Math.max(
+          1500,
+          Math.min(Number(smtpProfile.greetingTimeout || 0) || remainingMs, remainingMs)
+        );
+        smtpProfile.socketTimeout = Math.max(
+          3000,
+          Math.min(Number(smtpProfile.socketTimeout || 0) || remainingMs, remainingMs)
+        );
+      }
+
       try {
         const transporter = createSmtpTransporter(smtpProfile, {
           useCache: smtpProfile.useCache !== false,
         });
+        const retryAttempts = smtpDeliveryOptions.retryAttempts || (index === 0 ? 2 : 1);
+        const retryDelayMs = smtpDeliveryOptions.retryDelayMs || 2000;
         const smtpResult = await retryWithBackoff(
           () =>
             transporter.sendMail({
@@ -577,8 +646,8 @@ const sendEmail = async (to, subject, html, options = {}) => {
               html,
               attachments,
             }),
-          index === 0 ? 2 : 1,
-          2000
+          retryAttempts,
+          retryDelayMs
         );
         return smtpResult;
       } catch (error) {
@@ -586,7 +655,10 @@ const sendEmail = async (to, subject, html, options = {}) => {
         console.error(`SMTP Error (${smtpProfile.label || `profile-${index + 1}`}):`, error);
 
         const hasFallbackProfile = index < smtpProfiles.length - 1;
-        if (hasFallbackProfile && isSmtpConnectionError(error)) {
+        const timedOut =
+          smtpDeliveryOptions.maxElapsedMs &&
+          Date.now() - startedAt >= smtpDeliveryOptions.maxElapsedMs;
+        if (hasFallbackProfile && isSmtpConnectionError(error) && !timedOut) {
           console.warn(
             `SMTP profile "${smtpProfile.label || index + 1}" failed. Trying alternate SMTP settings.`
           );
@@ -595,6 +667,11 @@ const sendEmail = async (to, subject, html, options = {}) => {
 
         break;
       }
+    }
+
+    if (!lastSmtpError && smtpDeliveryOptions.maxElapsedMs) {
+      lastSmtpError = new Error("SMTP connection timed out.");
+      lastSmtpError.code = "ETIMEDOUT";
     }
 
     const providerMessage = getSmtpErrorMessage(lastSmtpError);

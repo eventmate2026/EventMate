@@ -75,7 +75,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-300"
     }`;
   const mobileQuickActionClass =
-    "inline-flex min-w-0 flex-1 items-center justify-center rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-indigo-400/30 dark:hover:text-indigo-200";
+    "inline-flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-indigo-400/30 dark:hover:text-indigo-200";
 
   if (!isStudent) {
     return null;
@@ -530,7 +530,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                         onClick={action.onSelect}
                         className={mobileQuickActionClass}
                       >
-                        {action.label}
+                        <span className="block max-w-full truncate whitespace-nowrap">
+                          {action.label}
+                        </span>
                       </button>
                     ))}
                   </div>

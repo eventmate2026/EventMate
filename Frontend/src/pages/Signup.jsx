@@ -138,7 +138,7 @@ export default function Signup() {
     submitLockRef.current = true;
     setIsLoading(true);
     try {
-      await primeBackendConnection();
+      await primeBackendConnection({ maxWaitMs: 2500 });
 
       const response = await api({
         ...SummaryApi.register,

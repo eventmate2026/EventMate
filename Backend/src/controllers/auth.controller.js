@@ -20,6 +20,7 @@ import {
 import { countRecentLogins, recordLoginHistoryEntry } from "../utils/loginHistory.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
+const INTERACTIVE_EMAIL_OPTIONS = Object.freeze({ deliveryProfile: "interactive" });
 
 const clampNumber = (value, min, max, fallback) => {
   const numeric = Number(value);
@@ -96,7 +97,12 @@ const buildEmailDeliveryError = (
 
 const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }) => {
   try {
-    await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+    await sendEmail(
+      email,
+      "Verify Email - EventMate",
+      verifyEmailTemplate({ name: fullName, otp }),
+      INTERACTIVE_EMAIL_OPTIONS
+    );
   } catch (error) {
     const deliveryError = buildEmailDeliveryError(failureMessage);
     deliveryError.cause = error;

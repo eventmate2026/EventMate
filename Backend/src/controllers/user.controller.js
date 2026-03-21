@@ -13,6 +13,7 @@ import {
 } from "../utils/sessionTracker.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
+const INTERACTIVE_EMAIL_OPTIONS = Object.freeze({ deliveryProfile: "interactive" });
 
 const resolveDepartment = (user) =>
   String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
@@ -132,7 +133,12 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   await user.save();
 
   try {
-    await sendEmail(email, "Reset Password OTP", forgotPasswordTemplate({ name: user.fullName, otp }));
+    await sendEmail(
+      email,
+      "Reset Password OTP",
+      forgotPasswordTemplate({ name: user.fullName, otp }),
+      INTERACTIVE_EMAIL_OPTIONS
+    );
   } catch (error) {
     user.otp = null;
     user.otpExpiry = null;
@@ -287,7 +293,12 @@ export const createCoordinator = async (req, res, next) => {
 
     if (requiresVerification) {
       try {
-        await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
+        await sendEmail(
+          email,
+          "Verify Email - EventMate",
+          verifyEmailTemplate({ name: fullName, otp }),
+          INTERACTIVE_EMAIL_OPTIONS
+        );
       } catch (error) {
         await User.deleteOne({ _id: coordinator._id });
         error.statusCode = Number(error.statusCode) || 503;

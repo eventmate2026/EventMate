@@ -123,7 +123,7 @@ const resolveWarmupUrl = () => {
   }
 };
 
-export const primeBackendConnection = async ({ force = false } = {}) => {
+export const primeBackendConnection = async ({ force = false, maxWaitMs = 0 } = {}) => {
   if (typeof window === "undefined" || !API_BASE_URL) {
     return false;
   }
@@ -154,6 +154,13 @@ export const primeBackendConnection = async ({ force = false } = {}) => {
     .finally(() => {
       backendWarmupPromise = null;
     });
+
+  if (Number(maxWaitMs) > 0) {
+    return Promise.race([
+      backendWarmupPromise,
+      pause(maxWaitMs).then(() => false),
+    ]);
+  }
 
   return backendWarmupPromise;
 };
