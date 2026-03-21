@@ -310,6 +310,15 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         ? "text-purple-600 dark:text-indigo-300 border-b-2 border-purple-600 dark:border-indigo-300"
         : "text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-indigo-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-white/20"
     }`;
+  const renderAvatar = (className, textClassName) => (
+    <AvatarWithFrame
+      src={avatarUrl}
+      alt={`${displayName} avatar`}
+      className={className}
+      coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
+      fallback={<span className={textClassName}>{avatarText}</span>}
+    />
+  );
 
   return (
     <>
@@ -384,22 +393,37 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             >
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
-            <button
-              type="button"
-              onClick={() => navigate("/profile")}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/30 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
-            >
-              Profile
-            </button>
 
-            <button
-              type="button"
-              onClick={onLogout}
-              className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400/30 dark:text-red-300 dark:hover:bg-red-500/15"
-            >
-              <LogOut size={15} />
-              Logout
-            </button>
+            <div className="relative ml-3">
+              <div>
+                <button
+                  type="button"
+                  className="flex rounded-full border-2 border-transparent text-sm transition duration-150 ease-in-out focus:outline-none focus:border-purple-300"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                >
+                  <span className="sr-only">Open user menu</span>
+                  {renderAvatar("h-8 w-8", "text-sm")}
+                </button>
+              </div>
+
+              {isUserMenuOpen && (
+                <div className="animate-fade-in-down absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 dark:bg-gray-900 dark:ring-white/10">
+                  <div className="border-b border-gray-100 px-4 py-2 dark:border-white/10">
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{displayName}</p>
+                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                  >
+                    <LogOut size={16} /> Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* --- MOBILE MENU BUTTON --- */}
