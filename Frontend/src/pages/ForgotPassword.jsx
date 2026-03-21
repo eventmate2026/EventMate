@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
-import api from "../lib/api";
+import api, { primeBackendConnection } from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
 import { getSafeApiErrorText } from "../lib/safeMessage";
@@ -20,6 +20,10 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    void primeBackendConnection();
+  }, []);
 
   const getErrorMessage = (error, fallback) => {
     return getSafeApiErrorText(error, fallback);
@@ -41,6 +45,7 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.forgot_password,
         data: { email: formData.email },
@@ -69,6 +74,7 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.reset_password,
         data: {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../lib/api";
+import api, { primeBackendConnection } from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { useToast } from "../context/ToastContext";
@@ -23,6 +23,7 @@ export default function ContactUs({ compactTopSpacing = false }) {
       name: prev.name || profile?.fullName || "",
       email: prev.email || profile?.email || "",
     }));
+    void primeBackendConnection();
   }, []);
 
   const handleChange = (e) => {
@@ -47,6 +48,7 @@ export default function ContactUs({ compactTopSpacing = false }) {
     setIsLoading(true);
 
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.submit_contact,
         data: {

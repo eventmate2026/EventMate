@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import api from "../lib/api";
+import api, { primeBackendConnection } from "../lib/api";
 import {
   clearPendingVerificationEmail,
   getPendingVerificationEmail,
@@ -42,6 +42,10 @@ export default function VerifyEmail() {
     toast.info(initialMessage);
   }, [location.state, toast]);
 
+  useEffect(() => {
+    void primeBackendConnection();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -65,6 +69,7 @@ export default function VerifyEmail() {
 
     setIsLoading(true);
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({ ...SummaryApi.verify_email, data: formData });
       clearPendingVerificationEmail();
       toast.success(response.data?.message || "Email verified successfully.");
@@ -87,6 +92,7 @@ export default function VerifyEmail() {
 
     setIsResending(true);
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.resend_verification_otp,
         data: { email: formData.email },

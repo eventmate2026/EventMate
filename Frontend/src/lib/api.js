@@ -84,6 +84,11 @@ const getMaxAutoRetryAttempts = (config) => {
 };
 
 const isRetryableStatus = (status) => RETRYABLE_STATUS_CODES.has(Number(status));
+const isServiceWarmupResponse = (error) =>
+  Number(error?.response?.status || 0) === 503 &&
+  String(error?.response?.data?.code || "")
+    .trim()
+    .toUpperCase() === "SERVICE_WARMING_UP";
 
 const isRetryableNetworkError = (error) => {
   const code = String(error?.code || "").trim().toUpperCase();
@@ -176,9 +181,19 @@ const retryRequestIfRecoverable = async (error) => {
   }
 
   const status = Number(error?.response?.status || 0);
-  const shouldRetry = isRetryableStatus(status) || isRetryableNetworkError(error);
+  const warmupRetry = isServiceWarmupResponse(error);
+  const shouldRetry =
+    warmupRetry || isRetryableStatus(status) || isRetryableNetworkError(error);
   if (!shouldRetry) {
     return null;
+  }
+
+  if (warmupRetry && attemptCount >= 1) {
+    return null;
+  }
+
+  if (warmupRetry) {
+    await primeBackendConnection({ force: true, maxWaitMs: 4000 });
   }
 
   // Wake sleeping backends like Render before retrying the original GET.

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa6";
 import { ArrowLeft, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
-import api from "../lib/api";
+import api, { primeBackendConnection } from "../lib/api";
 import { storeAuth } from "../lib/auth";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
@@ -35,6 +35,10 @@ export default function Login() {
     if (!nextEmail) return;
     setData((prev) => ({ ...prev, email: prev.email || nextEmail }));
   }, [location.search]);
+
+  useEffect(() => {
+    void primeBackendConnection();
+  }, []);
 
   const finalizeLogin = ({ accessToken, refreshToken, role, user }) => {
     const finalAccessToken = accessToken;
@@ -86,6 +90,7 @@ export default function Login() {
 
     setIsLoading(true);
     try {
+      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.login,
         data: { email: normalizedEmail, password },
