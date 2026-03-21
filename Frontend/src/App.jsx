@@ -660,7 +660,15 @@ function ScrollToTop() {
 
 function MainLayout() {
   const location = useLocation();
-  const showSharedFooter = location.pathname !== "/";
+  const isFooterlessPublicUtilityRoute =
+    location.pathname === "/login" ||
+    location.pathname === "/signup" ||
+    location.pathname === "/verify-email" ||
+    location.pathname === "/forgot-password" ||
+    location.pathname === "/verify-registration" ||
+    location.pathname === "/team-invite" ||
+    location.pathname.startsWith("/attendance/verify");
+  const showSharedFooter = location.pathname !== "/" && !isFooterlessPublicUtilityRoute;
 
   return (
     <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-screen flex-col overflow-x-hidden transition-colors duration-500">

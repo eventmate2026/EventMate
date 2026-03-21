@@ -239,7 +239,7 @@ export default function Signup() {
   const parallaxY = (mousePosition.y - window.innerHeight / 2) / 50;
 
   return (
-    <main className="eventmate-page min-h-[calc(100vh-72px)] bg-gradient-to-br from-gray-50 via-indigo-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/60 relative overflow-hidden">
+    <main className="eventmate-page relative min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 via-indigo-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/60">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute w-[600px] h-[600px] top-[-200px] left-[-200px] rounded-full opacity-50 blur-3xl animate-blob-slow"
@@ -273,8 +273,8 @@ export default function Signup() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-white/20 dark:from-slate-950/40 dark:via-transparent dark:to-slate-900/20 pointer-events-none" />
 
-      <section className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 px-6 py-6 sm:py-8 lg:py-10 items-start lg:items-center min-h-[calc(100vh-72px)]">
-        <div className="space-y-8">
+      <section className="relative z-10 mx-auto grid min-h-[calc(100svh-4rem)] max-w-7xl items-start gap-8 px-6 pb-6 pt-20 sm:min-h-[calc(100svh-4.5rem)] sm:px-6 sm:pb-8 sm:pt-24 lg:grid-cols-2 lg:items-start lg:gap-10 lg:px-8">
+        <div className="space-y-8 lg:max-w-xl lg:pt-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <Link
               to="/"
@@ -308,7 +308,7 @@ export default function Signup() {
           <div className="w-full max-w-[420px] bg-white/90 dark:bg-slate-900/85 backdrop-blur-lg rounded-2xl shadow-2xl hover:shadow-3xl transition duration-500 border border-white/20 dark:border-white/10">
             <div className="h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
 
-            <div className="p-8">
+            <div className="p-6 sm:p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
                 Student Registration
               </h2>
