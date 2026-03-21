@@ -73,17 +73,23 @@ export default function Login() {
     e.preventDefault();
     if (isLoading) return;
 
-    if (!data.email || !data.password) {
+    const normalizedEmail = String(data.email || "").trim().toLowerCase();
+    const password = String(data.password || "");
+
+    if (!normalizedEmail || !password) {
       setErrors({
-        email: !data.email ? "Email is required" : "",
-        password: !data.password ? "Password is required" : "",
+        email: !normalizedEmail ? "Email is required" : "",
+        password: !password ? "Password is required" : "",
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await api({ ...SummaryApi.login, data });
+      const response = await api({
+        ...SummaryApi.login,
+        data: { email: normalizedEmail, password },
+      });
       const { accessToken, refreshToken, role, token, user } = response.data || {};
       toast.success("Login successful. Redirecting to your dashboard...");
       finalizeLogin({ accessToken: accessToken || token, refreshToken, role, user });
@@ -97,8 +103,13 @@ export default function Login() {
           : backendMessage;
       const fallbackMessage = "Login failed. Please try again.";
       const networkMessage = fallbackMessage;
-      if (status === 403 && /verify your email/i.test(backendMessage)) {
-        const pendingEmail = String(data.email || "").trim().toLowerCase();
+      if (
+        status === 403 &&
+        /verify(?: your)? email|email (?:is )?not verified|verify email first/i.test(
+          backendMessage
+        )
+      ) {
+        const pendingEmail = normalizedEmail;
         if (pendingEmail) {
           storePendingVerificationEmail(pendingEmail);
           toast.info("Please verify your email before logging in.");

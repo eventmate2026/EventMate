@@ -276,10 +276,11 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
 // ---------------- LOGIN ----------------
 export const loginController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password)
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail || !password)
     return res.status(400).json({ success: false, message: "Email and password required" });
 
-  const user = await User.findOne({ email }).select(AUTH_SELECT_FIELDS);
+  const user = await User.findOne({ email: normalizedEmail }).select(AUTH_SELECT_FIELDS);
   if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
   const settings = await getSecuritySettings();

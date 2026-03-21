@@ -28,6 +28,8 @@ const sanitizeSubjectLine = (value) =>
     .replace(/[\r\n]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+const getSettledFailureMessage = (result) =>
+  String(result?.reason?.message || result?.reason || "Unknown email error").trim();
 
 /* ================================================
    POST /api/contact
@@ -81,6 +83,8 @@ export const submitContact = async (req, res, next) => {
       .map((item) => String(item?.email || "").trim())
       .filter(Boolean);
 
+    let emailDeliveryPending = false;
+
     if (adminEmails.length) {
       const rawMessage = String(message || "").trim();
       const subjectMatch = rawMessage.match(/^Subject:\s*(.+)$/im);
@@ -107,13 +111,28 @@ export const submitContact = async (req, res, next) => {
         </div>
       `;
 
-      await Promise.allSettled(
+      const emailResults = await Promise.allSettled(
         adminEmails.map((recipient) => sendEmail(recipient, emailSubject, html))
       );
+      const failedEmailResults = emailResults.filter((result) => result.status === "rejected");
+      emailDeliveryPending = failedEmailResults.length > 0;
+
+      if (failedEmailResults.length) {
+        console.error(
+          `Contact email delivery delayed for ${failedEmailResults.length}/${adminEmails.length} admin recipient(s): ${failedEmailResults
+            .map((result) => getSettledFailureMessage(result))
+            .filter(Boolean)
+            .join(" | ")}`
+        );
+      }
     }
-    return res.status(201).json({
+
+    return res.status(emailDeliveryPending ? 202 : 201).json({
       success: true,
-      message: "Your message has been submitted. We'll get back to you soon!",
+      message: emailDeliveryPending
+        ? "Your message was saved, but email delivery to admins is delayed right now. It is still available in the EventMate contact center."
+        : "Your message has been submitted. We'll get back to you soon!",
+      emailDeliveryPending,
       data: {
         fullName: contact.fullName,
         email: contact.email,

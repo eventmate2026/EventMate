@@ -56,7 +56,15 @@ export default function ContactUs({ compactTopSpacing = false }) {
         },
       });
 
-      toast.success(response.data?.message || "Message sent successfully.");
+      const deliveryPending =
+        Boolean(response.data?.emailDeliveryPending) || Number(response.status) === 202;
+      const responseMessage = response.data?.message || "Message sent successfully.";
+
+      if (deliveryPending) {
+        toast.info(responseMessage, { duration: 5200 });
+      } else {
+        toast.success(responseMessage);
+      }
 
       setFormData({
         name: user?.fullName || "",
