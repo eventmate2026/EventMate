@@ -17,8 +17,9 @@ const FRIENDLY_MESSAGE_MAP = new Map([
 const TECHNICAL_MESSAGE_PATTERNS = [
   /<!doctype html|<html|<body|<script/i,
   /\b(?:reference|type|syntax|range)error\b/i,
-  /\b(?:mongodb|mongoose|casterror|validationerror|cloudinary|sendgrid|nodemailer|smtp|dmarc|cors|stack trace|exception|duplicate key|e11000|mongo_uri|api[_ -]?secret|backend_url)\b/i,
-  /\b(?:errno|econnreset|ecconnaborted|enotfound|socket hang up|server selection)\b/i,
+  /\b(?:mongodb|mongoose|casterror|validationerror|cloudinary|sendgrid|nodemailer|smtp|dmarc|cors|stack trace|exception|duplicate key|e11000|mongo_uri|api[_ -]?secret|backend_url|jwt|bearer|sessionid|cloudinary_api_secret|smtp_pass|jwt_refresh_secret|jwt_secret)\b/i,
+  /\b(?:errno|econnreset|ecconnaborted|enotfound|socket hang up|server selection|err_connection_closed|err_timed_out|err_connection_reset)\b/i,
+  /\b(?:failed to load resource|status code \d{3}|local \(\:\:\:0\)|network is unreachable|connection timeout)\b/i,
   /(?:[A-Za-z]:\\|\/(?:usr|var|home|app|srv)\/)/,
   /(?:^|\n)\s*at\s+[A-Za-z0-9_$.[\]]+\s+\((?:[A-Za-z]:\\|\/)/,
 ];
@@ -38,6 +39,8 @@ const DEFAULT_SAFE_MESSAGES = {
   success: "Done successfully.",
   info: "Please check the latest update.",
 };
+
+const NESTED_SENSITIVE_KEYS = new Set(["warning", "error", "detail", "emailLastError", "lastError"]);
 
 const normalizeMessage = (value) =>
   String(value || "")
@@ -138,6 +141,41 @@ export const sanitizeApiPayload = (payload, options = {}) => {
       .map((entry) => sanitizeApiMessage(entry, { ...options, kind: "error" }))
       .filter(Boolean);
   }
+
+  const seen = new WeakSet();
+
+  const walkNestedPayload = (value) => {
+    if (!value || typeof value !== "object") return;
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      value.forEach((entry) => walkNestedPayload(entry));
+      return;
+    }
+
+    Object.entries(value).forEach(([key, entry]) => {
+      if (key === "message") {
+        return;
+      }
+
+      if (key === "errors" && Array.isArray(entry)) {
+        value[key] = entry
+          .map((item) => sanitizeApiMessage(item, { ...options, kind: "error" }))
+          .filter(Boolean);
+        return;
+      }
+
+      if (NESTED_SENSITIVE_KEYS.has(key) && typeof entry === "string") {
+        value[key] = sanitizeApiMessage(entry, { ...options, kind: "error" });
+        return;
+      }
+
+      walkNestedPayload(entry);
+    });
+  };
+
+  walkNestedPayload(payload);
 
   return payload;
 };

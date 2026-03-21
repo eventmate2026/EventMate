@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
-import api from "../lib/api";
+import api, { primeBackendConnection } from "../lib/api";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
 import { getSafeApiErrorText } from "../lib/safeMessage";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -23,6 +25,11 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const submitLockRef = useRef(false);
+  const fullNameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const confirmPasswordInputRef = useRef(null);
+  const agreeInputRef = useRef(null);
 
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -34,6 +41,10 @@ export default function Signup() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
+  useEffect(() => {
+    void primeBackendConnection();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
@@ -43,37 +54,98 @@ export default function Signup() {
   };
 
   const validateForm = () => {
+    const normalizedFullName = String(formData.fullName || "").trim();
+    const normalizedEmail = String(formData.email || "").trim().toLowerCase();
+    const password = String(formData.password || "");
+    const confirmPassword = String(formData.confirmPassword || "");
     const newErrors = {};
-    if (!formData.fullName) newErrors.fullName = "Full name is required";
-    if (!formData.email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid";
-    if (!formData.password) newErrors.password = "Password is required";
-    else if (formData.password.length < 8) newErrors.password = "Password must be at least 8 characters";
-    if (formData.confirmPassword !== formData.password) newErrors.confirmPassword = "Passwords do not match";
-    if (!formData.agree) newErrors.agree = "Please accept the terms to continue";
-    return newErrors;
+    let firstField = "";
+    let firstMessage = "";
+
+    const addError = (field, message) => {
+      newErrors[field] = message;
+      if (!firstField) {
+        firstField = field;
+        firstMessage = message;
+      }
+    };
+
+    if (!normalizedFullName) {
+      addError("fullName", "Full name is required.");
+    } else if (normalizedFullName.length < 3) {
+      addError("fullName", "Full name must be at least 3 characters.");
+    }
+
+    if (!normalizedEmail) {
+      addError("email", "Email is required.");
+    } else if (!EMAIL_REGEX.test(normalizedEmail)) {
+      addError("email", "Enter a valid email address.");
+    }
+
+    if (!password) {
+      addError("password", "Password is required.");
+    } else if (password.length < 8) {
+      addError("password", "Password must be at least 8 characters.");
+    }
+
+    if (!confirmPassword) {
+      addError("confirmPassword", "Please confirm your password.");
+    } else if (confirmPassword !== password) {
+      addError("confirmPassword", "Passwords do not match.");
+    }
+
+    if (!formData.agree) {
+      addError("agree", "Please accept the terms to continue.");
+    }
+
+    return {
+      errors: newErrors,
+      firstField,
+      firstMessage,
+      normalizedFullName,
+      normalizedEmail,
+    };
+  };
+
+  const focusField = (field) => {
+    const focusMap = {
+      fullName: fullNameInputRef,
+      email: emailInputRef,
+      password: passwordInputRef,
+      confirmPassword: confirmPasswordInputRef,
+      agree: agreeInputRef,
+    };
+
+    focusMap[field]?.current?.focus?.();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitLockRef.current || isLoading) return;
     setErrors({});
-    const validationErrors = validateForm();
+    const { errors: validationErrors, firstField, firstMessage, normalizedFullName, normalizedEmail } =
+      validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      focusField(firstField);
+      if (firstMessage) {
+        toast.error(firstMessage);
+      }
       return;
     }
 
-    const email = String(formData.email || "").trim().toLowerCase();
+    const email = normalizedEmail;
     submitLockRef.current = true;
     setIsLoading(true);
     try {
+      await primeBackendConnection();
+
       const response = await api({
         ...SummaryApi.register,
         data: {
-          fullName: formData.fullName,
+          fullName: normalizedFullName,
           email,
-          password: formData.password,
+          password: String(formData.password || ""),
         },
       });
 
@@ -114,9 +186,12 @@ export default function Signup() {
       );
     } catch (error) {
       const status = Number(error?.response?.status || 0);
+      const hasNetworkFailure = !error?.response;
+      const networkMessage =
+        "The service is taking longer than usual. Please wait a few seconds and try again.";
       const apiError =
         error.response?.data?.errors?.[0] ||
-        getSafeApiErrorText(error, "Registration failed. Please try again.");
+        getSafeApiErrorText(error, hasNetworkFailure ? networkMessage : "Registration failed. Please try again.");
       const verifyEmailFallbackMessage =
         "This email is already linked to an account. Continue to email verification to resend the OTP, or log in if your account is already verified.";
       const delayedOtpMessage =
@@ -251,6 +326,7 @@ export default function Signup() {
                   <label htmlFor="signup-full-name" className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
                   <input
                     id="signup-full-name"
+                    ref={fullNameInputRef}
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
@@ -266,6 +342,7 @@ export default function Signup() {
                   <label htmlFor="signup-email" className="text-sm font-medium text-gray-700 dark:text-slate-200">Email Address</label>
                   <input
                     id="signup-email"
+                    ref={emailInputRef}
                     type="email"
                     name="email"
                     value={formData.email}
@@ -283,6 +360,7 @@ export default function Signup() {
                   <div className="relative mt-1">
                     <input
                       id="signup-password"
+                      ref={passwordInputRef}
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
@@ -308,6 +386,7 @@ export default function Signup() {
                   <div className="relative mt-1">
                     <input
                       id="signup-confirm-password"
+                      ref={confirmPasswordInputRef}
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={formData.confirmPassword}
@@ -331,6 +410,7 @@ export default function Signup() {
                 <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
                   <input
                     id="signup-agree"
+                    ref={agreeInputRef}
                     type="checkbox"
                     name="agree"
                     checked={formData.agree}
@@ -350,6 +430,7 @@ export default function Signup() {
                   </label>
                 </div>
                 {errors.agree && <p className="text-xs text-red-600">{errors.agree}</p>}
+                {errors.submit && <p className="text-xs text-red-600">{errors.submit}</p>}
 
                 <button
                   type="submit"

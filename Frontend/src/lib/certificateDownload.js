@@ -1,5 +1,6 @@
 import api from "./api";
 import SummaryApi from "../api/SummaryApi";
+import { sanitizeUserFacingMessage } from "./safeMessage";
 
 const resolveEntityId = (...candidates) => {
   for (const value of candidates) {
@@ -168,9 +169,15 @@ const extractErrorMessageFromBlob = async (blob) => {
     if (!text) return "";
     try {
       const parsed = JSON.parse(text);
-      return String(parsed?.message || parsed?.error || "").trim();
+      return sanitizeUserFacingMessage(String(parsed?.message || parsed?.error || "").trim(), {
+        kind: "error",
+        fallback: "",
+      });
     } catch {
-      return text.slice(0, 180).trim();
+      return sanitizeUserFacingMessage(text.slice(0, 180).trim(), {
+        kind: "error",
+        fallback: "",
+      });
     }
   } catch {
     return "";
@@ -295,6 +302,9 @@ export const downloadCertificateAsset = async (row) => {
   return {
     ok: false,
     code: "error",
-    message,
+    message: sanitizeUserFacingMessage(message, {
+      kind: "error",
+      fallback: "Unable to download this certificate right now. Please try again.",
+    }),
   };
 };

@@ -394,9 +394,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         ? "border-indigo-200 bg-white text-indigo-600 dark:border-indigo-400/30 dark:bg-slate-950/60 dark:text-indigo-200"
         : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-300"
     }`;
-  const mobileMenuTitleClass = "text-sm font-semibold leading-5";
+  const mobileMenuTitleClass = "block text-sm font-semibold leading-5";
   const mobileMenuDescriptionClass = (active = false) =>
-    `mt-1 text-[11px] leading-5 ${
+    `block mt-1 text-[11px] leading-5 ${
       active ? "text-indigo-500/90 dark:text-indigo-200/80" : "text-slate-500 dark:text-slate-400"
     }`;
   const mobileMenuSectionLabelClass =
@@ -707,7 +707,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         <span className={mobileMenuIconShellClass(item.active)}>
           <Icon className="h-4.5 w-4.5" />
         </span>
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex flex-1 flex-col">
           <span className={mobileMenuTitleClass}>{item.label}</span>
           {item.description ? (
             <span className={mobileMenuDescriptionClass(item.active)}>{item.description}</span>
