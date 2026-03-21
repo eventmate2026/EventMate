@@ -570,6 +570,7 @@ export default function OrganizerCreateEvent() {
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Department</span>
                     <input
+                      name="department"
                       value={defaultDepartment || "Department not set in profile"}
                       readOnly
                       className={`mt-1 ${fieldClass} bg-slate-100 dark:bg-white/10`}
@@ -806,6 +807,7 @@ export default function OrganizerCreateEvent() {
                   </span>
                   <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <select
+                      name="coordinatorPick"
                       value={coordinatorPick}
                       onChange={(event) => setCoordinatorPick(event.target.value)}
                       className={`${fieldClass} sm:flex-1`}
@@ -905,10 +907,10 @@ export default function OrganizerCreateEvent() {
                 {judges.map((row, index) => (
                   <div key={`judge-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 p-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input value={row.name} onChange={(event) => handleListItemChange(setJudges, index, "name", event.target.value)} placeholder="Judge Name" className={fieldClass} />
-                      <input value={row.organization} onChange={(event) => handleListItemChange(setJudges, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
-                      <input value={row.department} onChange={(event) => handleListItemChange(setJudges, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
-                      <input value={row.occupation} onChange={(event) => handleListItemChange(setJudges, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
+                      <input name={`judgeName-${index}`} value={row.name} onChange={(event) => handleListItemChange(setJudges, index, "name", event.target.value)} placeholder="Judge Name" className={fieldClass} />
+                      <input name={`judgeOrganization-${index}`} value={row.organization} onChange={(event) => handleListItemChange(setJudges, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
+                      <input name={`judgeDepartment-${index}`} value={row.department} onChange={(event) => handleListItemChange(setJudges, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
+                      <input name={`judgeOccupation-${index}`} value={row.occupation} onChange={(event) => handleListItemChange(setJudges, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
                       <button type="button" onClick={() => handleListRemove(setJudges, index)} className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/15">
                         <Trash2 size={13} />
                       </button>
@@ -932,10 +934,10 @@ export default function OrganizerCreateEvent() {
                 {mentors.map((row, index) => (
                   <div key={`mentor-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 p-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input value={row.name} onChange={(event) => handleListItemChange(setMentors, index, "name", event.target.value)} placeholder="Mentor Name" className={fieldClass} />
-                      <input value={row.organization} onChange={(event) => handleListItemChange(setMentors, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
-                      <input value={row.department} onChange={(event) => handleListItemChange(setMentors, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
-                      <input value={row.occupation} onChange={(event) => handleListItemChange(setMentors, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
+                      <input name={`mentorName-${index}`} value={row.name} onChange={(event) => handleListItemChange(setMentors, index, "name", event.target.value)} placeholder="Mentor Name" className={fieldClass} />
+                      <input name={`mentorOrganization-${index}`} value={row.organization} onChange={(event) => handleListItemChange(setMentors, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
+                      <input name={`mentorDepartment-${index}`} value={row.department} onChange={(event) => handleListItemChange(setMentors, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
+                      <input name={`mentorOccupation-${index}`} value={row.occupation} onChange={(event) => handleListItemChange(setMentors, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
                       <button type="button" onClick={() => handleListRemove(setMentors, index)} className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/15">
                         <Trash2 size={13} />
                       </button>

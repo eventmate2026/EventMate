@@ -248,6 +248,7 @@ export default function AdminCertificatesAuditLogs() {
           <form onSubmit={handleVerifySubmit} className="mt-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
             <input
               type="text"
+              name="verifyCode"
               value={verifyCode}
               onChange={(event) => setVerifyCode(event.target.value)}
               placeholder="Enter verification code (e.g. EM-2026-7A1C-4D9F)"
@@ -324,6 +325,7 @@ export default function AdminCertificatesAuditLogs() {
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
+                      name="registrySearch"
                       value={registrySearch}
                       onChange={(event) => setRegistrySearch(event.target.value)}
                       placeholder="Search code, student, event..."
@@ -331,6 +333,7 @@ export default function AdminCertificatesAuditLogs() {
                     />
                   </div>
                   <select
+                    name="registryStatus"
                     value={registryStatus}
                     onChange={(event) => setRegistryStatus(event.target.value)}
                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"
@@ -433,6 +436,7 @@ export default function AdminCertificatesAuditLogs() {
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
+                      name="auditSearch"
                       value={auditSearch}
                       onChange={(event) => setAuditSearch(event.target.value)}
                       placeholder="Search actor, code or details..."
@@ -440,6 +444,7 @@ export default function AdminCertificatesAuditLogs() {
                     />
                   </div>
                   <select
+                    name="auditAction"
                     value={auditAction}
                     onChange={(event) => setAuditAction(event.target.value)}
                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-900 dark:text-slate-100"

@@ -719,8 +719,10 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                     {isTeamRegistration && (
                       <div className="mb-4">
-                        <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Team Name *</label>
+                        <label htmlFor="student-event-team-name" className="text-xs font-medium text-slate-600 dark:text-slate-300">Team Name *</label>
                         <input
+                          id="student-event-team-name"
+                          name="teamName"
                           value={teamName}
                           onChange={(inputEvent) => setTeamName(inputEvent.target.value)}
                           className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
@@ -729,17 +731,18 @@ export default function StudentEventDetails({ mode = "details" }) {
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input placeholder="Full Name *" value={leaderProfile.fullName} onChange={(eventValue) => updateLeaderField("fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input type="email" placeholder="Email Address *" value={leaderProfile.email} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200" />
-                      <input placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input name="leaderFullName" placeholder="Full Name *" value={leaderProfile.fullName} onChange={(eventValue) => updateLeaderField("fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input name="leaderEmail" type="email" placeholder="Email Address *" value={leaderProfile.email} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200" />
+                      <input name="leaderMobileNumber" placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input name="leaderCollegeName" placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input
+                        name="leaderBranch"
                         placeholder="Department *"
                         value={leaderProfile.branch}
                         readOnly
                         className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-not-allowed"
                       />
-                      <input placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input name="leaderYear" placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                     </div>
 
                     {isTeamRegistration && (
@@ -761,9 +764,10 @@ export default function StudentEventDetails({ mode = "details" }) {
                                 )}
                               </div>
                               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <input placeholder="Full Name *" value={member.fullName} onChange={(eventValue) => updateMemberField(index, "fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input name={`memberFullName-${index}`} placeholder="Full Name *" value={member.fullName} onChange={(eventValue) => updateMemberField(index, "fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <div className="space-y-1">
                                   <input
+                                    name={`memberEmail-${index}`}
                                     placeholder="Email Address *"
                                     value={member.email}
                                     onChange={(eventValue) => handleMemberEmailChange(index, eventValue.target.value)}
@@ -781,16 +785,18 @@ export default function StudentEventDetails({ mode = "details" }) {
                                     </p>
                                   )}
                                 </div>
-                                <input placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
-                                <input placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input name={`memberMobileNumber-${index}`} placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input name={`memberCollegeName-${index}`} placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 {isDepartmentEvent ? (
                                   <input
+                                    name={`memberDepartment-${index}`}
                                     value={eventVisibilityDepartment}
                                     readOnly
                                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 cursor-not-allowed"
                                   />
                                 ) : (
                                   <select
+                                    name={`memberBranch-${index}`}
                                     value={member.branch}
                                     onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)}
                                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
@@ -803,7 +809,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                                     ))}
                                   </select>
                                 )}
-                                <input placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input name={`memberYear-${index}`} placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                               </div>
                             </div>
                           ))}
@@ -823,11 +829,11 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                     <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
                       <label className="flex items-start gap-2">
-                        <input type="checkbox" checked={declarations.studentAuthenticity} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, studentAuthenticity: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
+                        <input name="studentAuthenticity" type="checkbox" checked={declarations.studentAuthenticity} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, studentAuthenticity: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
                         I confirm that the submitted details are genuine.
                       </label>
                       <label className="flex items-start gap-2">
-                        <input type="checkbox" checked={declarations.certificateAwareness} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, certificateAwareness: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
+                        <input name="certificateAwareness" type="checkbox" checked={declarations.certificateAwareness} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, certificateAwareness: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
                         I understand certificates are issued only after attendance verification.
                       </label>
                     </div>

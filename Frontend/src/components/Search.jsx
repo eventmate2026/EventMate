@@ -1,7 +1,13 @@
-﻿export default function Search({ value = "", onChange, placeholder = "Search events..." }) {
+export default function Search({
+  value = "",
+  onChange,
+  placeholder = "Search events...",
+  name = "search",
+}) {
   return (
     <input
       type="search"
+      name={name}
       value={value}
       onChange={onChange}
       placeholder={placeholder}

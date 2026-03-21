@@ -337,8 +337,15 @@ export default function StudentFeedbackPending() {
                               </div>
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Comment (optional)</label>
+                              <label
+                                htmlFor={`feedback-comment-${eventId}`}
+                                className="text-xs font-medium text-slate-600 dark:text-slate-300"
+                              >
+                                Comment (optional)
+                              </label>
                               <textarea
+                                id={`feedback-comment-${eventId}`}
+                                name={`feedbackComment-${eventId}`}
                                 rows={3}
                                 value={draft.comment}
                                 onChange={(inputEvent) => updateDraft(eventId, { comment: inputEvent.target.value })}

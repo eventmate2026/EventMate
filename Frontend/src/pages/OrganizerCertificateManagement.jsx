@@ -1534,6 +1534,7 @@ export default function OrganizerCertificateManagement() {
         <input
           ref={backgroundInputRef}
           type="file"
+          name="backgroundImageFile"
           accept="image/*"
           onChange={handleBackgroundFileSelected}
           className="hidden"
@@ -1541,6 +1542,7 @@ export default function OrganizerCertificateManagement() {
         <input
           ref={logoInputRef}
           type="file"
+          name="logoImageFile"
           accept="image/*"
           onChange={handleLogoFileSelected}
           className="hidden"
@@ -1548,6 +1550,7 @@ export default function OrganizerCertificateManagement() {
         <input
           ref={accreditationLogoInputRef}
           type="file"
+          name="accreditationLogoFile"
           accept="image/*"
           onChange={handleAccreditationLogoFileSelected}
           className="hidden"
@@ -1559,6 +1562,7 @@ export default function OrganizerCertificateManagement() {
               signatureInputRefs.current[field.role] = element;
             }}
             type="file"
+            name={`${field.role}SignatureFile`}
             accept="image/png"
             onChange={handleSignatureFileSelected(field.role)}
             className="hidden"
@@ -2177,6 +2181,7 @@ export default function OrganizerCertificateManagement() {
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-start">
                     <input
                       type="url"
+                      name="backgroundImageUrl"
                       value={draftCustomization.backgroundImageUrl || ""}
                       maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS.backgroundImageUrl}
                       onChange={(eventValue) =>
@@ -2212,6 +2217,7 @@ export default function OrganizerCertificateManagement() {
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-start">
                     <input
                       type="url"
+                      name="logoUrl"
                       value={draftCustomization.logoUrl || ""}
                       maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS.logoUrl}
                       onChange={(eventValue) =>
@@ -2247,6 +2253,7 @@ export default function OrganizerCertificateManagement() {
                   <div className="mt-2 grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-start">
                     <input
                       type="url"
+                      name="accreditationLogoUrl"
                       value={draftCustomization.accreditationLogoUrl || ""}
                       maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS.accreditationLogoUrl}
                       onChange={(eventValue) =>
@@ -2282,6 +2289,7 @@ export default function OrganizerCertificateManagement() {
                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{field.label}</span>
                         <input
                           type="text"
+                          name={field.key}
                           value={draftCustomization[field.key] || ""}
                           maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS[field.key]}
                           onChange={(eventValue) => handleDraftCustomizationChange(field.key, eventValue.target.value)}
@@ -2314,6 +2322,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">Size</span>
                             <input
                               type="number"
+                              name={`${field.key}FontSize`}
                               min="8"
                               max="40"
                               step="1"
@@ -2329,6 +2338,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">Color</span>
                             <input
                               type="color"
+                              name={`${field.key}ColorPicker`}
                               value={styleNode?.color || "#000000"}
                               onChange={(eventValue) =>
                                 handleDraftStyleChange(field.key, "color", eventValue.target.value)
@@ -2341,6 +2351,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">Hex</span>
                             <input
                               type="text"
+                              name={`${field.key}Color`}
                               value={styleNode?.color || ""}
                               onChange={(eventValue) =>
                                 handleDraftStyleChange(field.key, "color", eventValue.target.value)
@@ -2418,6 +2429,7 @@ export default function OrganizerCertificateManagement() {
                             </span>
                             <input
                               type="text"
+                              name={field.labelKey}
                               value={draftCustomization[field.labelKey] || ""}
                               maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS[field.labelKey]}
                               onChange={(eventValue) =>
@@ -2430,6 +2442,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-200">Name</span>
                             <input
                               type="text"
+                              name={field.nameKey}
                               value={draftCustomization[field.nameKey] || ""}
                               maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS[field.nameKey]}
                               onChange={(eventValue) =>
@@ -2444,6 +2457,7 @@ export default function OrganizerCertificateManagement() {
                             </span>
                             <input
                               type="text"
+                              name={field.deptKey}
                               value={draftCustomization[field.deptKey] || ""}
                               maxLength={CERTIFICATE_CUSTOMIZATION_LIMITS[field.deptKey]}
                               onChange={(eventValue) =>
@@ -3047,6 +3061,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">X</span>
                             <input
                               type="number"
+                              name={`${field.key}X`}
                               min="0"
                               max="100"
                               step="0.1"
@@ -3060,6 +3075,7 @@ export default function OrganizerCertificateManagement() {
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">Y</span>
                             <input
                               type="number"
+                              name={`${field.key}Y`}
                               min="0"
                               max="100"
                               step="0.1"
@@ -3072,6 +3088,7 @@ export default function OrganizerCertificateManagement() {
                           <label className="space-y-0.5">
                             <span className="text-[10px] text-slate-500 dark:text-slate-300">Anchor</span>
                             <select
+                              name={`${field.key}Anchor`}
                               value={node.anchor}
                               onChange={(eventValue) => handleDraftLayoutChange(field.key, "anchor", eventValue.target.value)}
                               className="w-full rounded-md border border-slate-300 dark:border-white/15 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs text-slate-900 dark:text-slate-100"
@@ -3087,6 +3104,7 @@ export default function OrganizerCertificateManagement() {
                               <span className="text-[10px] text-slate-500 dark:text-slate-300">Width</span>
                               <input
                                 type="number"
+                                name={`${field.key}Width`}
                                 min={
                                   field.key === "verificationCode"
                                     ? "180"
@@ -3118,6 +3136,7 @@ export default function OrganizerCertificateManagement() {
                               <span className="text-[10px] text-slate-500 dark:text-slate-300">Height</span>
                               <input
                                 type="number"
+                                name={`${field.key}Height`}
                                 min="22"
                                 max="52"
                                 step="1"

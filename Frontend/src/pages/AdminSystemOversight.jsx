@@ -367,6 +367,7 @@ export default function AdminSystemOversight() {
               <div className="relative max-w-sm">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  name="oversightSearch"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search event, organizer or department..."

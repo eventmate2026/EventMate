@@ -167,8 +167,10 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Subject</label>
+                <label htmlFor="contact-admin-subject" className="text-xs font-medium text-slate-600 dark:text-slate-300">Subject</label>
                 <input
+                  id="contact-admin-subject"
+                  name="subject"
                   value={subject}
                   onChange={(event) => setSubject(event.target.value)}
                   placeholder="Approval required for upcoming event"
@@ -176,8 +178,10 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
+                <label htmlFor="contact-admin-message" className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
                 <textarea
+                  id="contact-admin-message"
+                  name="message"
                   rows={6}
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}

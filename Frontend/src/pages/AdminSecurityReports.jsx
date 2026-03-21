@@ -257,6 +257,7 @@ export default function AdminSecurityReports() {
                   </div>
                   <input
                     type="range"
+                    name="accessTokenLifetimeMinutes"
                     min={5}
                     max={120}
                     step={1}
@@ -287,6 +288,7 @@ export default function AdminSecurityReports() {
                   </div>
                   <input
                     type="range"
+                    name="refreshTokenLifetimeDays"
                     min={1}
                     max={30}
                     step={1}
@@ -335,6 +337,7 @@ export default function AdminSecurityReports() {
                   </span>
                   <input
                     type="number"
+                    name="maxFailedLoginAttempts"
                     min={3}
                     max={20}
                     value={settings.maxFailedLoginAttempts}
@@ -354,6 +357,7 @@ export default function AdminSecurityReports() {
                   </span>
                   <input
                     type="number"
+                    name="lockoutDurationMinutes"
                     min={5}
                     max={240}
                     value={settings.lockoutDurationMinutes}

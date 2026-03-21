@@ -295,6 +295,7 @@ export default function AdminCoordinatorManagement() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
+                name="coordinatorSearch"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name or email..."

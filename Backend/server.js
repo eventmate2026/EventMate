@@ -15,11 +15,9 @@ dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 
-// Create HTTP server from Express app
 const httpServer = createServer(app);
 const corsOriginValidator = createCorsOriginValidator();
 
-// Setup Socket.io on top of HTTP server
 const io = new Server(httpServer, {
   cors: {
     origin: corsOriginValidator,
@@ -27,26 +25,22 @@ const io = new Server(httpServer, {
   }
 });
 
-// Socket connection handler
 io.on("connection", (socket) => {
-  console.log(`🔌 Socket connected: ${socket.id}`);
+  console.log(`Socket connected: ${socket.id}`);
 
-  // User joins their own private room
   socket.on("join", (userId) => {
     socket.join(`user_${userId}`);
-    console.log(`✅ User ${userId} joined their room`);
+    console.log(`User ${userId} joined their room`);
   });
 
   socket.on("disconnect", () => {
-    console.log(`❌ Socket disconnected: ${socket.id}`);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 
-// Pass io instance to notification service
 initSocket(io);
 
 const bootstrap = async () => {
-  await connectDB();
   startCronJobs();
   if (isNotificationEmailWorkerEnabled()) {
     startNotificationEmailWorker();
@@ -55,8 +49,31 @@ const bootstrap = async () => {
   }
 
   httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
+
+  try {
+    await connectDB({ retryOnFailure: true });
+  } catch (error) {
+    console.error(
+      "MongoDB not ready during boot. The API will return 503 until the background reconnect succeeds.",
+      error?.message || error
+    );
+  }
 };
 
-bootstrap();
+httpServer.on("error", (error) => {
+  console.error("HTTP server error:", error?.message || error);
+});
+
+process.on("unhandledRejection", (error) => {
+  console.error("Unhandled promise rejection:", error);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
+bootstrap().catch((error) => {
+  console.error("Server bootstrap failed:", error?.message || error);
+});

@@ -245,6 +245,7 @@ export default function AdminUserManagement() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
+                name="userSearch"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name, email, or role..."
@@ -254,6 +255,7 @@ export default function AdminUserManagement() {
 
             <div className="grid grid-cols-2 gap-2">
               <select
+                name="roleFilter"
                 value={roleFilter}
                 onChange={(event) => setRoleFilter(event.target.value)}
                 className="w-full py-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-slate-100 text-sm px-2"
@@ -266,6 +268,7 @@ export default function AdminUserManagement() {
               </select>
 
               <select
+                name="statusFilter"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="w-full py-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-slate-100 text-sm px-2"

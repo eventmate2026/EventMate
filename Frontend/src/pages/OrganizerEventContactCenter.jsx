@@ -562,6 +562,7 @@ export default function OrganizerEventContactCenter() {
                 >
                   <input
                     type="checkbox"
+                    name="selectedRecipients"
                     checked={isSelected}
                     onChange={() => toggleSelection(id)}
                     disabled={isDisabled}
@@ -701,6 +702,7 @@ export default function OrganizerEventContactCenter() {
                 <div className="relative w-full sm:max-w-xs">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    name="participantSearch"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search by name, email, or department..."
@@ -844,8 +846,10 @@ export default function OrganizerEventContactCenter() {
                 <form onSubmit={handleSend} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4">
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
+                      <label htmlFor="organizer-contact-title" className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
                       <input
+                        id="organizer-contact-title"
+                        name="title"
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         disabled={isMessagingDisabled}
@@ -854,8 +858,10 @@ export default function OrganizerEventContactCenter() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
+                      <label htmlFor="organizer-contact-message" className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
                       <textarea
+                        id="organizer-contact-message"
+                        name="message"
                         rows={6}
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}

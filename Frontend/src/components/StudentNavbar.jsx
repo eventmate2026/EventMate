@@ -5,7 +5,10 @@ import {
   X, 
   LogOut, 
   Moon,
-  Sun
+  Sun,
+  Home,
+  Calendar,
+  Mail
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link, useNavigate } from 'react-router-dom';
@@ -45,6 +48,34 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const mobileProfilePanelTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
+  const mobileMenuPanelMotion = prefersReducedMotion
+    ? {
+        initial: false,
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: 0, scale: 1 },
+      }
+    : {
+        initial: { opacity: 0, y: -12, scale: 0.97 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -10, scale: 0.985 },
+      };
+  const mobileMenuPanelTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
+  const mobileMenuItemClass = (active = false) =>
+    `group flex w-full items-start gap-3 rounded-[22px] border px-3.5 py-3.5 text-left transition-all duration-200 ${
+      active
+        ? "border-indigo-200 bg-indigo-50/90 text-indigo-700 shadow-[0_16px_30px_-24px_rgba(79,70,229,0.65)] dark:border-indigo-400/35 dark:bg-indigo-500/15 dark:text-indigo-200"
+        : "border-transparent bg-slate-50/80 text-slate-700 hover:border-slate-200 hover:bg-white dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/10 dark:hover:bg-white/[0.07]"
+    }`;
+  const mobileMenuIconShellClass = (active = false) =>
+    `mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${
+      active
+        ? "border-indigo-200 bg-white text-indigo-600 dark:border-indigo-400/30 dark:bg-slate-950/60 dark:text-indigo-200"
+        : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-300"
+    }`;
+  const mobileQuickActionClass =
+    "inline-flex min-w-0 flex-1 items-center justify-center rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-indigo-400/30 dark:hover:text-indigo-200";
 
   if (!isStudent) {
     return null;
@@ -56,6 +87,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     "my-events": "/student-dashboard/my-events",
     notifications: "/student-dashboard/notifications",
     "contact-us": "/student-dashboard/contact-us",
+  };
+  const closeMenus = () => {
+    setIsMobileMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsMobileProfileOpen(false);
   };
 
   useEffect(() => {
@@ -127,9 +163,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     }
 
     navigate(pageToPath[pageName] || "/student-dashboard");
-    setIsMobileMenuOpen(false);
-    setIsUserMenuOpen(false);
-    setIsMobileProfileOpen(false);
+    closeMenus();
     window.scrollTo(0, 0);
   };
   const toggleMobileProfileMenu = () => {
@@ -142,17 +176,97 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   };
 
   const isActivePage = (pageName) => activePage === pageName;
+  const mobileMenuSections = [
+    {
+      title: "Explore",
+      items: [
+        {
+          key: "home",
+          label: "Home",
+          description: "Return to your student dashboard overview.",
+          icon: Home,
+          active: isActivePage("home"),
+          onSelect: () => handleNavClick("home"),
+        },
+        {
+          key: "events",
+          label: "Events",
+          description: "Browse upcoming events and open registrations.",
+          icon: Calendar,
+          active: isActivePage("events"),
+          onSelect: () => handleNavClick("events"),
+        },
+        {
+          key: "my-events",
+          label: "My Events",
+          description: "Open your registered and completed events.",
+          icon: Calendar,
+          active: isActivePage("my-events"),
+          onSelect: () => handleNavClick("my-events"),
+        },
+      ],
+    },
+    {
+      title: "Support",
+      items: [
+        {
+          key: "contact-us",
+          label: "Contact us",
+          description: "Reach the EventMate team whenever you need help.",
+          icon: Mail,
+          active: isActivePage("contact-us"),
+          onSelect: () => handleNavClick("contact-us"),
+        },
+      ],
+    },
+  ];
+  const mobileQuickActions = [
+    {
+      key: "profile",
+      label: "Profile",
+      onSelect: () => {
+        navigate("/profile");
+        closeMenus();
+      },
+    },
+    {
+      key: "notifications",
+      label: unreadCount > 0 ? `Alerts (${unreadCount > 99 ? "99+" : unreadCount})` : "Alerts",
+      onSelect: () => {
+        handleNavClick("notifications");
+      },
+    },
+  ];
+  const renderMobileMenuEntry = (item) => {
+    const Icon = item.icon || Home;
+    return (
+      <button
+        key={item.key}
+        type="button"
+        onClick={item.onSelect}
+        className={mobileMenuItemClass(item.active)}
+      >
+        <span className={mobileMenuIconShellClass(item.active)}>
+          <Icon className="h-4.5 w-4.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-sm font-semibold leading-5">{item.label}</span>
+          <span
+            className={`mt-1 block text-[11px] leading-5 ${
+              item.active ? "text-indigo-500/90 dark:text-indigo-200/80" : "text-slate-500 dark:text-slate-400"
+            }`}
+          >
+            {item.description}
+          </span>
+        </span>
+      </button>
+    );
+  };
   const desktopLinkClass = (pageName) =>
     `inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
       isActivePage(pageName)
         ? "text-purple-600 dark:text-indigo-300 border-b-2 border-purple-600 dark:border-indigo-300"
         : "text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-indigo-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-white/20"
-    }`;
-  const mobileLinkClass = (pageName) =>
-    `block w-full rounded-xl px-4 py-3 text-left text-base font-medium transition ${
-      isActivePage(pageName)
-        ? "bg-purple-50 text-purple-700 dark:bg-indigo-500/10 dark:text-indigo-300"
-        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
     }`;
 
   const renderAvatar = (className, textClassName) => (
@@ -355,7 +469,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                 setIsMobileProfileOpen(false);
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
+              className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/90 p-2 text-slate-500 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300 dark:hover:border-indigo-400/40 dark:hover:text-indigo-200"
             >
               <span className="sr-only">Open main menu</span>
               {isMobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
@@ -365,46 +479,92 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       </div>
 
       {/* --- MOBILE MENU PANEL --- */}
-      {isMobileMenuOpen && (
-        <>
-          <button
-            type="button"
-            aria-label="Close mobile menu"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 top-16 z-[105] bg-slate-950/55 backdrop-blur-[1px] sm:hidden"
-          />
-          <div className="fixed left-3 right-3 top-[4.5rem] z-[109] max-h-[min(22rem,calc(100svh-6rem))] overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900 sm:hidden">
-            <div className="p-2.5">
-              <div className="space-y-1.5">
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Close mobile menu"
+              onClick={closeMenus}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+              className="fixed inset-0 top-16 z-[105] bg-slate-950/40 backdrop-blur-[2px] sm:hidden"
+            />
+            <motion.div
+              initial={mobileMenuPanelMotion.initial}
+              animate={mobileMenuPanelMotion.animate}
+              exit={mobileMenuPanelMotion.exit}
+              transition={mobileMenuPanelTransition}
+              className="fixed right-3 top-[4.35rem] z-[109] w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(30rem,calc(100svh-5.5rem))] overflow-y-auto overscroll-contain rounded-[30px] border border-slate-200/80 bg-white/96 shadow-[0_32px_80px_-38px_rgba(15,23,42,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/96 sm:hidden"
+            >
+              <div className="p-3">
+                <div className="rounded-[26px] border border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-white p-4 dark:border-white/10 dark:from-white/[0.08] dark:via-white/[0.04] dark:to-transparent">
+                  <div className="flex items-start gap-3">
+                    <AvatarWithFrame
+                      src={avatarUrl}
+                      alt={`${displayName} avatar`}
+                      className="h-11 w-11 shrink-0"
+                      coreClassName="h-full w-full border border-indigo-200 bg-white text-indigo-700 dark:border-indigo-400/40 dark:bg-slate-950/70 dark:text-indigo-200 flex items-center justify-center text-sm font-semibold"
+                      fallback={<span>{avatarText || "S"}</span>}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                        Student Menu
+                      </p>
+                      <h2 className="mt-1 truncate text-base font-semibold text-slate-900 dark:text-white">
+                        {displayName}
+                      </h2>
+                      <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-300">
+                        {user?.email || "student@college.com"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {mobileQuickActions.map((action) => (
+                      <button
+                        key={action.key}
+                        type="button"
+                        onClick={action.onSelect}
+                        className={mobileQuickActionClass}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  {mobileMenuSections.map((section) => (
+                    <div key={section.title} className="space-y-2.5">
+                      <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                        {section.title}
+                      </p>
+                      <div className="space-y-2">
+                        {section.items.map((item) => renderMobileMenuEntry(item))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <button
-                  onClick={() => handleNavClick('home')}
-                  className={mobileLinkClass("home")}
+                  type="button"
+                  onClick={() => {
+                    onLogout();
+                    closeMenus();
+                  }}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/12 dark:text-red-300 dark:hover:bg-red-500/18"
                 >
-                  Home
-                </button>
-                <button
-                  onClick={() => handleNavClick('events')}
-                  className={mobileLinkClass("events")}
-                >
-                  Events
-                </button>
-                <button
-                  onClick={() => handleNavClick('my-events')}
-                  className={mobileLinkClass("my-events")}
-                >
-                  My Events
-                </button>
-                <button
-                  onClick={() => handleNavClick("contact-us")}
-                  className={mobileLinkClass("contact-us")}
-                >
-                  Contact us
+                  <LogOut size={16} />
+                  Sign out
                 </button>
               </div>
-            </div>
-          </div>
-        </>
-      )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </nav>
     </>
   );

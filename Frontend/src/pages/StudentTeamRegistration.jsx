@@ -263,6 +263,7 @@ export default function StudentTeamRegistration() {
                               {isEditing ? (
                                 <div className="flex flex-col gap-2">
                                   <input
+                                    name={`memberEmail-${index}`}
                                     value={draftEmail}
                                     onChange={(event) =>
                                       setEmailDrafts((prev) => ({

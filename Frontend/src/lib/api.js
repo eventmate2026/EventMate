@@ -6,6 +6,7 @@ import { sanitizeApiPayload } from "./safeMessage";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 20000,
 });
 
 const GET_CACHE_TTL_MS = 60000;
@@ -116,9 +117,9 @@ const resolveWarmupUrl = () => {
   if (!base) return "";
 
   try {
-    return new URL("/", `${base.replace(/\/+$/, "")}/`).toString();
+    return new URL("/healthz", `${base.replace(/\/+$/, "")}/`).toString();
   } catch {
-    return `${base.replace(/\/+$/, "")}/`;
+    return `${base.replace(/\/+$/, "")}/healthz`;
   }
 };
 

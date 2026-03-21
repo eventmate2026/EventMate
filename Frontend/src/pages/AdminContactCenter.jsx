@@ -516,6 +516,7 @@ export default function AdminContactCenter() {
                 >
                   <input
                     type="checkbox"
+                    name="selectedRecipients"
                     checked={isSelected}
                     onChange={() => toggleSelection(id)}
                     className="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200"
@@ -636,6 +637,7 @@ export default function AdminContactCenter() {
                 <div className="relative w-full sm:max-w-xs">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    name="contactSearch"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search by name, email, role, or department..."
@@ -806,8 +808,10 @@ export default function AdminContactCenter() {
                 <form onSubmit={handleSend} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4">
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
+                      <label htmlFor="admin-contact-title" className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
                       <input
+                        id="admin-contact-title"
+                        name="title"
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         placeholder="Urgent schedule update"
@@ -815,8 +819,10 @@ export default function AdminContactCenter() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
+                      <label htmlFor="admin-contact-message" className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
                       <textarea
+                        id="admin-contact-message"
+                        name="message"
                         rows={6}
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}

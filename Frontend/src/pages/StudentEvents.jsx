@@ -343,6 +343,7 @@ export default function StudentEvents() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
+                  name="upcomingSearch"
                   value={upcomingSearch}
                   onChange={(event) => setUpcomingSearch(event.target.value)}
                   placeholder="Search upcoming events..."
@@ -399,6 +400,7 @@ export default function StudentEvents() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
+                  name="completedSearch"
                   value={completedSearch}
                   onChange={(event) => setCompletedSearch(event.target.value)}
                   placeholder="Search completed events..."

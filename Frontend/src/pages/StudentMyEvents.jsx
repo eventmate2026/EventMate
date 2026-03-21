@@ -435,6 +435,7 @@ export default function StudentMyEvents() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
+              name="myEventsSearch"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search my events..."

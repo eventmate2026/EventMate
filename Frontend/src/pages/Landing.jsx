@@ -511,6 +511,7 @@ export default function Landing() {
               </div>
               <input
                 type="text"
+                name="eventSearch"
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

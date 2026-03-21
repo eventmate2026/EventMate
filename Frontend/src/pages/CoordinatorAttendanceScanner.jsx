@@ -907,6 +907,7 @@ export default function CoordinatorAttendanceScanner() {
                     <input
                       ref={fileInputRef}
                       type="file"
+                      name="scannerImageFile"
                       accept="image/*"
                       onChange={handleScanImageFile}
                       className="hidden"

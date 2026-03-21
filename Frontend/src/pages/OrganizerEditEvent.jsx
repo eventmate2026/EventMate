@@ -396,9 +396,10 @@ export default function OrganizerEditEvent() {
               <option value="COLLEGE">College Level</option>
               <option value="DEPARTMENT">Department Level</option>
             </select>
-            <input value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
+            <input name="status" value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
             {form.visibilityScope === "DEPARTMENT" && (
               <input
+                name="organizerDepartment"
                 value={organizerDepartment || "Department not set in profile"}
                 placeholder="Department"
                 readOnly

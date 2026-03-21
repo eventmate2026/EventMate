@@ -638,6 +638,7 @@ export default function OrganizerEventViewList() {
                 <label className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    name="participantSearch"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search by name, email, college, team..."
@@ -646,6 +647,7 @@ export default function OrganizerEventViewList() {
                 </label>
 
                 <select
+                  name="registrationFilter"
                   value={registrationFilter}
                   onChange={(event) => setRegistrationFilter(event.target.value)}
                   className="rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
@@ -658,6 +660,7 @@ export default function OrganizerEventViewList() {
                 </select>
 
                 <select
+                  name="attendanceFilter"
                   value={attendanceFilter}
                   onChange={(event) => setAttendanceFilter(event.target.value)}
                   className="rounded-md border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-sm text-slate-800 dark:text-slate-100"
@@ -868,6 +871,7 @@ export default function OrganizerEventViewList() {
                                   {reviewAction === "approve" ? "Approving..." : "Approve"}
                                 </button>
                                 <input
+                                  name={`paymentReviewReason-${winnerKey}`}
                                   value={paymentReviewDrafts[winnerKey] || ""}
                                   onChange={(event) =>
                                     setPaymentReviewDrafts((prev) => ({

@@ -431,6 +431,7 @@ export default function Profile() {
                   <label className="block">
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
                     <input
+                      name="email"
                       value={profile?.email || ""}
                       readOnly
                       className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-3 text-sm text-slate-600 dark:text-slate-300"

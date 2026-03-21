@@ -1,6 +1,7 @@
 import Notification from "../models/Notification.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
+import { isDatabaseReady } from "../config/db.js";
 
 let io = null;
 let workerIntervalId = null;
@@ -253,6 +254,10 @@ export const processPendingNotificationEmails = async ({
   batchSize = 20,
   maxAttempts = 8
 } = {}) => {
+  if (!isDatabaseReady()) {
+    return { processed: 0, skipped: "db_not_ready" };
+  }
+
   if (workerBusy) return { processed: 0 };
   workerBusy = true;
 

@@ -424,6 +424,8 @@ export default function StudentRegistrationPayment() {
                         Transaction ID
                       </span>
                       <input
+                        id="registration-payment-transaction-id"
+                        name="transactionId"
                         value={transactionId}
                         onChange={(event) => setTransactionId(event.target.value)}
                         disabled={!canUploadProof}
@@ -438,8 +440,10 @@ export default function StudentRegistrationPayment() {
                         {paymentScreenshot ? paymentScreenshot.name : "Choose payment screenshot"}
                       </span>
                       <input
+                        id="registration-payment-screenshot"
                         ref={paymentScreenshotInputRef}
                         type="file"
+                        name="paymentScreenshot"
                         accept="image/png,image/jpeg,image/webp,image/jpg"
                         disabled={!canUploadProof}
                         onChange={handlePaymentScreenshotChange}

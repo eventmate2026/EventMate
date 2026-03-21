@@ -886,6 +886,7 @@ export default function OrganizerEventScanQR() {
                     <input
                       ref={fileInputRef}
                       type="file"
+                      name="scanImageFile"
                       accept="image/*"
                       onChange={handleScanImageFile}
                       className="hidden"

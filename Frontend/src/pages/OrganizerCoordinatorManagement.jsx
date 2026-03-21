@@ -280,6 +280,7 @@ export default function OrganizerCoordinatorManagement() {
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Coordinator</h2>
           <form onSubmit={handleCreateCoordinator} className="mt-4 grid gap-3 sm:grid-cols-2">
             <input
+              name="fullName"
               value={form.fullName}
               onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))}
               placeholder="Full name"
@@ -287,6 +288,7 @@ export default function OrganizerCoordinatorManagement() {
             />
             <input
               type="email"
+              name="email"
               value={form.email}
               onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
               placeholder="Email"
@@ -294,12 +296,14 @@ export default function OrganizerCoordinatorManagement() {
             />
             <input
               type="password"
+              name="password"
               value={form.password}
               onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
               placeholder="Password (min 8 chars)"
               className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
             />
             <select
+              name="assignEventId"
               value={form.assignEventId}
               onChange={(event) => setForm((prev) => ({ ...prev, assignEventId: event.target.value }))}
               className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
@@ -331,6 +335,7 @@ export default function OrganizerCoordinatorManagement() {
           </h2>
           <form onSubmit={handleAssignCoordinator} className="mt-4 grid gap-3 sm:grid-cols-2">
             <select
+              name="eventId"
               value={assignForm.eventId}
               onChange={(event) => setAssignForm((prev) => ({ ...prev, eventId: event.target.value }))}
               className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
@@ -345,6 +350,7 @@ export default function OrganizerCoordinatorManagement() {
             </select>
 
             <select
+              name="coordinatorId"
               value={assignForm.coordinatorId}
               onChange={(event) => setAssignForm((prev) => ({ ...prev, coordinatorId: event.target.value }))}
               className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
