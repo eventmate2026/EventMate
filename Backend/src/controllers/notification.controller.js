@@ -111,9 +111,15 @@ const resolveWebhookNotificationId = (event) =>
       ""
   ).trim();
 
+const getNotificationEmailWebhookSecret = () =>
+  String(process.env.EMAIL_EVENT_WEBHOOK_SECRET || "").trim();
+
+const isNotificationEmailWebhookConfigured = () =>
+  Boolean(getNotificationEmailWebhookSecret());
+
 const isNotificationEmailWebhookAuthorized = (req) => {
-  const configuredSecret = String(process.env.EMAIL_EVENT_WEBHOOK_SECRET || "").trim();
-  if (!configuredSecret) return true;
+  const configuredSecret = getNotificationEmailWebhookSecret();
+  if (!configuredSecret) return false;
 
   const providedSecret = String(
     req.headers["x-email-webhook-secret"] ||
@@ -796,6 +802,13 @@ export const getAdminGroupReceipts = async (req, res, next) => {
 
 export const recordNotificationEmailEvents = async (req, res, next) => {
   try {
+    if (!isNotificationEmailWebhookConfigured()) {
+      return res.status(404).json({
+        success: false,
+        message: "Not found"
+      });
+    }
+
     if (!isNotificationEmailWebhookAuthorized(req)) {
       return res.status(401).json({
         success: false,

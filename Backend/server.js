@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import app from "./src/app.js";
 import connectDB from "./src/config/db.js";
 import { createCorsOriginValidator } from "./src/config/clientOrigins.js";
+import { validateRuntimeEnv } from "./src/config/runtimeEnv.js";
 import User from "./src/models/User.model.js";
 import { getSecuritySettings } from "./src/services/securitySettings.service.js";
 import startCronJobs from "./src/utils/cronJobs.js";
@@ -16,6 +17,7 @@ import {
 } from "./src/services/notification.service.js";
 
 dotenv.config();
+validateRuntimeEnv();
 
 const PORT = process.env.PORT || 5000;
 

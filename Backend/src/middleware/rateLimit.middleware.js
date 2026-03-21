@@ -56,3 +56,53 @@ export const authLimiter = rateLimit({
     xForwardedForHeader: false,
   },
 });
+
+const buildLimiter = ({ windowMs, max, message }) =>
+  rateLimit({
+    windowMs,
+    max,
+    message: { success: false, message },
+    keyGenerator: (req) => getRateLimitKey(req),
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: {
+      trustProxy: false,
+      xForwardedForHeader: false,
+    },
+  });
+
+export const refreshLimiter = buildLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 60,
+  message: "Too many session refresh attempts. Try again shortly.",
+});
+
+export const otpVerificationLimiter = buildLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  message: "Too many verification attempts. Please try again shortly.",
+});
+
+export const passwordRecoveryLimiter = buildLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many password recovery attempts. Please try again later.",
+});
+
+export const contactLimiter = buildLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many contact requests. Please try again later.",
+});
+
+export const certificatePublicLimiter = buildLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 80,
+  message: "Too many certificate requests. Please try again later.",
+});
+
+export const emailWebhookLimiter = buildLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 300,
+  message: "Too many webhook requests. Please try again later.",
+});

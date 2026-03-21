@@ -1,6 +1,7 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
+import { contactLimiter } from "../middleware/rateLimit.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 import {
   submitContact,
@@ -12,7 +13,7 @@ import {
 const router = express.Router();
 
 // Public - anyone can submit (logged in or not)
-router.post("/", optionalAuthMiddleware, submitContact);
+router.post("/", contactLimiter, optionalAuthMiddleware, submitContact);
 
 router.get("/my", authMiddleware, getMyContacts);
 router.get("/admins", authMiddleware, getAdminContacts);

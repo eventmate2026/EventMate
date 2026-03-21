@@ -20,7 +20,6 @@ export default defineConfig(({ mode }) => {
             motion: ["framer-motion"],
             icons: ["lucide-react", "react-icons"],
             http: ["axios"],
-            socket: ["socket.io-client"],
           },
         },
       },

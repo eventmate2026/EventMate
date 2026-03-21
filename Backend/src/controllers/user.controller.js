@@ -72,6 +72,10 @@ export const updateProfileController = asyncHandler(async (req, res) => {
 
 // ---------------- UPLOAD AVATAR ----------------
 export const uploadAvatarController = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: "Avatar image is required" });
+  }
+
   const result = await uploadImageCloudinary(req.file);
   req.user.avatar = result.url;
   await req.user.save();
@@ -115,7 +119,12 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  if (!user) {
+    return res.json({
+      success: true,
+      message: "If an account exists for this email, an OTP has been sent."
+    });
+  }
 
   const otp = generateOtp();
   user.otp = otp;
@@ -133,7 +142,10 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  res.json({ success: true, message: "OTP sent to email" });
+  res.json({
+    success: true,
+    message: "If an account exists for this email, an OTP has been sent."
+  });
 });
 
 // ---------------- RESET PASSWORD ----------------
@@ -147,7 +159,9 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email }).select("+otp +otpExpiry");
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  if (!user) {
+    return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
+  }
 
   if (!user.otp || !user.otpExpiry || String(user.otp) !== otp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -166,7 +180,9 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
 // Admin creates Organizer
 export const createOrganizer = async (req, res, next) => {
   try {
-    const { fullName, email, password } = req.body;
+    const fullName = String(req.body?.fullName || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = req.body?.password;
     const organizerDepartment = String(
       req.body?.professionalProfile?.department || req.body?.department || ""
     ).trim();
@@ -219,7 +235,9 @@ export const createOrganizer = async (req, res, next) => {
 // MAIN_ADMIN or ORGANIZER creates Student Coordinator
 export const createCoordinator = async (req, res, next) => {
   try {
-    const { fullName, email, password } = req.body;
+    const fullName = String(req.body?.fullName || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = req.body?.password;
     const requestedDepartment = String(
       req.body?.professionalProfile?.department || req.body?.department || ""
     ).trim();
