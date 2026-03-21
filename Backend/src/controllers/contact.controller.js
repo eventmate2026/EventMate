@@ -4,6 +4,30 @@ import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+const normalizeText = (value, maxLength = 4000) => String(value || "").trim().slice(0, maxLength);
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const escapeHtml = (value) =>
+  String(value || "").replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return character;
+    }
+  });
+const sanitizeSubjectLine = (value) =>
+  normalizeText(value, 160)
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /* ================================================
    POST /api/contact
@@ -11,13 +35,22 @@ const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 ================================================ */
 export const submitContact = async (req, res, next) => {
   try {
-    const { fullName, email, message } = req.body;
+    const fullName = normalizeText(req.body?.fullName, 120);
+    const email = normalizeEmail(req.body?.email);
+    const message = normalizeText(req.body?.message, 5000);
 
     if (!fullName || !email || !message)
       return res.status(400).json({
         success: false,
         message: "Full name, email and message are required"
       });
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address"
+      });
+    }
 
     const contact = await Contact.create({
       fullName,
@@ -51,21 +84,25 @@ export const submitContact = async (req, res, next) => {
     if (adminEmails.length) {
       const rawMessage = String(message || "").trim();
       const subjectMatch = rawMessage.match(/^Subject:\s*(.+)$/im);
-      const extractedSubject = subjectMatch?.[1]?.trim();
+      const extractedSubject = sanitizeSubjectLine(subjectMatch?.[1]);
       const emailSubject = `EventMate Contact${extractedSubject ? ` - ${extractedSubject}` : ""}`;
       const submittedRole = String(req.user?.role || "GUEST").trim();
+      const safeFullName = escapeHtml(fullName);
+      const safeEmail = escapeHtml(email);
+      const safeRole = escapeHtml(submittedRole);
+      const safeMessage = escapeHtml(rawMessage);
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 20px; background: #f8fafc;">
           <h2 style="margin: 0 0 12px; color: #0f172a;">New Contact Message</h2>
           <p style="margin: 0 0 12px; color: #334155;">
-            <strong>Name:</strong> ${fullName}<br />
-            <strong>Email:</strong> ${email}<br />
-            <strong>Role:</strong> ${submittedRole}
+            <strong>Name:</strong> ${safeFullName}<br />
+            <strong>Email:</strong> ${safeEmail}<br />
+            <strong>Role:</strong> ${safeRole}
           </p>
           <div style="margin-top: 12px; padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
             <p style="margin: 0 0 8px; color: #475569; font-size: 13px;">Message</p>
-            <pre style="margin: 0; white-space: pre-wrap; font-family: inherit; color: #0f172a; font-size: 14px;">${rawMessage}</pre>
+            <pre style="margin: 0; white-space: pre-wrap; font-family: inherit; color: #0f172a; font-size: 14px;">${safeMessage}</pre>
           </div>
         </div>
       `;

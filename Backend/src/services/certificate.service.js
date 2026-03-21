@@ -15,10 +15,45 @@ import { sendNotification } from "./notification.service.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
 export const buildCertificateEmailSlug = (email) =>
-  String(email || "").trim().toLowerCase().replace(/[@.]/g, "_");
+  normalizeEmail(email).replace(/[@.]/g, "_");
 
 const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+const getCertificateDownloadSecret = () =>
+  String(
+    process.env.CERTIFICATE_DOWNLOAD_SECRET ||
+      process.env.JWT_SECRET ||
+      process.env.JWT_REFRESH_SECRET ||
+      ""
+  ).trim();
+
+const buildCertificateDownloadTokenSeed = (eventId, participantEmail) =>
+  `${String(eventId || "").trim()}::${normalizeEmail(participantEmail)}`;
+
+export const createCertificateDownloadToken = (eventId, participantEmail) => {
+  const secret = getCertificateDownloadSecret();
+  const seed = buildCertificateDownloadTokenSeed(eventId, participantEmail);
+  if (!secret || !seed || !normalizeEmail(participantEmail)) return "";
+
+  return crypto.createHmac("sha256", secret).update(seed).digest("hex");
+};
+
+export const isCertificateDownloadTokenValid = (token, eventId, participantEmail) => {
+  const submitted = String(token || "").trim().toLowerCase();
+  const expected = createCertificateDownloadToken(eventId, participantEmail);
+  if (!submitted || !expected || !/^[a-f0-9]{64}$/i.test(submitted)) return false;
+
+  const submittedBuffer = Buffer.from(submitted, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  if (!submittedBuffer.length || submittedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(submittedBuffer, expectedBuffer);
+};
 
 const getBackendBaseUrl = ({ required = true } = {}) => {
   const backendBaseUrl = normalizeBaseUrl(
@@ -40,12 +75,13 @@ export const buildCertificateDownloadUrl = (
   const normalizedBaseUrl = normalizeBaseUrl(backendBaseUrl);
   const normalizedEventId = String(eventId || "").trim();
   const emailSlug = buildCertificateEmailSlug(participantEmail);
+  const token = createCertificateDownloadToken(normalizedEventId, participantEmail);
 
-  if (!normalizedBaseUrl || !normalizedEventId || !emailSlug) {
+  if (!normalizedBaseUrl || !normalizedEventId || !emailSlug || !token) {
     return "";
   }
 
-  return `${normalizedBaseUrl}/api/certificates/download/${normalizedEventId}/${emailSlug}`;
+  return `${normalizedBaseUrl}/api/certificates/download/${normalizedEventId}/${emailSlug}?token=${encodeURIComponent(token)}`;
 };
 
 const formatCertificateDate = (value) => {

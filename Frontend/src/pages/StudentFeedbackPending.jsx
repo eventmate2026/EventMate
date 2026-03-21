@@ -316,9 +316,9 @@ export default function StudentFeedbackPending() {
 
                         {expanded && (
                           <div className="mt-4 space-y-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/5 p-3">
-                            <div>
-                              <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Rating (1 to 5)</label>
-                              <div className="mt-2 flex items-center gap-2">
+                            <fieldset>
+                              <legend className="text-xs font-medium text-slate-600 dark:text-slate-300">Rating (1 to 5)</legend>
+                              <div className="mt-2 flex items-center gap-2" role="group" aria-label="Rating from 1 to 5">
                                 {[1, 2, 3, 4, 5].map((ratingValue) => (
                                   <button
                                     key={`${eventId}-rating-${ratingValue}`}
@@ -335,7 +335,7 @@ export default function StudentFeedbackPending() {
                                   </button>
                                 ))}
                               </div>
-                            </div>
+                            </fieldset>
                             <div>
                               <label
                                 htmlFor={`feedback-comment-${eventId}`}

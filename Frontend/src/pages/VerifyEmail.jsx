@@ -120,10 +120,15 @@ export default function VerifyEmail() {
 
         <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
           <div>
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
-            <div className="mt-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100">
-              {formData.email || "No verification email found"}
-            </div>
+            <label htmlFor="verify-email-address" className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
+            <input
+              id="verify-email-address"
+              name="email"
+              type="email"
+              readOnly
+              value={formData.email || "No verification email found"}
+              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100"
+            />
             {!hasVerificationEmail && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-300">
                 Go back to signup or login and request a fresh OTP first.

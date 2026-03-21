@@ -437,9 +437,9 @@ export default function Profile() {
                       className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-3 text-sm text-slate-600 dark:text-slate-300"
                     />
                   </label>
-                  <label className="block">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</span>
-                    <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <fieldset className="block">
+                    <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</legend>
+                    <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Education level">
                       {EDUCATION_LEVELS.map((level) => {
                         const isSelected = formData.educationLevel === level;
                         return (
@@ -459,7 +459,7 @@ export default function Profile() {
                         );
                       })}
                     </div>
-                  </label>
+                  </fieldset>
                 </div>
 
                 {isStudent && (

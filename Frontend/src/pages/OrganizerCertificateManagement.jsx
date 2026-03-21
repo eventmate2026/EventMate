@@ -1558,11 +1558,11 @@ export default function OrganizerCertificateManagement() {
         {SIGNATURE_FIELDS.map((field) => (
           <input
             key={field.role}
+            name={`${field.role}SignatureFile`}
             ref={(element) => {
               signatureInputRefs.current[field.role] = element;
             }}
             type="file"
-            name={`${field.role}SignatureFile`}
             accept="image/png"
             onChange={handleSignatureFileSelected(field.role)}
             className="hidden"

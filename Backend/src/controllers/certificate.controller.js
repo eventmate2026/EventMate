@@ -4,9 +4,11 @@ import Event from "../models/Event.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {
   buildCertificateEmailSlug,
+  buildCertificateDownloadUrl,
   generateCertificatesForEvent,
   generateCertificatesForSelection,
   generateDemoCertificateBuffer,
+  isCertificateDownloadTokenValid,
   normalizeCertificateCustomization
 } from "../services/certificate.service.js";
 
@@ -15,6 +17,23 @@ const normalizeVerificationCode = (value) =>
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const mapCertificateWithSignedDownloadUrl = (certificate) => {
+  if (!certificate) return certificate;
+  const plainCertificate =
+    typeof certificate.toObject === "function" ? certificate.toObject() : { ...certificate };
+  const signedUrl = buildCertificateDownloadUrl(
+    plainCertificate.eventId,
+    plainCertificate.participantEmail
+  );
+
+  return {
+    ...plainCertificate,
+    certificateUrl: signedUrl || plainCertificate.certificateUrl || "",
+  };
+};
 
 const resolveAuditActorContext = (req) => {
   const role = req?.user?.role || "PUBLIC";
@@ -122,7 +141,7 @@ export const getMyCertificates = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: certificates.length,
-      data: certificates
+      data: certificates.map(mapCertificateWithSignedDownloadUrl)
     });
   } catch (error) {
     next(error);
@@ -156,7 +175,7 @@ export const getEventCertificates = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: certificates.length,
-      data: certificates
+      data: certificates.map(mapCertificateWithSignedDownloadUrl)
     });
   } catch (error) {
     next(error);
@@ -629,6 +648,7 @@ export const downloadCertificate = async (req, res, next) => {
   try {
     const { eventId, emailSlug } = req.params;
     const normalizedSlug = String(emailSlug || "").trim().toLowerCase();
+    const submittedToken = String(req.query?.token || "").trim();
 
     if (!normalizedSlug) {
       return res.status(400).json({
@@ -649,6 +669,36 @@ export const downloadCertificate = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Certificate not found"
+      });
+    }
+
+    const requesterRole = String(req.user?.role || "").trim().toUpperCase();
+    const requesterEmail = normalizeEmail(req.user?.email);
+    const isCertificateOwner =
+      requesterRole === "STUDENT" &&
+      requesterEmail &&
+      requesterEmail === normalizeEmail(certificate.participantEmail);
+    const isAdmin = requesterRole === "MAIN_ADMIN";
+    let isOrganizerOwner = false;
+
+    if (requesterRole === "ORGANIZER") {
+      const event = await Event.findById(eventId).select("_id createdBy organizer");
+      isOrganizerOwner =
+        Boolean(event) &&
+        (String(event?.createdBy || "") === String(req.user?._id || "") ||
+          String(event?.organizer?.organizerId || "") === String(req.user?._id || ""));
+    }
+
+    const hasValidDownloadToken = isCertificateDownloadTokenValid(
+      submittedToken,
+      eventId,
+      certificate.participantEmail
+    );
+
+    if (!hasValidDownloadToken && !isCertificateOwner && !isAdmin && !isOrganizerOwner) {
+      return res.status(403).json({
+        success: false,
+        message: "Certificate download link is invalid or has expired"
       });
     }
 

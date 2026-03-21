@@ -427,6 +427,7 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
       success: true,
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
+      user: buildAuthUser(user),
     });
   } catch (err) {
     return res.status(403).json({ success: false, message: "Invalid or expired refresh token" });

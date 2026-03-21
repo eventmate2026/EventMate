@@ -13,7 +13,10 @@ import { buildEventEndDateTime, buildEventStartDateTime } from "../utils/eventTi
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
-import { generateCertificatesForRegistration } from "./certificate.service.js";
+import {
+  buildCertificateDownloadUrl,
+  generateCertificatesForRegistration
+} from "./certificate.service.js";
 
 const notifyAssignedCoordinators = async (event, payloadBuilder) => {
   const coordinators = event?.studentCoordinators || [];
@@ -1831,7 +1834,9 @@ export const getMyRegistrations = async (userId) => {
             certificateType: certificate.certificateType,
             position: certificate.position,
             participantEmail: certificate.participantEmail,
-            certificateUrl: certificate.certificateUrl,
+            certificateUrl:
+              buildCertificateDownloadUrl(eventId, certificate.participantEmail) ||
+              certificate.certificateUrl,
             issuedAt: certificate.issuedAt,
             verificationCode: certificate.verificationCode
           }

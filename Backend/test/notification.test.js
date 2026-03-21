@@ -7,7 +7,9 @@ import {
 } from "../src/services/notification.service.js";
 import { buildAttendanceVerificationUrl } from "../src/services/qr.service.js";
 import {
-  buildCertificateDownloadUrl
+  buildCertificateDownloadUrl,
+  createCertificateDownloadToken,
+  isCertificateDownloadTokenValid
 } from "../src/services/certificate.service.js";
 import {
   buildTeamNoticeRecipientMap,
@@ -158,22 +160,54 @@ test("buildAttendanceVerificationUrl falls back to the raw token when no public 
 });
 
 test("buildCertificateDownloadUrl builds a direct certificate URL when backend URL is configured", () => {
+  const previousCertificateSecret = process.env.CERTIFICATE_DOWNLOAD_SECRET;
+  process.env.CERTIFICATE_DOWNLOAD_SECRET = "test-certificate-secret";
+
   const result = buildCertificateDownloadUrl(
     "event123",
     "student@example.com",
     "https://api.eventmate.example.com/"
   );
 
+  const parsed = new URL(result);
+
   assert.equal(
-    result,
+    `${parsed.origin}${parsed.pathname}`,
     "https://api.eventmate.example.com/api/certificates/download/event123/student_example_com"
   );
+  assert.equal(
+    parsed.searchParams.get("token"),
+    createCertificateDownloadToken("event123", "student@example.com")
+  );
+
+  if (previousCertificateSecret === undefined) {
+    delete process.env.CERTIFICATE_DOWNLOAD_SECRET;
+  } else {
+    process.env.CERTIFICATE_DOWNLOAD_SECRET = previousCertificateSecret;
+  }
 });
 
 test("buildCertificateDownloadUrl returns empty string when no backend URL is configured", () => {
   const result = buildCertificateDownloadUrl("event123", "student@example.com", "");
 
   assert.equal(result, "");
+});
+
+test("isCertificateDownloadTokenValid accepts only the matching certificate download token", () => {
+  const previousCertificateSecret = process.env.CERTIFICATE_DOWNLOAD_SECRET;
+  process.env.CERTIFICATE_DOWNLOAD_SECRET = "test-certificate-secret";
+
+  const token = createCertificateDownloadToken("event123", "student@example.com");
+
+  assert.equal(isCertificateDownloadTokenValid(token, "event123", "student@example.com"), true);
+  assert.equal(isCertificateDownloadTokenValid(token, "event123", "other@example.com"), false);
+  assert.equal(isCertificateDownloadTokenValid("bad-token", "event123", "student@example.com"), false);
+
+  if (previousCertificateSecret === undefined) {
+    delete process.env.CERTIFICATE_DOWNLOAD_SECRET;
+  } else {
+    process.env.CERTIFICATE_DOWNLOAD_SECRET = previousCertificateSecret;
+  }
 });
 
 test("getAllowedFrontendOrigins falls back to Vercel deployment URL", () => {

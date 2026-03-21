@@ -335,26 +335,41 @@ function ProtectedRoute({ children, requiredRole }) {
       });
     };
 
+    const restoreSessionFromRefresh = async () => {
+      const refreshToken = getStoredRefreshToken();
+      if (!refreshToken) {
+        throw new Error("Missing refresh token.");
+      }
+
+      const response = await api({
+        ...SummaryApi.refresh_token,
+        data: { refreshToken },
+        skipAuth: true,
+      });
+
+      const nextAccessToken = response.data?.accessToken;
+      const nextRefreshToken = response.data?.refreshToken;
+      const nextUser = response.data?.user || null;
+      if (!nextAccessToken) {
+        throw new Error("Missing access token.");
+      }
+
+      storeAuth({
+        accessToken: nextAccessToken,
+        refreshToken: nextRefreshToken,
+        user: nextUser,
+      });
+
+      return readAuthSnapshot();
+    };
+
     const bootstrapAuth = async () => {
       let snapshot = readAuthSnapshot();
       let shouldClearAuth = false;
 
       try {
         if (!snapshot.token && snapshot.refreshToken) {
-          const response = await api({
-            ...SummaryApi.refresh_token,
-            data: { refreshToken: snapshot.refreshToken },
-            skipAuth: true,
-          });
-
-          const nextAccessToken = response.data?.accessToken;
-          const nextRefreshToken = response.data?.refreshToken;
-          if (!nextAccessToken) {
-            throw new Error("Missing access token.");
-          }
-
-          storeAuth({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
-          snapshot = readAuthSnapshot();
+          snapshot = await restoreSessionFromRefresh();
         }
 
         if (snapshot.token && !snapshot.user) {
@@ -368,9 +383,24 @@ function ProtectedRoute({ children, requiredRole }) {
             const profileUser = profileResponse.data?.user || null;
             if (profileUser) {
               storeAuth({ user: profileUser });
+              snapshot = readAuthSnapshot();
             }
-          } catch {
-            // Keep any existing stored session instead of forcing logout on a transient reload failure.
+          } catch (profileError) {
+            const profileStatus = Number(profileError?.response?.status || 0);
+            if (profileStatus === 401 || profileStatus === 403) {
+              throw profileError;
+            }
+
+            if (snapshot.refreshToken) {
+              try {
+                snapshot = await restoreSessionFromRefresh();
+              } catch (refreshError) {
+                const refreshStatus = Number(refreshError?.response?.status || 0);
+                if (refreshStatus === 401 || refreshStatus === 403) {
+                  throw refreshError;
+                }
+              }
+            }
           }
         }
       } catch (error) {

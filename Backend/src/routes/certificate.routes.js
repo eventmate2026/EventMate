@@ -1,5 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
+import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 import upload from "../middleware/multer.middleware.js";
 import {
@@ -101,6 +102,6 @@ router.post(
 );
 
 // Public download
-router.get("/download/:eventId/:emailSlug", downloadCertificate);
+router.get("/download/:eventId/:emailSlug", optionalAuthMiddleware, downloadCertificate);
 
 export default router;

@@ -807,6 +807,7 @@ export default function OrganizerEventViewList() {
                                 <span className="text-xs text-slate-400 dark:text-slate-500">Locked</span>
                               ) : (
                                 <select
+                                  name={`winnerPosition-${winnerKey}`}
                                   value={pendingPosition}
                                   onChange={(event) => handleQueueWinnerAssign(row.registrationId, event.target.value)}
                                   disabled={!canSelectWinner}
