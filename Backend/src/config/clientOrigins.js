@@ -47,12 +47,16 @@ const collectOrigins = (...values) =>
   );
 
 const isVercelHostname = (hostname) => hostname.endsWith(".vercel.app");
-
-const extractVercelProjectPrefix = (value) => {
+const getVercelSubdomain = (value) => {
   const hostname = getOriginHostname(value);
   if (!isVercelHostname(hostname)) return "";
 
-  const [subdomain = ""] = hostname.split(".");
+  return String(hostname.split(".")[0] || "").trim().toLowerCase();
+};
+
+const extractVercelProjectPrefix = (value) => {
+  const subdomain = getVercelSubdomain(value);
+  if (!subdomain) return "";
   const gitPreviewPrefix = subdomain.split("-git-")[0];
   return gitPreviewPrefix.trim().toLowerCase();
 };
@@ -66,6 +70,60 @@ const getAllowedVercelProjectPrefixes = (origins) =>
     )
   );
 
+const getAllowedVercelTeamScopeMappings = (origins) => {
+  const subdomains = Array.from(
+    new Set(
+      origins
+        .map(getVercelSubdomain)
+        .filter(Boolean)
+    )
+  );
+  const mappings = [];
+
+  for (const base of subdomains) {
+    for (const candidate of subdomains) {
+      if (candidate === base || !candidate.startsWith(`${base}-`)) continue;
+
+      const scope = candidate.slice(base.length + 1).trim().toLowerCase();
+      if (!scope) continue;
+
+      mappings.push({
+        basePrefix: base,
+        baseRoot: String(base.split("-")[0] || "").trim().toLowerCase(),
+        scope,
+      });
+    }
+  }
+
+  return Array.from(
+    new Map(
+      mappings.map((mapping) => [`${mapping.basePrefix}::${mapping.scope}`, mapping])
+    ).values()
+  );
+};
+
+const isMatchingScopedVercelPreviewOrigin = (origin, allowedOrigins) => {
+  const subdomain = getVercelSubdomain(origin);
+  if (!subdomain) return false;
+
+  const scopeMappings = getAllowedVercelTeamScopeMappings(allowedOrigins);
+  if (!scopeMappings.length) return false;
+
+  return scopeMappings.some(({ basePrefix, baseRoot, scope }) => {
+    if (!subdomain.endsWith(`-${scope}`)) return false;
+
+    const previewPrefix = subdomain.slice(0, -(scope.length + 1)).trim().toLowerCase();
+    if (!previewPrefix) return false;
+
+    return (
+      previewPrefix === basePrefix ||
+      previewPrefix.startsWith(`${basePrefix}-`) ||
+      (baseRoot &&
+        (previewPrefix === baseRoot || previewPrefix.startsWith(`${baseRoot}-`)))
+    );
+  });
+};
+
 const isMatchingVercelPreviewOrigin = (origin, allowedOrigins) => {
   const hostname = getOriginHostname(origin);
   if (!isVercelHostname(hostname)) return false;
@@ -75,7 +133,7 @@ const isMatchingVercelPreviewOrigin = (origin, allowedOrigins) => {
 
   return allowedPrefixes.some((prefix) =>
     hostname === `${prefix}.vercel.app` || hostname.startsWith(`${prefix}-`)
-  );
+  ) || isMatchingScopedVercelPreviewOrigin(origin, allowedOrigins);
 };
 
 const isCorsDebugEnabled = () => /^true$/i.test(String(process.env.CORS_DEBUG || "").trim());

@@ -328,6 +328,29 @@ test("createCorsOriginValidator allows matching Vercel preview deployments", asy
   assert.equal(result.allowed, true);
 });
 
+test("createCorsOriginValidator allows matching Vercel team preview deployments", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  process.env.FRONTEND_URLS =
+    "https://eventmate-app.vercel.app,https://eventmate-app-eventmate2026s-projects.vercel.app";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("https://eventmate-6xwy0bwvx-eventmate2026s-projects.vercel.app", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  assert.equal(result.error, null);
+  assert.equal(result.allowed, true);
+});
+
 test("createCorsOriginValidator allows requests without an origin header", async () => {
   const validator = createCorsOriginValidator();
 
@@ -411,6 +434,31 @@ test("createCorsOriginValidator blocks unrelated Vercel projects", async () => {
 
   const result = await new Promise((resolve) => {
     validator("https://another-project.vercel.app", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  assert.equal(result.allowed, undefined);
+  assert.ok(result.error instanceof Error);
+  assert.equal(result.error.message, "Origin not allowed by CORS");
+  assert.equal(result.error.statusCode, 403);
+});
+
+test("createCorsOriginValidator blocks unrelated Vercel team preview deployments", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  process.env.FRONTEND_URLS =
+    "https://eventmate-app.vercel.app,https://eventmate-app-eventmate2026s-projects.vercel.app";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("https://anotherapp-6xwy0bwvx-eventmate2026s-projects.vercel.app", (error, allowed) => {
       resolve({ error, allowed });
     });
   });
