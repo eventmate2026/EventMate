@@ -167,7 +167,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
   return (
     <>
-    <nav className="sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 shadow-sm">
+    <nav className="sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
@@ -318,7 +318,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                     exit={mobileProfilePanelMotion.exit}
                     transition={mobileProfilePanelTransition}
                     role="menu"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-gray-900"
                   >
                     <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
@@ -373,9 +373,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             onClick={() => setIsMobileMenuOpen(false)}
             className="fixed inset-0 top-16 z-[105] bg-slate-950/55 backdrop-blur-[1px] sm:hidden"
           />
-          <div className="fixed inset-x-0 top-16 z-[109] h-[calc(100svh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-950 sm:hidden">
-            <div className="flex min-h-full flex-col px-4 pt-3 pb-8">
-              <div className="space-y-2">
+          <div className="fixed left-3 right-3 top-[4.5rem] z-[109] max-h-[min(22rem,calc(100svh-6rem))] overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900 sm:hidden">
+            <div className="p-2.5">
+              <div className="space-y-1.5">
                 <button
                   onClick={() => handleNavClick('home')}
                   className={mobileLinkClass("home")}

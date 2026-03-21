@@ -4,10 +4,13 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
-  const backendApiUrl = String(env.VITE_API_URL || "").trim();
+  const backendApiUrl = String(env.VITE_API_URL || env.BACKEND_URL || "").trim();
 
   return {
     plugins: [react()],
+    define: {
+      __EVENTMATE_API_URL__: JSON.stringify(backendApiUrl),
+    },
 
     build: {
       rollupOptions: {

@@ -6,6 +6,7 @@ import api from "../lib/api";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { useToast } from "../context/ToastContext";
+import { getSafeApiErrorText } from "../lib/safeMessage";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -63,19 +64,35 @@ export default function Signup() {
 
     setIsLoading(true);
     try {
-      const email = formData.email;
+      const email = String(formData.email || "").trim().toLowerCase();
       const response = await api({
         ...SummaryApi.register,
         data: {
           fullName: formData.fullName,
-          email: formData.email,
+          email,
           password: formData.password,
         },
       });
 
       const apiMessage =
         response.data?.message || "Registration successful. Check your email for the OTP.";
-      toast.success(apiMessage, { duration: 4200 });
+      const nextStep = String(response.data?.nextStep || "verify_email").trim().toLowerCase();
+      const isFreshRegistration = Number(response.status) === 201;
+
+      if (nextStep === "login") {
+        toast.info(apiMessage, { duration: 4200 });
+        setTimeout(
+          () => navigate(`/login?email=${encodeURIComponent(email)}`, { replace: true }),
+          800
+        );
+        return;
+      }
+
+      if (isFreshRegistration) {
+        toast.success(apiMessage, { duration: 4200 });
+      } else {
+        toast.info(apiMessage, { duration: 4200 });
+      }
       storePendingVerificationEmail(email);
       setFormData({
         fullName: "",
@@ -88,15 +105,14 @@ export default function Signup() {
       setTimeout(
         () =>
           navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
-            state: { email },
+            state: { email, message: apiMessage },
           }),
         800
       );
     } catch (error) {
       const apiError =
         error.response?.data?.errors?.[0] ||
-        error.response?.data?.message ||
-        "Registration failed. Please try again.";
+        getSafeApiErrorText(error, "Registration failed. Please try again.");
       setErrors((prev) => ({ ...prev, submit: apiError }));
       toast.error(apiError);
     } finally {

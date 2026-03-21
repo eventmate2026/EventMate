@@ -233,6 +233,80 @@ test("getPrimaryFrontendUrl prefers deployed https origins over localhost", () =
   assert.equal(result, "https://eventmate-app.vercel.app");
 });
 
+test("createCorsOriginValidator allows localhost development origins by default", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  const previousFrontendUrl = process.env.FRONTEND_URL;
+  const previousVercelUrl = process.env.VERCEL_URL;
+
+  process.env.FRONTEND_URLS = "";
+  process.env.FRONTEND_URL = "";
+  process.env.VERCEL_URL = "";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("http://localhost:5173", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  if (previousFrontendUrl === undefined) {
+    delete process.env.FRONTEND_URL;
+  } else {
+    process.env.FRONTEND_URL = previousFrontendUrl;
+  }
+
+  if (previousVercelUrl === undefined) {
+    delete process.env.VERCEL_URL;
+  } else {
+    process.env.VERCEL_URL = previousVercelUrl;
+  }
+
+  assert.equal(result.error, null);
+  assert.equal(result.allowed, true);
+});
+
+test("createCorsOriginValidator allows matching Vercel preview deployments", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  process.env.FRONTEND_URLS = "https://eventmate-app.vercel.app";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("https://eventmate-app-git-main-user.vercel.app", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  assert.equal(result.error, null);
+  assert.equal(result.allowed, true);
+});
+
+test("createCorsOriginValidator allows requests without an origin header", async () => {
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator(undefined, (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.allowed, true);
+});
+
 test("error middleware hides internal 500 details from clients", () => {
   const originalConsoleError = console.error;
   console.error = () => {};
@@ -279,6 +353,30 @@ test("createCorsOriginValidator returns 403 for blocked origins", async () => {
 
   const result = await new Promise((resolve) => {
     validator("https://blocked.example.com", (error, allowed) => {
+      resolve({ error, allowed });
+    });
+  });
+
+  if (previousFrontendUrls === undefined) {
+    delete process.env.FRONTEND_URLS;
+  } else {
+    process.env.FRONTEND_URLS = previousFrontendUrls;
+  }
+
+  assert.equal(result.allowed, undefined);
+  assert.ok(result.error instanceof Error);
+  assert.equal(result.error.message, "Origin not allowed by CORS");
+  assert.equal(result.error.statusCode, 403);
+});
+
+test("createCorsOriginValidator blocks unrelated Vercel projects", async () => {
+  const previousFrontendUrls = process.env.FRONTEND_URLS;
+  process.env.FRONTEND_URLS = "https://eventmate-app.vercel.app";
+
+  const validator = createCorsOriginValidator();
+
+  const result = await new Promise((resolve) => {
+    validator("https://another-project.vercel.app", (error, allowed) => {
       resolve({ error, allowed });
     });
   });

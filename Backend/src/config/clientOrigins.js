@@ -1,4 +1,12 @@
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/+$/, "");
+
+const DEFAULT_LOCAL_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+];
+
 const getOriginHostname = (value) => {
   const normalized = normalizeOrigin(value);
   if (!normalized) return "";
@@ -38,8 +46,48 @@ const collectOrigins = (...values) =>
     )
   );
 
+const isVercelHostname = (hostname) => hostname.endsWith(".vercel.app");
+
+const extractVercelProjectPrefix = (value) => {
+  const hostname = getOriginHostname(value);
+  if (!isVercelHostname(hostname)) return "";
+
+  const [subdomain = ""] = hostname.split(".");
+  const gitPreviewPrefix = subdomain.split("-git-")[0];
+  return gitPreviewPrefix.trim().toLowerCase();
+};
+
+const getAllowedVercelProjectPrefixes = (origins) =>
+  Array.from(
+    new Set(
+      origins
+        .map(extractVercelProjectPrefix)
+        .filter(Boolean)
+    )
+  );
+
+const isMatchingVercelPreviewOrigin = (origin, allowedOrigins) => {
+  const hostname = getOriginHostname(origin);
+  if (!isVercelHostname(hostname)) return false;
+
+  const allowedPrefixes = getAllowedVercelProjectPrefixes(allowedOrigins);
+  if (!allowedPrefixes.length) return false;
+
+  return allowedPrefixes.some((prefix) =>
+    hostname === `${prefix}.vercel.app` || hostname.startsWith(`${prefix}-`)
+  );
+};
+
+const isCorsDebugEnabled = () => /^true$/i.test(String(process.env.CORS_DEBUG || "").trim());
+
+const logCorsDebug = (message) => {
+  if (!isCorsDebugEnabled()) return;
+  console.log(`[CORS] ${message}`);
+};
+
 export const getAllowedFrontendOrigins = () =>
   collectOrigins(
+    DEFAULT_LOCAL_ORIGINS,
     process.env.FRONTEND_URLS,
     process.env.FRONTEND_URL,
     normalizeDeployUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL),
@@ -63,18 +111,27 @@ export const createCorsOriginValidator = () => {
 
   return (origin, callback) => {
     if (!origin) {
+      logCorsDebug("Allowing request without Origin header.");
       callback(null, true);
       return;
     }
 
     const normalizedOrigin = normalizeOrigin(origin);
     if (allowedOrigins.includes(normalizedOrigin)) {
+      logCorsDebug(`Allowing exact origin: ${normalizedOrigin}`);
+      callback(null, true);
+      return;
+    }
+
+    if (isMatchingVercelPreviewOrigin(normalizedOrigin, allowedOrigins)) {
+      logCorsDebug(`Allowing Vercel preview origin: ${normalizedOrigin}`);
       callback(null, true);
       return;
     }
 
     const corsError = new Error("Origin not allowed by CORS");
     corsError.statusCode = 403;
+    console.warn(`[CORS] Blocked origin: ${normalizedOrigin}`);
     callback(corsError);
   };
 };

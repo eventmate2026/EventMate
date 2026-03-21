@@ -1,11 +1,17 @@
-export default({ name, otp }) => `
-  <div style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 40px 0;">
-    
-    <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 10px;">
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
+export default ({ name, otp }) => `
+  <div style="font-family: Arial, sans-serif; background-color: #f9fafb; padding: 40px 0;">
+    <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 30px; border-radius: 10px;">
       <h2 style="text-align: center; color: #16a34a;">EventMate</h2>
 
-      <h3 style="color: #111827;">Welcome ${name} 👋</h3>
+      <h3 style="color: #111827;">Welcome ${escapeHtml(name)},</h3>
 
       <p style="color: #374151;">
         Thanks for joining EventMate! Please verify your email using the OTP below:
@@ -19,7 +25,7 @@ export default({ name, otp }) => `
         border-radius: 8px;
       ">
         <h1 style="letter-spacing: 6px; color: #16a34a; margin: 0;">
-          ${otp}
+          ${escapeHtml(otp)}
         </h1>
       </div>
 
@@ -28,15 +34,14 @@ export default({ name, otp }) => `
       </p>
 
       <p style="color: #6b7280; font-size: 13px;">
-        If you didn’t create an account, you can ignore this email.
+        If you didn't create an account, you can ignore this email.
       </p>
 
       <hr style="margin: 30px 0;" />
 
       <p style="text-align: center; font-size: 12px; color: #9ca3af;">
-        © ${new Date().getFullYear()} EventMate. All rights reserved.
+        (c) ${new Date().getFullYear()} EventMate. All rights reserved.
       </p>
-
     </div>
   </div>
 `;

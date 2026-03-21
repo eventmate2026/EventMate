@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { getDefaultSafeMessage, sanitizeUserFacingMessage } from "../lib/safeMessage";
 
 const ToastContext = createContext(null);
 
@@ -29,13 +30,29 @@ const TOAST_STYLES = {
 
 const normalizeToastPayload = (input) => {
   if (typeof input === "string") {
-    return { type: "info", text: input };
+    const rawText = input.trim();
+    return {
+      type: "info",
+      text: rawText
+        ? sanitizeUserFacingMessage(rawText, {
+            kind: "info",
+            fallback: getDefaultSafeMessage("info"),
+          })
+        : "",
+    };
   }
 
   const type = String(input?.type || "info").trim().toLowerCase();
+  const normalizedType = TOAST_STYLES[type] ? type : "info";
+  const rawText = String(input?.text || input?.message || "").trim();
   return {
-    type: TOAST_STYLES[type] ? type : "info",
-    text: String(input?.text || "").trim(),
+    type: normalizedType,
+    text: rawText
+      ? sanitizeUserFacingMessage(rawText, {
+          kind: normalizedType,
+          fallback: getDefaultSafeMessage(normalizedType),
+        })
+      : "",
     duration: Number(input?.duration) > 0 ? Number(input.duration) : undefined,
   };
 };

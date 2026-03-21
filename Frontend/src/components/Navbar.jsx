@@ -299,7 +299,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm"
     : isPrivileged
       ? "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
-      : "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-white/10 shadow-sm";
+      : "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm";
   const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
   const showPublicMobileQuickActions = isPublic && location.pathname === "/";
   const isAdminUsersRoute =
@@ -547,7 +547,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 </button>
 
                 {isAdminUsersMenuOpen && (
-                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-950">
+                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-900">
                     <Link
                       to="/admin-dashboard/user-management"
                       onClick={closeAdminUsersMenuImmediately}
@@ -983,7 +983,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                       exit={mobileProfilePanelMotion.exit}
                       transition={mobileProfilePanelTransition}
                       role="menu"
-                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-slate-950"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-gray-900"
                     >
                       <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
@@ -1043,14 +1043,14 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
             className={`${mobileVisibilityClass} fixed inset-0 top-16 z-[105] bg-slate-950/55 backdrop-blur-[1px]`}
           />
           <div
-            className={`${mobileVisibilityClass} fixed inset-x-0 top-16 z-[109] h-[calc(100svh-4rem)] overflow-y-auto overscroll-contain ${
+            className={`${mobileVisibilityClass} fixed left-3 right-3 top-[4.5rem] z-[109] max-h-[min(26rem,calc(100svh-6rem))] overflow-y-auto overscroll-contain rounded-[28px] ${
               isPublic
-                ? "nav-public-mobile-panel bg-white dark:bg-slate-950"
-                : "border-b border-gray-200 dark:border-white/10 bg-white dark:bg-gray-950 shadow-2xl"
+                ? "nav-public-mobile-panel border border-white/10 bg-slate-950/95 shadow-[0_28px_70px_-35px_rgba(15,23,42,0.95)] backdrop-blur-xl"
+                : "border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-gray-900"
             }`}
           >
-            <div className="flex min-h-full flex-col px-4 pt-3 pb-8">
-              <div className="space-y-2">
+            <div className="p-2.5">
+              <div className="space-y-1.5">
                 {isPublic ? (
                   <>
                     <Link

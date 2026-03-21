@@ -27,9 +27,17 @@ const SECRET_VALUE_PATTERNS = [
   /\b(?:access|refresh)[ -]?token\s*[:=]\s*\S+/i,
   /\bsecret\s*[:=]\s*\S+/i,
   /\btoken=\S+/i,
+  /\bmongodb(?:\+srv)?:\/\/\S+/i,
+  /\bSG\.[A-Za-z0-9._-]{20,}/,
   /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}/,
   /\b[a-f0-9]{48,}\b/i,
 ];
+
+const DEFAULT_SAFE_MESSAGES = {
+  error: "Something went wrong. Please try again.",
+  success: "Done successfully.",
+  info: "Please check the latest update.",
+};
 
 const normalizeMessage = (value) =>
   String(value || "")
@@ -87,6 +95,25 @@ export const sanitizeApiMessage = (value, { status = 0, kind = "error" } = {}) =
   return friendly;
 };
 
+export const getDefaultSafeMessage = (kind = "error") => {
+  const normalizedKind = String(kind || "error").trim().toLowerCase();
+  return DEFAULT_SAFE_MESSAGES[normalizedKind] || DEFAULT_SAFE_MESSAGES.error;
+};
+
+export const sanitizeUserFacingMessage = (
+  value,
+  { kind = "error", status = 0, fallback = "" } = {}
+) => {
+  const normalizedValue = normalizeMessage(value);
+  if (!normalizedValue) return "";
+
+  const safeMessage = sanitizeApiMessage(normalizedValue, { status, kind });
+  if (safeMessage) return safeMessage;
+
+  const safeFallback = sanitizeApiMessage(fallback, { status: 0, kind });
+  return safeFallback || getDefaultSafeMessage(kind);
+};
+
 export const sanitizeApiPayload = (payload, options = {}) => {
   if (!payload || typeof payload !== "object") return payload;
 
@@ -96,6 +123,14 @@ export const sanitizeApiPayload = (payload, options = {}) => {
 
   if (typeof payload.warning === "string") {
     payload.warning = sanitizeApiMessage(payload.warning, { ...options, kind: "error" });
+  }
+
+  if (typeof payload.error === "string") {
+    payload.error = sanitizeApiMessage(payload.error, { ...options, kind: "error" });
+  }
+
+  if (typeof payload.detail === "string") {
+    payload.detail = sanitizeApiMessage(payload.detail, { ...options, kind: "error" });
   }
 
   if (Array.isArray(payload.errors)) {

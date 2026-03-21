@@ -121,13 +121,18 @@ export const registerUserController = asyncHandler(async (req, res) => {
 
   if (existingUser) {
     if (existingUser.emailVerified) {
-      return res.status(409).json({ success: false, message: "Email already registered" });
+      return res.status(200).json({
+        success: true,
+        message: "This email is already registered. Please log in to continue.",
+        nextStep: "login",
+      });
     }
 
     if (!isSelfRegisteredStudent(existingUser)) {
-      return res.status(409).json({
-        success: false,
-        message: "Email already registered. Please verify the account or contact admin.",
+      return res.status(200).json({
+        success: true,
+        message: "This email is already linked to an invited account. Please verify it or contact the admin.",
+        nextStep: "verify_email",
       });
     }
 
@@ -148,7 +153,8 @@ export const registerUserController = asyncHandler(async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Account already exists but isn't verified. A new OTP has been sent to your email.",
+      message: "Your account already exists. A new OTP has been sent to your email.",
+      nextStep: "verify_email",
     });
   }
 
@@ -173,7 +179,11 @@ export const registerUserController = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  res.status(201).json({ success: true, message: "Registered successfully. OTP sent to email." });
+  res.status(201).json({
+    success: true,
+    message: "Registered successfully. OTP sent to email.",
+    nextStep: "verify_email",
+  });
 });
 
 export const resendVerificationOtpController = asyncHandler(async (req, res) => {

@@ -27,7 +27,13 @@ const corsOriginValidator = createCorsOriginValidator();
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: corsOriginValidator, credentials: true }));
+app.use((req, res, next) => {
+  if (/^true$/i.test(String(process.env.CORS_DEBUG || "").trim())) {
+    console.log("Incoming Origin:", req.headers.origin || "(none)");
+  }
+  next();
+});
+app.use(cors({ origin: corsOriginValidator }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
