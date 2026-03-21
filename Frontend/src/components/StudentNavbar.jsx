@@ -384,6 +384,13 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             >
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/30 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
+            >
+              Profile
+            </button>
 
             <button
               type="button"
