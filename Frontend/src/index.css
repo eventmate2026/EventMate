@@ -25,7 +25,7 @@
 
 html {
   height: 100%;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   scroll-padding-top: var(--eventmate-nav-offset);
   scrollbar-gutter: stable both-edges;
   transition: background-color 0.45s ease, color 0.45s ease;

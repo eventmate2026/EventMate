@@ -600,6 +600,17 @@ function ScrollToTop() {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (typeof window === "undefined" || !window.history) return undefined;
+
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    return () => {
+      window.history.scrollRestoration = previousScrollRestoration;
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
 
     if (location.hash) {
@@ -638,11 +649,10 @@ function ScrollToTop() {
       };
     }
 
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
+    const resetScroll = { top: 0, left: 0, behavior: "auto" };
+    window.scrollTo(resetScroll);
+    document.documentElement?.scrollTo?.(resetScroll);
+    document.body?.scrollTo?.(resetScroll);
   }, [location.pathname, location.search, location.hash, prefersReducedMotion]);
 
   return null;

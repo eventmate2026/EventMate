@@ -188,7 +188,7 @@ export default function Signup() {
       const status = Number(error?.response?.status || 0);
       const hasNetworkFailure = !error?.response;
       const networkMessage =
-        "The service is taking longer than usual. Please wait a few seconds and try again.";
+        "We could not complete sign up right now. Please try again in a moment.";
       const apiError =
         error.response?.data?.errors?.[0] ||
         getSafeApiErrorText(error, hasNetworkFailure ? networkMessage : "Registration failed. Please try again.");
