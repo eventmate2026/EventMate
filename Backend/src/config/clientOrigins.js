@@ -186,10 +186,3 @@ export const createCorsOriginValidator = () => {
       callback(null, true);
       return;
     }
-
-    const corsError = new Error("Origin not allowed by CORS");
-    corsError.statusCode = 403;
-    console.warn(`[CORS] Blocked origin: ${normalizedOrigin}`);
-    callback(corsError);
-  };
-};

@@ -15,11 +15,7 @@ import {
   buildTeamNoticeRecipientMap,
   collectOrganizerEventAudience
 } from "../src/controllers/notification.controller.js";
-import {
-  createCorsOriginValidator,
-  getAllowedFrontendOrigins,
-  getPrimaryFrontendUrl
-} from "../src/config/clientOrigins.js";
+import { getAllowedFrontendOrigins, getPrimaryFrontendUrl } from "../src/config/clientOrigins.js";
 import errorMiddleware from "../src/middleware/error.middleware.js";
 
 const createMockResponse = () => {
@@ -401,6 +397,7 @@ test("error middleware hides provider outage details from clients", () => {
     message: "This service is temporarily unavailable. Please try again."
   });
 });
+<<<<<<< HEAD
 
 test("createCorsOriginValidator returns 403 for blocked origins", async () => {
   const previousFrontendUrls = process.env.FRONTEND_URLS;
@@ -474,3 +471,5 @@ test("createCorsOriginValidator blocks unrelated Vercel team preview deployments
   assert.equal(result.error.message, "Origin not allowed by CORS");
   assert.equal(result.error.statusCode, 403);
 });
+=======
+>>>>>>> parent of f1db1ba (correcting)
