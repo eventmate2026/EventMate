@@ -10,7 +10,6 @@ const DEFAULT_LOCAL_ORIGINS = [
 const getOriginHostname = (value) => {
   const normalized = normalizeOrigin(value);
   if (!normalized) return "";
-
   try {
     return new URL(normalized).hostname.trim().toLowerCase();
   } catch {
@@ -47,10 +46,10 @@ const collectOrigins = (...values) =>
   );
 
 const isVercelHostname = (hostname) => hostname.endsWith(".vercel.app");
+
 const getVercelSubdomain = (value) => {
   const hostname = getOriginHostname(value);
   if (!isVercelHostname(hostname)) return "";
-
   return String(hostname.split(".")[0] || "").trim().toLowerCase();
 };
 
@@ -83,10 +82,8 @@ const getAllowedVercelTeamScopeMappings = (origins) => {
   for (const base of subdomains) {
     for (const candidate of subdomains) {
       if (candidate === base || !candidate.startsWith(`${base}-`)) continue;
-
       const scope = candidate.slice(base.length + 1).trim().toLowerCase();
       if (!scope) continue;
-
       mappings.push({
         basePrefix: base,
         baseRoot: String(base.split("-")[0] || "").trim().toLowerCase(),
@@ -111,10 +108,8 @@ const isMatchingScopedVercelPreviewOrigin = (origin, allowedOrigins) => {
 
   return scopeMappings.some(({ basePrefix, baseRoot, scope }) => {
     if (!subdomain.endsWith(`-${scope}`)) return false;
-
     const previewPrefix = subdomain.slice(0, -(scope.length + 1)).trim().toLowerCase();
     if (!previewPrefix) return false;
-
     return (
       previewPrefix === basePrefix ||
       previewPrefix.startsWith(`${basePrefix}-`) ||
@@ -136,7 +131,8 @@ const isMatchingVercelPreviewOrigin = (origin, allowedOrigins) => {
   ) || isMatchingScopedVercelPreviewOrigin(origin, allowedOrigins);
 };
 
-const isCorsDebugEnabled = () => /^true$/i.test(String(process.env.CORS_DEBUG || "").trim());
+const isCorsDebugEnabled = () =>
+  /^true$/i.test(String(process.env.CORS_DEBUG || "").trim());
 
 const logCorsDebug = (message) => {
   if (!isCorsDebugEnabled()) return;
@@ -155,7 +151,6 @@ export const getAllowedFrontendOrigins = () =>
 
 export const getPrimaryFrontendUrl = () => {
   const allowedOrigins = getAllowedFrontendOrigins();
-
   return (
     allowedOrigins.find((origin) => isHttpsOrigin(origin) && !isLocalOrigin(origin)) ||
     allowedOrigins.find((origin) => !isLocalOrigin(origin)) ||
@@ -175,6 +170,7 @@ export const createCorsOriginValidator = () => {
     }
 
     const normalizedOrigin = normalizeOrigin(origin);
+
     if (allowedOrigins.includes(normalizedOrigin)) {
       logCorsDebug(`Allowing exact origin: ${normalizedOrigin}`);
       callback(null, true);
@@ -186,3 +182,9 @@ export const createCorsOriginValidator = () => {
       callback(null, true);
       return;
     }
+
+    logCorsDebug(`Rejecting origin: ${normalizedOrigin}`);
+    callback(new Error("Origin not allowed by CORS"));
+  };
+};   
+}
