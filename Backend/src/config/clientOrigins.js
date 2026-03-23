@@ -187,4 +187,4 @@ export const createCorsOriginValidator = () => {
     callback(new Error("Origin not allowed by CORS"));
   };
 };   
-}
+
