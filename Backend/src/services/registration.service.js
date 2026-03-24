@@ -5,18 +5,10 @@ import MemberVerification from "../models/MemberVerification.model.js";
 import TeamInvitation from "../models/TeamInvitation.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import User from "../models/User.model.js";
-import Feedback from "../models/Feedback.model.js";
-import Certificate from "../models/Certificate.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
-import { buildEventEndDateTime, buildEventStartDateTime } from "../utils/eventTime.js";
-import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
-import {
-  buildCertificateDownloadUrl,
-  generateCertificatesForRegistration
-} from "./certificate.service.js";
 
 const notifyAssignedCoordinators = async (event, payloadBuilder) => {
   const coordinators = event?.studentCoordinators || [];
@@ -45,7 +37,6 @@ const refreshEventAttendanceTotal = async (eventId) => {
 
 const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
 const normalizeDepartment = (value = "") => String(value || "").trim().toLowerCase();
-const normalizeId = (value = "") => String(value || "").trim();
 const isMidnightUtc = (date) =>
   date.getUTCHours() === 0 &&
   date.getUTCMinutes() === 0 &&
@@ -71,12 +62,11 @@ const resolveRegistrationDeadline = (value) => {
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
-  const endDateTime = buildEventEndDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate,
-    event?.schedule?.endTime
-  );
-  if (!endDateTime) return false;
-  return Date.now() > endDateTime.getTime();
+  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  if (Number.isNaN(endTime)) return false;
+  return Date.now() > endTime;
 };
 
 const formatEventDate = (event) => {
@@ -85,196 +75,6 @@ const formatEventDate = (event) => {
   const parsed = new Date(dateValue);
   if (Number.isNaN(parsed.getTime())) return "TBA";
   return parsed.toDateString();
-};
-
-const eventRequiresPayment = (event) => Number(event?.registration?.fee || 0) > 0;
-
-const getEventPaymentConfig = (event) => ({
-  method:
-    String(event?.registration?.paymentConfig?.method || "").trim().toUpperCase() === "PHONEPE_QR"
-      ? "PHONEPE_QR"
-      : "FREE",
-  accountName: String(event?.registration?.paymentConfig?.accountName || "").trim(),
-  upiId: String(event?.registration?.paymentConfig?.upiId || "").trim(),
-  qrImageUrl: String(event?.registration?.paymentConfig?.qrImageUrl || "").trim(),
-  instructions: String(event?.registration?.paymentConfig?.instructions || "").trim()
-});
-
-const ensureEventPaymentConfigured = (event) => {
-  if (!eventRequiresPayment(event)) return;
-  const config = getEventPaymentConfig(event);
-  if (!config.accountName || (!config.upiId && !config.qrImageUrl)) {
-    throw new Error("Organizer has not configured payment details for this paid event yet");
-  }
-};
-
-const applyEventPaymentDefaults = (registration, event) => {
-  registration.payment = registration.payment || {};
-  registration.payment.amount = Number(event?.registration?.fee || 0);
-
-  if (!eventRequiresPayment(event)) {
-    registration.payment.method = "FREE";
-    registration.payment.paymentStatus = "NotRequired";
-    registration.payment.rejectionReason = "";
-    return;
-  }
-
-  const config = getEventPaymentConfig(event);
-  registration.payment.method = config.method === "PHONEPE_QR" ? "PHONEPE_QR" : "PHONEPE_QR";
-  if (
-    !registration.payment.paymentStatus ||
-    registration.payment.paymentStatus === "NotRequired"
-  ) {
-    registration.payment.paymentStatus = "Pending";
-  }
-};
-
-const canReviewPaymentForEvent = (event, requester) => {
-  const requesterId = normalizeId(requester?._id);
-  const requesterRole = String(requester?.role || "").trim().toUpperCase();
-  if (!requesterId) return false;
-  if (requesterRole === "MAIN_ADMIN") return true;
-  return normalizeId(event?.createdBy) === requesterId;
-};
-
-const isRegistrationViewer = (registration, requesterId, requesterEmail) => {
-  const normalizedRequesterId = normalizeId(requesterId);
-  const normalizedRequesterEmail = normalizeEmail(requesterEmail);
-  if (!registration) return false;
-
-  if (normalizedRequesterId && normalizeId(registration?.registeredBy) === normalizedRequesterId) {
-    return true;
-  }
-
-  if (!normalizedRequesterEmail) return false;
-  if (normalizeEmail(registration?.teamLeader?.email) === normalizedRequesterEmail) return true;
-
-  return Array.isArray(registration?.teamMembers)
-    ? registration.teamMembers.some(
-        (member) => normalizeEmail(member?.email) === normalizedRequesterEmail
-      )
-    : false;
-};
-
-const finalizeRegistrationConfirmation = async (registration, event, verifiedBy = null) => {
-  applyEventPaymentDefaults(registration, event);
-  registration.status = "Confirmed";
-  registration.allMembersVerified = true;
-
-  if (eventRequiresPayment(event)) {
-    registration.payment.paymentStatus = "Verified";
-    registration.payment.rejectionReason = "";
-    registration.payment.verifiedBy = verifiedBy || registration.payment.verifiedBy || null;
-    registration.payment.verifiedAt = registration.payment.verifiedAt || new Date();
-  } else {
-    registration.payment.verifiedBy = null;
-    registration.payment.verifiedAt = null;
-  }
-
-  await registration.save();
-  await generateQRsForRegistration(registration, event);
-  return registration;
-};
-
-const moveRegistrationToPendingPayment = async (
-  registration,
-  event,
-  { paymentStatus = "Pending", rejectionReason = "" } = {}
-) => {
-  ensureEventPaymentConfigured(event);
-  applyEventPaymentDefaults(registration, event);
-  registration.status = "PendingPayment";
-  registration.allMembersVerified = true;
-  registration.payment.paymentStatus = paymentStatus;
-  registration.payment.rejectionReason = String(rejectionReason || "").trim();
-  registration.payment.verifiedBy = null;
-  registration.payment.verifiedAt = null;
-  await registration.save();
-  return registration;
-};
-
-const advanceRegistrationAfterAcceptance = async (registration, event) => {
-  if (eventRequiresPayment(event)) {
-    await moveRegistrationToPendingPayment(registration, event);
-    return {
-      status: registration.status,
-      message:
-        "All team members accepted. Complete payment to receive the event QR pass."
-    };
-  }
-
-  await finalizeRegistrationConfirmation(registration, event);
-  return {
-    status: registration.status,
-    message: "Registration confirmed. QR codes have been sent."
-  };
-};
-
-const ensureAttendanceWindowOpen = (event) => {
-  const eventStartDateTime = buildEventStartDateTime(
-    event?.schedule?.startDate,
-    event?.schedule?.startTime
-  );
-  const eventEndDateTime = buildEventEndDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate,
-    event?.schedule?.endTime
-  );
-
-  if (!eventStartDateTime || !eventEndDateTime) {
-    throw new Error("Event schedule is incomplete for attendance marking");
-  }
-
-  const now = Date.now();
-  if (now < eventStartDateTime.getTime() || now > eventEndDateTime.getTime()) {
-    throw new Error("Attendance can only be marked between the event start and end time");
-  }
-};
-
-const canManageAttendanceForEvent = (event, requester) => {
-  const requesterId = normalizeId(requester?._id);
-  if (!requesterId) return false;
-
-  const isOrganizer = normalizeId(event?.createdBy) === requesterId;
-  const isAssignedCoordinator = Array.isArray(event?.studentCoordinators)
-    ? event.studentCoordinators.some(
-        (coordinator) => normalizeId(coordinator?.coordinatorId) === requesterId
-      )
-    : false;
-
-  return isOrganizer || isAssignedCoordinator;
-};
-
-const resolveParticipantMetaFromRegistration = (registration, email, fallbackName = "") => {
-  const participantEmail = normalizeEmail(email);
-  const participants = [
-    registration?.teamLeader,
-    ...(Array.isArray(registration?.teamMembers) ? registration.teamMembers : [])
-  ].filter(Boolean);
-
-  const match = participants.find(
-    (participant) => normalizeEmail(participant?.email) === participantEmail
-  );
-
-  return {
-    participantName:
-      String(match?.name || fallbackName || "Participant").trim() || "Participant",
-    participantEmail,
-    participantDepartment: String(match?.branch || match?.department || "").trim(),
-    participantCollege: String(match?.college || "").trim(),
-    participantYear: String(match?.year || "").trim()
-  };
-};
-
-const loadAttendanceContext = async (token) => {
-  const qr = await ParticipantQR.findOne({ token });
-  if (!qr) throw new Error("Invalid QR code");
-
-  const event = await Event.findById(qr.eventId);
-  if (!event) throw new Error("Event not found");
-
-  const registration = await EventRegistration.findById(qr.registration);
-
-  return { qr, event, registration };
 };
 
 const buildTeamInviteLink = (token, action) => {
@@ -736,14 +536,9 @@ export const initiateRegistration = async (eventId, userId, payload) => {
   if (existing)
     throw new Error("You already have an active registration for this event");
 
-  const requiresPayment = eventRequiresPayment(event);
-  if (requiresPayment) {
-    ensureEventPaymentConfigured(event);
-  }
-
   let initialStatus;
   if (!isTeam) {
-    initialStatus = requiresPayment ? "PendingPayment" : "Confirmed";
+    initialStatus = "Confirmed";
   } else {
     initialStatus = "PendingMemberVerification";
   }
@@ -776,16 +571,10 @@ await sendNotification({
   recipientId: userId,
   recipientName: registration.teamLeader.name,
   recipientRole: "STUDENT",
-  title: isTeam
-    ? "Team Registration Started"
-    : requiresPayment
-      ? "Registration Created"
-      : "Registration Confirmed!",
+  title: isTeam ? "Team Registration Started" : "Registration Confirmed!",
   message: isTeam
     ? `Team registration for ${event.title} is pending member acceptance.`
-    : requiresPayment
-      ? `Your registration for ${event.title} is waiting for payment confirmation.`
-      : `You're registered for ${event.title}`,
+    : `You're registered for ${event.title}`,
   type: "REGISTRATION",
   refId: registration._id
 });
@@ -866,16 +655,17 @@ export const verifyMember = async (token) => {
     registration.allMembersVerified = true;
     const event = await Event.findById(registration.event);
     if (!event) throw new Error("Event not found");
-    const result = await advanceRegistrationAfterAcceptance(registration, event);
-    return {
-      message: result.message
-    };
+    registration.status = "Confirmed";
+    await registration.save();
+    await generateQRsForRegistration(registration, event);
   } else {
     await registration.save();
   }
 
   return {
-    message: "Email verified successfully. Waiting for other members to verify."
+    message: allVerified
+      ? "Email verified! Registration confirmed. Check your email for your QR code."
+      : "Email verified successfully. Waiting for other members to verify."
   };
 };
 
@@ -887,7 +677,7 @@ export const verifyMember = async (token) => {
 export const getTeamRegistrationStatus = async (registrationId, requesterId) => {
   const registration = await EventRegistration.findById(registrationId).populate(
     "event",
-    "title schedule venue status isTeamEvent registration"
+    "title schedule venue status isTeamEvent"
   );
 
   if (!registration) throw new Error("Registration not found");
@@ -935,8 +725,6 @@ export const getTeamRegistrationStatus = async (registrationId, requesterId) => 
     allAccepted &&
     !anyRejected &&
     String(registration.status || "") === "PendingMemberVerification";
-  const payment = registration?.payment || {};
-  const requiresPayment = eventRequiresPayment(event);
 
   return {
     registrationId: registration._id,
@@ -952,19 +740,6 @@ export const getTeamRegistrationStatus = async (registrationId, requesterId) => 
       date: formatEventDate(event),
       venue: event?.venue?.location || event?.venue || "TBA"
     },
-    payment: requiresPayment
-      ? {
-          required: true,
-          amount: Number(payment?.amount || event?.registration?.fee || 0),
-          paymentStatus: String(payment?.paymentStatus || "Pending").trim() || "Pending",
-          rejectionReason: String(payment?.rejectionReason || "").trim(),
-        }
-      : {
-          required: false,
-          amount: 0,
-          paymentStatus: "NotRequired",
-          rejectionReason: "",
-        },
     members,
     summary,
     allAccepted,
@@ -1058,15 +833,18 @@ export const respondToTeamInvitation = async (token, action) => {
   registration.allMembersVerified = allAccepted;
 
   let event = null;
-  let acceptanceResult = null;
+  let autoConfirmed = false;
   if (allAccepted && !anyRejected && String(registration.status || "") === "PendingMemberVerification") {
     event = await Event.findById(registration.event);
     if (!event) throw new Error("Event not found");
-    acceptanceResult = await advanceRegistrationAfterAcceptance(registration, event);
+    registration.status = "Confirmed";
+    autoConfirmed = true;
   }
 
-  if (!acceptanceResult) {
-    await registration.save();
+  await registration.save();
+
+  if (autoConfirmed && event) {
+    await generateQRsForRegistration(registration, event);
   }
 
   try {
@@ -1089,7 +867,7 @@ export const respondToTeamInvitation = async (token, action) => {
     status: invite.status,
     message:
       nextStatus === "ACCEPTED"
-        ? acceptanceResult?.message || "Invitation accepted. Thanks for confirming."
+        ? "Invitation accepted. Thanks for confirming."
         : "Invitation rejected. The team leader has been notified."
   };
 };
@@ -1125,12 +903,13 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
     registration.status === "PendingPayment" ||
     registration.status === "PendingPaymentVerification"
   ) {
+    registration.status = "Confirmed";
+    registration.allMembersVerified = true;
+    await registration.save();
+    await generateQRsForRegistration(registration, event);
     return {
       status: registration.status,
-      message:
-        String(registration.status || "") === "PendingPaymentVerification"
-          ? "Payment proof is under review. QR codes will be sent after approval."
-          : "Team accepted. Complete payment to receive the event QR pass."
+      message: "Team accepted. Registration confirmed and QR codes have been sent."
     };
   }
 
@@ -1152,11 +931,14 @@ export const confirmTeamRegistration = async (registrationId, requesterId) => {
   const allAccepted = invites.every((invite) => invite.status === "ACCEPTED");
   if (!allAccepted) throw new Error("Waiting for all team members to accept");
 
-  const result = await advanceRegistrationAfterAcceptance(registration, event);
+  registration.allMembersVerified = true;
+  registration.status = "Confirmed";
+  await registration.save();
+  await generateQRsForRegistration(registration, event);
 
   return {
-    status: result.status,
-    message: result.message
+    status: registration.status,
+    message: "Team accepted. Registration confirmed and QR codes have been sent."
   };
 };
 
@@ -1207,233 +989,6 @@ export const resendTeamInvites = async (registrationId, requesterId) => {
       sent > 0
         ? `Invitations resent to ${sent} member${sent === 1 ? "" : "s"}.`
         : "No pending invitations to resend."
-  };
-};
-
-/* ================================================
-   PAYMENT DETAILS / SUBMISSION / REVIEW
-================================================ */
-
-export const getRegistrationPaymentDetails = async (registrationId, requesterId) => {
-  const requester = await User.findById(requesterId).select("email role");
-  if (!requester) throw new Error("User not found");
-
-  const registration = await EventRegistration.findById(registrationId).populate(
-    "event",
-    "title schedule venue registration isTeamEvent organizer createdBy"
-  );
-
-  if (!registration) throw new Error("Registration not found");
-
-  const event = registration.event;
-  if (!event) throw new Error("Event not found");
-
-  const canReview = canReviewPaymentForEvent(event, requester);
-  const canView = canReview || isRegistrationViewer(registration, requesterId, requester?.email);
-  if (!canView) {
-    throw new Error("Not authorized to view payment details for this registration");
-  }
-
-  if (!eventRequiresPayment(event)) {
-    throw new Error("This event does not require payment");
-  }
-
-  ensureEventPaymentConfigured(event);
-  applyEventPaymentDefaults(registration, event);
-  const paymentConfig = getEventPaymentConfig(event);
-  const isOwner = normalizeId(registration?.registeredBy) === normalizeId(requesterId);
-
-  return {
-    registrationId: registration._id,
-    status: registration.status,
-    isTeamEvent: Boolean(event?.isTeamEvent),
-    isTeamLeader: isOwner,
-    canSubmitPayment: isOwner && String(registration.status || "") !== "Confirmed",
-    canReviewPayment: canReview,
-    event: {
-      id: event?._id || null,
-      title: event?.title || "Event",
-      date: formatEventDate(event),
-      venue: event?.venue?.location || event?.venue || "TBA"
-    },
-    payment: {
-      amount: Number(registration?.payment?.amount || event?.registration?.fee || 0),
-      method: String(registration?.payment?.method || paymentConfig.method || "PHONEPE_QR")
-        .trim() || "PHONEPE_QR",
-      transactionId: String(registration?.payment?.transactionId || "").trim(),
-      paymentScreenshot: String(registration?.payment?.paymentScreenshot || "").trim(),
-      paymentStatus: String(registration?.payment?.paymentStatus || "Pending").trim() || "Pending",
-      rejectionReason: String(registration?.payment?.rejectionReason || "").trim(),
-      verifiedAt: registration?.payment?.verifiedAt || null
-    },
-    paymentConfig
-  };
-};
-
-export const submitRegistrationPayment = async (
-  registrationId,
-  requesterId,
-  payload,
-  paymentScreenshotFile
-) => {
-  if (!paymentScreenshotFile) {
-    throw new Error("Payment screenshot is required");
-  }
-
-  const registration = await EventRegistration.findById(registrationId);
-  if (!registration) throw new Error("Registration not found");
-
-  if (normalizeId(registration?.registeredBy) !== normalizeId(requesterId)) {
-    throw new Error("Only the registration owner can submit payment");
-  }
-
-  if (registration.status === "Cancelled" || registration.status === "Rejected") {
-    throw new Error("This registration is no longer active");
-  }
-
-  const event = await Event.findById(registration.event);
-  if (!event) throw new Error("Event not found");
-  if (!eventRequiresPayment(event)) {
-    throw new Error("This event does not require payment");
-  }
-
-  ensureEventPaymentConfigured(event);
-  applyEventPaymentDefaults(registration, event);
-
-  const currentPaymentStatus = String(registration?.payment?.paymentStatus || "").trim();
-  if (registration.status === "Confirmed" && currentPaymentStatus === "Verified") {
-    return {
-      status: registration.status,
-      paymentStatus: currentPaymentStatus,
-      message: "Payment has already been approved."
-    };
-  }
-
-  if (String(registration.status || "") === "PendingMemberVerification") {
-    throw new Error("Wait for all team members to accept before submitting payment");
-  }
-
-  if (
-    String(registration.status || "") === "PendingPaymentVerification" &&
-    currentPaymentStatus === "UnderReview"
-  ) {
-    throw new Error("Payment proof is already under review");
-  }
-
-  const transactionId = String(payload?.transactionId || "").trim();
-  if (!transactionId) {
-    throw new Error("Transaction ID is required");
-  }
-
-  const uploadedScreenshot = await uploadImageCloudinary(paymentScreenshotFile, {
-    folder: "eventmate/registrations/payments",
-    resourceType: "image"
-  });
-
-  registration.status = "PendingPaymentVerification";
-  registration.allMembersVerified = true;
-  registration.payment.transactionId = transactionId;
-  registration.payment.paymentScreenshot = uploadedScreenshot.url;
-  registration.payment.paymentStatus = "UnderReview";
-  registration.payment.rejectionReason = "";
-  registration.payment.verifiedBy = null;
-  registration.payment.verifiedAt = null;
-  await registration.save();
-
-  await sendNotification({
-    recipientId: event.createdBy,
-    recipientName: event?.organizer?.name || "Organizer",
-    recipientRole: "ORGANIZER",
-    title: "Payment Submitted",
-    message: `${registration?.teamLeader?.name || "A participant"} submitted payment proof for ${event.title}.`,
-    type: "REGISTRATION",
-    refId: registration._id
-  });
-
-  await notifyAssignedCoordinators(event, () => ({
-    title: "Payment Submitted",
-    message: `${registration?.teamLeader?.name || "A participant"} submitted payment proof for ${event.title}.`,
-    type: "REGISTRATION",
-    refId: registration._id
-  }));
-
-  return {
-    status: registration.status,
-    paymentStatus: registration.payment.paymentStatus,
-    message: "Payment proof submitted for review."
-  };
-};
-
-export const reviewRegistrationPayment = async (registrationId, reviewer, payload) => {
-  const registration = await EventRegistration.findById(registrationId);
-  if (!registration) throw new Error("Registration not found");
-
-  const event = await Event.findById(registration.event);
-  if (!event) throw new Error("Event not found");
-
-  if (!canReviewPaymentForEvent(event, reviewer)) {
-    throw new Error("Not authorized to review this payment");
-  }
-
-  if (!eventRequiresPayment(event)) {
-    throw new Error("This event does not require payment");
-  }
-
-  applyEventPaymentDefaults(registration, event);
-
-  if (!String(registration?.payment?.paymentScreenshot || "").trim()) {
-    throw new Error("No payment proof has been submitted yet");
-  }
-
-  const action = String(payload?.action || "").trim().toLowerCase();
-  if (action !== "approve" && action !== "reject") {
-    throw new Error("Review action must be approve or reject");
-  }
-
-  if (action === "approve") {
-    await finalizeRegistrationConfirmation(registration, event, reviewer?._id || null);
-
-    await sendNotification({
-      recipientId: registration.registeredBy,
-      recipientName: registration?.teamLeader?.name || "Participant",
-      recipientRole: "STUDENT",
-      title: "Payment Approved",
-      message: `Your registration for ${event.title} is confirmed. Your QR pass is now ready.`,
-      type: "REGISTRATION",
-      refId: registration._id
-    });
-
-    return {
-      status: registration.status,
-      paymentStatus: registration.payment.paymentStatus,
-      message: "Payment approved and registration confirmed."
-    };
-  }
-
-  const rejectionReason = String(payload?.rejectionReason || "").trim();
-  if (!rejectionReason) {
-    throw new Error("Rejection reason is required");
-  }
-
-  await moveRegistrationToPendingPayment(registration, event, {
-    paymentStatus: "Rejected",
-    rejectionReason
-  });
-
-  await sendNotification({
-    recipientId: registration.registeredBy,
-    recipientName: registration?.teamLeader?.name || "Participant",
-    recipientRole: "STUDENT",
-    title: "Payment Rejected",
-    message: `Payment proof for ${event.title} was rejected. Reason: ${rejectionReason}`,
-    type: "REGISTRATION",
-    refId: registration._id
-  });
-
-  return {
-    status: registration.status,
-    paymentStatus: registration.payment.paymentStatus,
-    message: "Payment rejected. Student can submit a new proof."
   };
 };
 
@@ -1716,7 +1271,7 @@ export const sendPendingTeamInvitesForUser = async (user) => {
 ================================================ */
 
 export const getMyRegistrations = async (userId) => {
-  const user = await User.findById(userId).select("email").lean();
+  const user = await User.findById(userId).select("email");
   const userEmail = normalizeEmail(user?.email);
 
   const registrationQuery = userEmail
@@ -1730,119 +1285,29 @@ export const getMyRegistrations = async (userId) => {
     : { registeredBy: userId };
 
   const registrations = await EventRegistration.find(registrationQuery)
-    .populate(
-      "event",
-      "title category schedule venue status posterUrl certificate isTeamEvent registration organizer"
-    )
-    .sort({ createdAt: -1 })
-    .lean();
+    .populate("event", "title category schedule venue status posterUrl")
+    .sort({ createdAt: -1 });
 
-  const registrationIds = registrations.map((registration) => registration._id);
-  const feedbackRows = registrationIds.length
-    ? await Feedback.find({
-        registration: { $in: registrationIds }
-      })
-        .select("registration")
-        .lean()
-    : [];
-  const feedbackByRegistrationId = new Set(
-    feedbackRows.map((feedback) => normalizeId(feedback?.registration))
-  );
-
-  const lookupEmailByRegistrationId = new Map();
-  const lookupEmails = new Set();
-  const eventIds = new Set();
-
-  registrations.forEach((reg) => {
-    const registrationId = normalizeId(reg?._id);
-    const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
-    const eventId = normalizeId(reg?.event?._id || reg?.event);
-
-    if (registrationId && lookupEmail) {
-      lookupEmailByRegistrationId.set(registrationId, lookupEmail);
-      lookupEmails.add(lookupEmail);
-    }
-
-    if (eventId) {
-      eventIds.add(eventId);
-    }
-  });
-
-  const [qrRows, certificateRows] = await Promise.all([
-    registrationIds.length && lookupEmails.size
-      ? ParticipantQR.find({
-          registration: { $in: registrationIds },
-          email: { $in: Array.from(lookupEmails) }
-        })
-          .select("registration email qrImageUrl role attendanceMarked attendanceMarkedAt")
-          .lean()
-      : [],
-    eventIds.size && lookupEmails.size
-      ? Certificate.find({
-          eventId: { $in: Array.from(eventIds) },
-          participantEmail: { $in: Array.from(lookupEmails) }
-        })
-          .select("eventId participantEmail certificateType position certificateUrl issuedAt verificationCode")
-          .lean()
-      : []
-  ]);
-
-  const qrByRegistrationKey = new Map(
-    qrRows.map((row) => [
-      `${normalizeId(row?.registration)}::${normalizeEmail(row?.email)}`,
-      row
-    ])
-  );
-
-  const certificateByEventAndEmailKey = new Map(
-    certificateRows.map((row) => [
-      `${normalizeId(row?.eventId)}::${normalizeEmail(row?.participantEmail)}`,
-      row
-    ])
-  );
-
-  const result = registrations.map((reg) => {
-    const registrationId = normalizeId(reg?._id);
-    const eventId = normalizeId(reg?.event?._id || reg?.event);
-    const lookupEmail = lookupEmailByRegistrationId.get(registrationId) || "";
-    const isTeamLeader =
-      normalizeId(reg?.registeredBy) === normalizeId(userId) ||
-      (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
-    const qr = lookupEmail
-      ? qrByRegistrationKey.get(`${registrationId}::${lookupEmail}`) || null
-      : null;
-    const certificate =
-      lookupEmail && eventId
-        ? certificateByEventAndEmailKey.get(`${eventId}::${lookupEmail}`) || null
+  const result = await Promise.all(
+    registrations.map(async (reg) => {
+      const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
+      const isTeamLeader =
+        reg?.registeredBy?.toString() === userId.toString() ||
+        (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
+      const qr = lookupEmail
+        ? await ParticipantQR.findOne({
+            registration: reg._id,
+            email: lookupEmail
+          }).select("qrImageUrl role attendanceMarked")
         : null;
-    const feedbackSubmitted = feedbackByRegistrationId.has(registrationId);
 
-    return {
-      ...reg,
-      qr: qr
-        ? {
-            qrImageUrl: qr.qrImageUrl,
-            role: qr.role,
-            attendanceMarked: qr.attendanceMarked,
-            attendanceMarkedAt: qr.attendanceMarkedAt
-          }
-        : null,
-      isTeamLeader,
-      feedbackSubmitted,
-      certificate: certificate
-        ? {
-            certificateType: certificate.certificateType,
-            position: certificate.position,
-            participantEmail: certificate.participantEmail,
-            certificateUrl:
-              buildCertificateDownloadUrl(eventId, certificate.participantEmail) ||
-              certificate.certificateUrl,
-            issuedAt: certificate.issuedAt,
-            verificationCode: certificate.verificationCode
-          }
-        : null
-    };
-  });
+      return {
+        ...reg.toObject(),
+        qr: qr || null,
+        isTeamLeader
+      };
+    })
+  );
 
   return result;
 };
@@ -1882,7 +1347,7 @@ export const getEventRegistrations = async (eventId, requester) => {
     registrations.map(async (reg) => {
       const qrs = await ParticipantQR.find({
         registration: reg._id
-      }).select("name email role token qrImageUrl attendanceMarked attendanceMarkedAt");
+      }).select("name email role qrImageUrl attendanceMarked attendanceMarkedAt");
 
       return {
         ...reg.toObject(),
@@ -1950,55 +1415,47 @@ const sendMemberVerificationEmails = async (registration, participants) => {
 };
 
 /* ================================================
-   PREVIEW ATTENDANCE VIA QR TOKEN
-   Resolve participant details before confirming entry
-================================================ */
-
-export const previewAttendance = async (token, requester) => {
-  const { qr, event, registration } = await loadAttendanceContext(token);
-
-  ensureAttendanceWindowOpen(event);
-
-  if (!canManageAttendanceForEvent(event, requester)) {
-    throw new Error("Not authorized to mark attendance for this event");
-  }
-
-  const participantMeta = resolveParticipantMetaFromRegistration(
-    registration,
-    qr.email,
-    qr.name
-  );
-
-  return {
-    participantName: participantMeta.participantName,
-    email: participantMeta.participantEmail || qr.email,
-    role: qr.role,
-    participantDepartment: participantMeta.participantDepartment,
-    participantCollege: participantMeta.participantCollege,
-    participantYear: participantMeta.participantYear,
-    registrationStatus: String(registration?.status || "").trim() || "Pending",
-    attendanceMarked: Boolean(qr.attendanceMarked),
-    attendanceMarkedAt: qr.attendanceMarkedAt || null,
-    eventId: event._id,
-    eventName: event.title
-  };
-};
-
-/* ================================================
    MARK ATTENDANCE VIA QR TOKEN
    Called when organizer/coordinator scans QR
 ================================================ */
 
 export const markAttendance = async (token, scannedBy) => {
-  const { qr, event, registration } = await loadAttendanceContext(token);
+
+  // Find QR record
+  const qr = await ParticipantQR.findOne({ token });
+  if (!qr) throw new Error("Invalid QR code");
 
   // Already attended check
   if (qr.attendanceMarked)
     throw new Error(`Attendance already marked for ${qr.name}`);
 
-  ensureAttendanceWindowOpen(event);
+  // Find the event
+  const event = await Event.findById(qr.eventId);
+  if (!event) throw new Error("Event not found");
 
-  if (!canManageAttendanceForEvent(event, scannedBy))
+// Event must be happening today
+const today = new Date();
+const eventStart = new Date(event.schedule.startDate);
+const eventEnd = new Date(event.schedule.endDate);
+
+// Strip time — compare dates only
+today.setHours(0, 0, 0, 0);
+eventStart.setHours(0, 0, 0, 0);
+eventEnd.setHours(0, 0, 0, 0);
+
+if (today < eventStart || today > eventEnd)
+  throw new Error("Attendance can only be marked on the event day");
+
+  // Authorization check
+  // Must be the organizer OR an assigned coordinator of THIS event
+  const isOrganizer =
+    event.createdBy.toString() === scannedBy._id.toString();
+
+  const isAssignedCoordinator = event.studentCoordinators.some(
+    (c) => c.coordinatorId.toString() === scannedBy._id.toString()
+  );
+
+  if (!isOrganizer && !isAssignedCoordinator)
     throw new Error("Not authorized to mark attendance for this event");
 
   // Mark attendance
@@ -2008,6 +1465,7 @@ export const markAttendance = async (token, scannedBy) => {
   await qr.save();
   await refreshEventAttendanceTotal(qr.eventId);
 // Notify student
+const registration = await EventRegistration.findById(qr.registration);
 if (registration) {
   await sendNotification({
     recipientId: registration.registeredBy,
@@ -2191,12 +1649,6 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
   registration.winner.position = position;
   await registration.save();
 
-  if (event.status === "Completed" && event?.certificate?.isEnabled) {
-    generateCertificatesForRegistration(registration, event).catch((error) => {
-      console.error("Winner certificate sync error:", error.message);
-    });
-  }
-
   return {
     position,
     name: event.isTeamEvent
@@ -2256,12 +1708,6 @@ export const untagWinner = async (registrationId, taggedBy) => {
 
   await registration.save();
 
-  if (event.status === "Completed" && event?.certificate?.isEnabled) {
-    generateCertificatesForRegistration(registration, event).catch((error) => {
-      console.error("Certificate downgrade sync error:", error.message);
-    });
-  }
-
   return {
     name: event.isTeamEvent
       ? registration.teamName
@@ -2270,4 +1716,3 @@ export const untagWinner = async (registrationId, taggedBy) => {
     eventName: event.title
   };
 };
-

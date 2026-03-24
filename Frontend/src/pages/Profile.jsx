@@ -6,7 +6,6 @@ import SummaryApi from "../api/SummaryApi";
 import { storeAuth } from "../lib/auth";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const yearOptions = ["1st", "2nd", "3rd", "4th"];
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -71,7 +70,6 @@ export default function Profile() {
   const [loading, setLoading] = useState({ profile: true, save: false, avatar: false });
   const [message, setMessage] = useState(null);
   const avatarInputRef = useRef(null);
-  useToastFeedback(message);
 
   const role = profile?.role || "";
   const isStudent = role === "STUDENT";
@@ -324,6 +322,18 @@ export default function Profile() {
           </div>
         </section>
 
+        {message && (
+          <p
+            className={`text-sm rounded-lg py-2 px-3 ${
+              message.type === "success"
+                ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
+                : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
+            }`}
+          >
+            {message.text}
+          </p>
+        )}
+
         <div className="grid lg:grid-cols-[1fr_2fr] gap-6">
           <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Account</h2>
@@ -429,49 +439,36 @@ export default function Profile() {
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email Address</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Email</span>
                     <input
-                      name="email"
                       value={profile?.email || ""}
                       readOnly
                       className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-4 py-3 text-sm text-slate-600 dark:text-slate-300"
                     />
                   </label>
-                  {isStudent ? (
-                    <fieldset className="block">
-                      <legend className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</legend>
-                      <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Education level">
-                        {EDUCATION_LEVELS.map((level) => {
-                          const isSelected = formData.educationLevel === level;
-                          return (
-                            <button
-                              key={level}
-                              type="button"
-                              onClick={() => handleEducationLevelSelect(level)}
-                              aria-pressed={isSelected}
-                              className={`rounded-xl border px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition ${
-                                isSelected
-                                  ? "border-indigo-600 bg-indigo-600 text-white"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
-                              }`}
-                            >
-                              {level}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </fieldset>
-                  ) : (
-                    <label className="block">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">College Name</span>
-                      <input
-                        name="collegeName"
-                        value={formData.collegeName}
-                        onChange={handleChange}
-                        className="mt-1 w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/30"
-                      />
-                    </label>
-                  )}
+                  <label className="block">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</span>
+                    <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {EDUCATION_LEVELS.map((level) => {
+                        const isSelected = formData.educationLevel === level;
+                        return (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => handleEducationLevelSelect(level)}
+                            aria-pressed={isSelected}
+                            className={`rounded-xl border px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition ${
+                              isSelected
+                                ? "border-indigo-600 bg-indigo-600 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                            }`}
+                          >
+                            {level}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </label>
                 </div>
 
                 {isStudent && (
@@ -570,5 +567,3 @@ export default function Profile() {
     </div>
   );
 }
-
-

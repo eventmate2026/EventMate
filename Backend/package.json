@@ -6,11 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "create-admin": "node scripts/createAdmin.js",
-    "test": "node --test --test-concurrency=1 --test-isolation=none"
+    "create-admin": "node scripts/createAdmin.js"
   },
   "dependencies": {
-    "@sendgrid/mail": "^8.1.6",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
@@ -28,7 +26,6 @@
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.3",
-    "node-mailjet": "^6.0.0",
     "validator": "^13.9.0"
   },
   "devDependencies": {

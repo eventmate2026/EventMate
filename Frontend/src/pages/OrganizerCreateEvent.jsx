@@ -5,7 +5,6 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
-import { useToast } from "../context/ToastContext";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
 const initialForm = {
@@ -21,10 +20,6 @@ const initialForm = {
   maxParticipants: "",
   registrationOpen: true,
   registrationFee: "0",
-  paymentAccountName: "",
-  paymentUpiId: "",
-  paymentInstructions: "",
-  paymentQr: null,
   eventMode: "INDIVIDUAL",
   minTeamSize: "2",
   maxTeamSize: "4",
@@ -49,7 +44,6 @@ const formatBytes = (bytes = 0) => {
 
 export default function OrganizerCreateEvent() {
   const navigate = useNavigate();
-  const toast = useToast();
   const user = getStoredUser();
   const defaultDepartment =
     user?.professionalProfile?.department || user?.academicProfile?.branch || "";
@@ -60,10 +54,10 @@ export default function OrganizerCreateEvent() {
   });
 
   const [form, setForm] = useState(buildInitialForm);
+  const [message, setMessage] = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
-  const [paymentQrPreviewUrl, setPaymentQrPreviewUrl] = useState("");
   const resourceInputRef = useRef(null);
   const [resourceError, setResourceError] = useState("");
   const [coordinatorOptions, setCoordinatorOptions] = useState([]);
@@ -84,17 +78,6 @@ export default function OrganizerCreateEvent() {
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [form.poster]);
-
-  useEffect(() => {
-    if (!form.paymentQr) {
-      setPaymentQrPreviewUrl("");
-      return;
-    }
-
-    const url = URL.createObjectURL(form.paymentQr);
-    setPaymentQrPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [form.paymentQr]);
 
   useEffect(() => {
     const loadCoordinatorOptions = async () => {
@@ -156,10 +139,6 @@ export default function OrganizerCreateEvent() {
       const nextFile = files?.[0] || null;
       if (name === "resourceFile") {
         handleResourceFile(nextFile);
-        return;
-      }
-      if (name === "paymentQr") {
-        setForm((prev) => ({ ...prev, paymentQr: nextFile }));
         return;
       }
       setForm((prev) => ({ ...prev, [name]: nextFile }));
@@ -278,15 +257,6 @@ export default function OrganizerCreateEvent() {
       return "Department is required for department-level events.";
     }
 
-    if (Number(form.registrationFee || 0) > 0) {
-      if (!String(form.paymentAccountName || "").trim()) {
-        return "Account name is required for paid events.";
-      }
-      if (!String(form.paymentUpiId || "").trim() && !form.paymentQr) {
-        return "UPI ID or payment QR image is required for paid events.";
-      }
-    }
-
     return null;
   };
 
@@ -322,20 +292,6 @@ export default function OrganizerCreateEvent() {
         lastDate: form.registrationLastDate || form.startDate,
         maxParticipants: Number(form.maxParticipants),
         fee: Number(form.registrationFee || 0),
-        paymentConfig:
-          Number(form.registrationFee || 0) > 0
-            ? {
-                method: "PHONEPE_QR",
-                accountName: String(form.paymentAccountName || "").trim(),
-                upiId: String(form.paymentUpiId || "").trim(),
-                instructions: String(form.paymentInstructions || "").trim(),
-              }
-            : {
-                method: "FREE",
-                accountName: "",
-                upiId: "",
-                instructions: "",
-              },
       })
     );
 
@@ -358,17 +314,15 @@ export default function OrganizerCreateEvent() {
     if (form.resourceFile) {
       payload.append("resourceFile", form.resourceFile);
     }
-    if (form.paymentQr) {
-      payload.append("paymentQr", form.paymentQr);
-    }
 
     return payload;
   };
 
   const submitEvent = async ({ publish }) => {
+    setMessage(null);
     const validationError = validateForm();
     if (validationError) {
-      toast.error(validationError);
+      setMessage({ type: "error", text: validationError });
       return;
     }
 
@@ -433,14 +387,28 @@ export default function OrganizerCreateEvent() {
         }
       }
 
-      toast.success(
-        publish
+      setMessage({
+        type: "success",
+        text: publish
           ? `Event created and published successfully.${assignmentNote}`
-          : `${createResponse.data?.message || "Event created as draft."}${assignmentNote}`
-      );
-      navigate("/organizer-dashboard");
+          : `${createResponse.data?.message || "Event created as draft."}${assignmentNote}`,
+      });
+
+      setForm(buildInitialForm());
+      setPreviewUrl("");
+      setResourceError("");
+      if (resourceInputRef.current) {
+        resourceInputRef.current.value = "";
+      }
+      setCoordinatorPick("");
+      setSelectedCoordinatorIds([]);
+      setJudges([]);
+      setMentors([]);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Unable to create event.");
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Unable to create event.",
+      });
     } finally {
       setIsSavingDraft(false);
       setIsPublishing(false);
@@ -496,6 +464,18 @@ export default function OrganizerCreateEvent() {
               </button>
             </div>
           </div>
+
+          {message && (
+            <p
+              className={`mt-4 text-sm rounded-lg py-2 px-3 ${
+                message.type === "success"
+                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
+                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
 
           <div className="mt-6 space-y-4">
             <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 p-4">
@@ -570,7 +550,6 @@ export default function OrganizerCreateEvent() {
                   <label className="block">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Department</span>
                     <input
-                      name="department"
                       value={defaultDepartment || "Department not set in profile"}
                       readOnly
                       className={`mt-1 ${fieldClass} bg-slate-100 dark:bg-white/10`}
@@ -588,9 +567,7 @@ export default function OrganizerCreateEvent() {
                 </p>
                 <button
                   type="button"
-                  onClick={() =>
-                    toast.info("Additional schedule sections will be available soon. Please use the current schedule for now.")
-                  }
+                  onClick={() => setMessage({ type: "success", text: "Multi-slot support is not available in this backend build; one schedule is used." })}
                   className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                 >
                   + Add Section
@@ -712,81 +689,6 @@ export default function OrganizerCreateEvent() {
                   </div>
                 </div>
               )}
-
-              {Number(form.registrationFee || 0) > 0 && (
-                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                    Payment Collection
-                  </p>
-                  <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        Account Name
-                      </span>
-                      <input
-                        name="paymentAccountName"
-                        value={form.paymentAccountName}
-                        onChange={handleChange}
-                        placeholder="e.g. EventMate Campus Cell"
-                        className={`mt-1 ${fieldClass}`}
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        UPI ID
-                      </span>
-                      <input
-                        name="paymentUpiId"
-                        value={form.paymentUpiId}
-                        onChange={handleChange}
-                        placeholder="e.g. eventmate@upi"
-                        className={`mt-1 ${fieldClass}`}
-                      />
-                    </label>
-
-                    <label className="block sm:col-span-2">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        Payment Instructions
-                      </span>
-                      <textarea
-                        name="paymentInstructions"
-                        value={form.paymentInstructions}
-                        onChange={handleChange}
-                        rows={3}
-                        placeholder="Share what students should mention in the payment note or any proof requirements."
-                        className={`mt-1 ${fieldClass}`}
-                      />
-                    </label>
-
-                    <div className="block sm:col-span-2">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                        Payment QR
-                      </span>
-                      <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 p-4 text-center hover:bg-slate-50 dark:border-white/20 dark:hover:bg-white/5">
-                        <UploadCloud size={18} className="text-indigo-500" />
-                        <span className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                          {form.paymentQr ? form.paymentQr.name : "Upload payment QR (PNG, JPG)"}
-                        </span>
-                        <input
-                          type="file"
-                          name="paymentQr"
-                          onChange={handleChange}
-                          accept="image/*"
-                          className="hidden"
-                        />
-                      </label>
-                      {paymentQrPreviewUrl ? (
-                        <img
-                          src={paymentQrPreviewUrl}
-                          alt="Payment QR preview"
-                          className="mt-3 h-40 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              )}
             </section>
 
             <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 p-4">
@@ -807,7 +709,6 @@ export default function OrganizerCreateEvent() {
                   </span>
                   <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <select
-                      name="coordinatorPick"
                       value={coordinatorPick}
                       onChange={(event) => setCoordinatorPick(event.target.value)}
                       className={`${fieldClass} sm:flex-1`}
@@ -907,10 +808,10 @@ export default function OrganizerCreateEvent() {
                 {judges.map((row, index) => (
                   <div key={`judge-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 p-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input name={`judgeName-${index}`} value={row.name} onChange={(event) => handleListItemChange(setJudges, index, "name", event.target.value)} placeholder="Judge Name" className={fieldClass} />
-                      <input name={`judgeOrganization-${index}`} value={row.organization} onChange={(event) => handleListItemChange(setJudges, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
-                      <input name={`judgeDepartment-${index}`} value={row.department} onChange={(event) => handleListItemChange(setJudges, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
-                      <input name={`judgeOccupation-${index}`} value={row.occupation} onChange={(event) => handleListItemChange(setJudges, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
+                      <input value={row.name} onChange={(event) => handleListItemChange(setJudges, index, "name", event.target.value)} placeholder="Judge Name" className={fieldClass} />
+                      <input value={row.organization} onChange={(event) => handleListItemChange(setJudges, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
+                      <input value={row.department} onChange={(event) => handleListItemChange(setJudges, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
+                      <input value={row.occupation} onChange={(event) => handleListItemChange(setJudges, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
                       <button type="button" onClick={() => handleListRemove(setJudges, index)} className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/15">
                         <Trash2 size={13} />
                       </button>
@@ -934,10 +835,10 @@ export default function OrganizerCreateEvent() {
                 {mentors.map((row, index) => (
                   <div key={`mentor-${index}`} className="rounded-lg border border-slate-200 dark:border-white/10 p-3">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input name={`mentorName-${index}`} value={row.name} onChange={(event) => handleListItemChange(setMentors, index, "name", event.target.value)} placeholder="Mentor Name" className={fieldClass} />
-                      <input name={`mentorOrganization-${index}`} value={row.organization} onChange={(event) => handleListItemChange(setMentors, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
-                      <input name={`mentorDepartment-${index}`} value={row.department} onChange={(event) => handleListItemChange(setMentors, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
-                      <input name={`mentorOccupation-${index}`} value={row.occupation} onChange={(event) => handleListItemChange(setMentors, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
+                      <input value={row.name} onChange={(event) => handleListItemChange(setMentors, index, "name", event.target.value)} placeholder="Mentor Name" className={fieldClass} />
+                      <input value={row.organization} onChange={(event) => handleListItemChange(setMentors, index, "organization", event.target.value)} placeholder="College/Company Name" className={fieldClass} />
+                      <input value={row.department} onChange={(event) => handleListItemChange(setMentors, index, "department", event.target.value)} placeholder="Department" className={fieldClass} />
+                      <input value={row.occupation} onChange={(event) => handleListItemChange(setMentors, index, "occupation", event.target.value)} placeholder="Occupation" className={`sm:col-span-2 ${fieldClass}`} />
                       <button type="button" onClick={() => handleListRemove(setMentors, index)} className="inline-flex items-center justify-center rounded-lg border border-rose-200 px-3 py-2 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-300 dark:hover:bg-rose-500/15">
                         <Trash2 size={13} />
                       </button>
@@ -945,7 +846,7 @@ export default function OrganizerCreateEvent() {
                   </div>
                 ))}
                 {judges.length === 0 && mentors.length === 0 && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Judges and mentors are optional. Add them when the event panel is finalized.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Judges and mentors are optional and kept as event notes in frontend.</p>
                 )}
               </div>
             </section>

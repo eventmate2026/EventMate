@@ -1,17 +1,18 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-
-  const backendApiUrl = String(env.VITE_API_URL || env.BACKEND_URL || "").trim();
+  const frontendEnvDir = fileURLToPath(new URL(".", import.meta.url));
+  const backendEnvDir = fileURLToPath(new URL("../Backend", import.meta.url));
+  const frontendEnv = loadEnv(mode, frontendEnvDir, "");
+  const backendEnv = loadEnv(mode, backendEnvDir, "");
+  const backendPort = String(backendEnv.PORT || "5000").trim() || "5000";
+  const backendApiUrl = String(frontendEnv.VITE_API_URL || "").trim();
+  const backendTarget = backendApiUrl || `http://127.0.0.1:${backendPort}`;
 
   return {
     plugins: [react()],
-    define: {
-      __EVENTMATE_API_URL__: JSON.stringify(backendApiUrl),
-    },
-
     build: {
       rollupOptions: {
         output: {
@@ -20,33 +21,28 @@ export default defineConfig(({ mode }) => {
             motion: ["framer-motion"],
             icons: ["lucide-react", "react-icons"],
             http: ["axios"],
+            socket: ["socket.io-client"],
           },
         },
       },
     },
-
     server: {
       host: true,
       port: 5173,
-
-      // ✅ ONLY for local development
-      proxy: backendApiUrl
-        ? undefined
-        : {
-            "/api": {
-              target: "http://127.0.0.1:5000",
-              changeOrigin: true,
-              secure: false,
-            },
-            "/socket.io": {
-              target: "http://127.0.0.1:5000",
-              changeOrigin: true,
-              secure: false,
-              ws: true,
-            },
-          },
+      proxy: {
+        "/api": {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/socket.io": {
+          target: backendTarget,
+          changeOrigin: true,
+          secure: false,
+          ws: true,
+        },
+      },
     },
-
     preview: {
       host: true,
       port: 4173,

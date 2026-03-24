@@ -2,18 +2,17 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import api from "../lib/api";
-import { useToast } from "../context/ToastContext";
 
 export default function VerifyRegistration() {
   const [params] = useSearchParams();
   const token = params.get("token");
-  const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState({ type: "info", text: "Verifying registration..." });
 
   useEffect(() => {
     const verify = async () => {
       if (!token) {
-        toast.error("Missing verification token.");
+        setMessage({ type: "error", text: "Missing verification token." });
         setLoading(false);
         return;
       }
@@ -24,9 +23,15 @@ export default function VerifyRegistration() {
           method: "get",
           skipAuth: true,
         });
-        toast.success(response.data?.message || "Registration verified successfully.");
+        setMessage({
+          type: "success",
+          text: response.data?.message || "Registration verified successfully.",
+        });
       } catch (error) {
-        toast.error(error.response?.data?.message || "Unable to verify registration.");
+        setMessage({
+          type: "error",
+          text: error.response?.data?.message || "Unable to verify registration.",
+        });
       } finally {
         setLoading(false);
       }
@@ -47,7 +52,17 @@ export default function VerifyRegistration() {
               <Loader2 size={14} className="animate-spin" />
               Verifying...
             </p>
-          ) : null}
+          ) : (
+            <p
+              className={`text-sm rounded-lg py-2 px-3 ${
+                message.type === "success"
+                  ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
         </div>
 
         <div className="mt-6 flex items-center justify-center gap-4 text-sm">

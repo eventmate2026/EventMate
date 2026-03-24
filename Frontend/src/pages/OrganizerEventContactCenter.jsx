@@ -16,20 +16,10 @@ import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractEventItem, extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const ROLE_LABELS = {
   STUDENT_COORDINATOR: "Coordinator",
   STUDENT: "Student"
-};
-
-const EMAIL_STATUS_LABELS = {
-  NOT_REQUESTED: "Web Only",
-  PENDING: "Email Queued",
-  PROCESSING: "Sending",
-  SENT: "Accepted by Provider",
-  FAILED: "Email Failed",
-  SKIPPED: "Email Skipped"
 };
 
 const normalizeId = (value) => String(value || "").trim();
@@ -68,44 +58,6 @@ const formatDateTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const getEmailStatusLabel = (status, trackingMode) => {
-  const normalizedStatus = String(status || "").trim().toUpperCase();
-  if (normalizedStatus === "SENT") {
-    return String(trackingMode || "").trim().toUpperCase() === "WEBHOOK_DELIVERY"
-      ? "Delivered"
-      : "Accepted by Provider";
-  }
-
-  return EMAIL_STATUS_LABELS[normalizedStatus] || status || "Web Only";
-};
-
-const getEmailStatusTimestamp = (item) => {
-  if (item.emailDeliveredAt) {
-    return `Delivered ${formatDateTime(item.emailDeliveredAt)}`;
-  }
-  if (item.emailAcceptedAt) {
-    return `Accepted ${formatDateTime(item.emailAcceptedAt)}`;
-  }
-  if (item.emailLastAttemptAt) {
-    return `Attempted ${formatDateTime(item.emailLastAttemptAt)}`;
-  }
-  return "No email attempt";
-};
-
-const getEmailStatusTone = (status) => {
-  const normalized = String(status || "").trim().toUpperCase();
-  if (normalized === "SENT") {
-    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
-  }
-  if (normalized === "FAILED") {
-    return "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300";
-  }
-  if (normalized === "PENDING" || normalized === "PROCESSING") {
-    return "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200";
-  }
-  return "bg-slate-200 text-slate-700 dark:bg-slate-600/40 dark:text-slate-200";
 };
 
 const parseRegistrationRows = (payload) => {
@@ -157,10 +109,6 @@ export default function OrganizerEventContactCenter() {
   const [receipts, setReceipts] = useState([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
   const [receiptsError, setReceiptsError] = useState(null);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(feedback);
-  useToastFeedback(groupsError, { defaultType: "error" });
-  useToastFeedback(receiptsError, { defaultType: "error" });
   const eventStatus = String(eventData?.status || "").trim().toUpperCase();
   const isMessagingDisabled =
     eventStatus === "COMPLETED" || eventStatus === "CANCELLED" || eventStatus === "CANCELED";
@@ -169,7 +117,7 @@ export default function OrganizerEventContactCenter() {
     setLoading(true);
     setError(null);
     try {
-      const [eventResponse, registrationsResponse, audienceResponse] = await Promise.all([
+      const [eventResponse, registrationsResponse, usersResponse] = await Promise.all([
         api({
           ...SummaryApi.get_public_event_details,
           url: SummaryApi.get_public_event_details.url.replace(":eventId", encodeURIComponent(eventId || "")),
@@ -178,16 +126,12 @@ export default function OrganizerEventContactCenter() {
           ...SummaryApi.get_event_registrations,
           url: SummaryApi.get_event_registrations.url.replace(":eventId", encodeURIComponent(eventId || "")),
         }),
-        api({
-          ...SummaryApi.get_event_contact_audience,
-          url: SummaryApi.get_event_contact_audience.url.replace(":eventId", encodeURIComponent(eventId || "")),
-          cacheTTL: 60000,
-        })
+        api({ ...SummaryApi.get_all_users, cacheTTL: 60000 })
       ]);
 
       setEventData(extractEventItem(eventResponse.data));
       setRegistrations(parseRegistrationRows(registrationsResponse.data));
-      setUsers(extractUsersList(audienceResponse?.data));
+      setUsers(extractUsersList(usersResponse?.data));
     } catch (loadError) {
       setEventData(null);
       setRegistrations([]);
@@ -331,26 +275,16 @@ export default function OrganizerEventContactCenter() {
 
     let registeredStudents = [];
     if (isTeamEvent) {
-      const participantUsers = new Map();
+      const leaderUsers = new Map();
       registrations.forEach((reg) => {
         const leaderEmail = String(reg?.teamLeader?.email || "").trim().toLowerCase();
         const leaderFromEmail = leaderEmail ? byEmail.get(leaderEmail) : null;
         const leaderFromId = byId.get(normalizeId(reg?.registeredBy));
         const leaderUser = leaderFromEmail || leaderFromId;
         const leaderId = normalizeId(leaderUser?._id || leaderUser?.id);
-        if (leaderUser && leaderId) participantUsers.set(leaderId, leaderUser);
-
-        const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
-        teamMembers.forEach((member) => {
-          const memberEmail = String(member?.email || "").trim().toLowerCase();
-          const memberUser = memberEmail ? byEmail.get(memberEmail) : null;
-          const memberId = normalizeId(memberUser?._id || memberUser?.id);
-          if (memberUser && memberId) {
-            participantUsers.set(memberId, memberUser);
-          }
-        });
+        if (leaderUser && leaderId) leaderUsers.set(leaderId, leaderUser);
       });
-      registeredStudents = Array.from(participantUsers.values())
+      registeredStudents = Array.from(leaderUsers.values())
         .filter((user) => !coordinatorIds.has(normalizeId(user?._id || user?.id)))
         .filter((user) => matchesSearch(user, term))
         .sort(sortByName);
@@ -562,7 +496,6 @@ export default function OrganizerEventContactCenter() {
                 >
                   <input
                     type="checkbox"
-                    name="selectedRecipients"
                     checked={isSelected}
                     onChange={() => toggleSelection(id)}
                     disabled={isDisabled}
@@ -602,12 +535,12 @@ export default function OrganizerEventContactCenter() {
   const pageTitle = isMessagingDisabled ? "Message History" : "Message Participants";
   const pageDescription = isMessagingDisabled
     ? `${eventTitle} - Review who received which messages and notices.`
-    : `${eventTitle} - Reach coordinators, temporary coordinators, and registered participants.`;
-  const registeredLabel = isTeamEvent ? "Team Participants" : "Registered Students";
+    : `${eventTitle} - Reach coordinators, temporary coordinators, and registered students.`;
+  const registeredLabel = isTeamEvent ? "Team Leaders" : "Registered Students";
   const registeredDescription = isTeamEvent
-    ? "Team leaders and team members registered for this event."
+    ? "Team leaders registered for this event."
     : "Students registered for this event.";
-  const registeredQuickLabel = isTeamEvent ? "Team Participants" : "Registered Students";
+  const registeredQuickLabel = isTeamEvent ? "Team Leaders" : "Registered Students";
   const activeGroup = useMemo(
     () => sentGroups.find((group) => group.groupId === activeGroupId) || null,
     [sentGroups, activeGroupId]
@@ -702,7 +635,6 @@ export default function OrganizerEventContactCenter() {
                 <div className="relative w-full sm:max-w-xs">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    name="participantSearch"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search by name, email, or department..."
@@ -780,7 +712,7 @@ export default function OrganizerEventContactCenter() {
                   title: registeredLabel,
                   description: registeredDescription,
                   users: directory.registeredStudents,
-                  emptyLabel: isTeamEvent ? "No team participants found." : "No registered students found.",
+                  emptyLabel: isTeamEvent ? "No team leaders found." : "No registered students found.",
                   disabled: isMessagingDisabled
                 })}
               </div>
@@ -846,10 +778,8 @@ export default function OrganizerEventContactCenter() {
                 <form onSubmit={handleSend} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-4">
                   <div className="space-y-3">
                     <div>
-                      <label htmlFor="organizer-contact-title" className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
+                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Title</label>
                       <input
-                        id="organizer-contact-title"
-                        name="title"
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
                         disabled={isMessagingDisabled}
@@ -858,10 +788,8 @@ export default function OrganizerEventContactCenter() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="organizer-contact-message" className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
+                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
                       <textarea
-                        id="organizer-contact-message"
-                        name="message"
                         rows={6}
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
@@ -883,6 +811,18 @@ export default function OrganizerEventContactCenter() {
                     </div>
 
                     <div>
+                      {feedback && (
+                        <p
+                          className={`mb-3 rounded-lg px-3 py-2 text-sm ${
+                            feedback.type === "success"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                              : "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300"
+                          }`}
+                        >
+                          {feedback.text}
+                        </p>
+                      )}
+
                       <button
                         type="submit"
                         disabled={sending || isMessagingDisabled}
@@ -903,10 +843,6 @@ export default function OrganizerEventContactCenter() {
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Delivery Status</h2>
                   <p className="text-sm text-slate-500 dark:text-slate-300">
                     Full history of sent messages with seen/unseen status.
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Until a verified sending domain and delivery webhook are added, email tracking means queued,
-                    attempted, or accepted by the provider, not confirmed inbox delivery.
                   </p>
                 </div>
                 <button
@@ -949,10 +885,6 @@ export default function OrganizerEventContactCenter() {
                         const isActive = group.groupId === activeGroupId;
                         const readCount = Number(group.readCount || 0);
                         const total = Number(group.total || 0);
-                        const emailRequestedCount = Number(group.emailRequestedCount || 0);
-                        const emailSentCount = Number(group.emailSentCount || 0);
-                        const emailFailedCount = Number(group.emailFailedCount || 0);
-                        const emailPendingCount = Number(group.emailPendingCount || 0);
                         return (
                           <button
                             key={group.groupId}
@@ -977,13 +909,6 @@ export default function OrganizerEventContactCenter() {
                                 {readCount}/{total} seen
                               </span>
                             </div>
-                            {emailRequestedCount > 0 && (
-                              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-300">
-                                Email: {emailSentCount}/{emailRequestedCount} sent
-                                {emailPendingCount > 0 ? `, ${emailPendingCount} pending` : ""}
-                                {emailFailedCount > 0 ? `, ${emailFailedCount} failed` : ""}
-                              </p>
-                            )}
                             {group.message && (
                               <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
                                 {String(group.message).slice(0, 120)}
@@ -1002,9 +927,6 @@ export default function OrganizerEventContactCenter() {
                     {activeGroup && (
                       <span className="text-xs text-slate-500 dark:text-slate-300">
                         {activeGroup.readCount}/{activeGroup.total} seen
-                        {Number(activeGroup.emailRequestedCount || 0) > 0
-                          ? ` | ${activeGroup.emailSentCount || 0}/${activeGroup.emailRequestedCount || 0} emailed`
-                          : ""}
                       </span>
                     )}
                   </div>
@@ -1080,21 +1002,6 @@ export default function OrganizerEventContactCenter() {
                             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                               {item.isRead ? formatDateTime(item.readAt) : "Waiting"}
                             </p>
-                            <span
-                              className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${getEmailStatusTone(
-                                item.emailStatus
-                              )}`}
-                            >
-                              {getEmailStatusLabel(item.emailStatus, item.emailTrackingMode)}
-                            </span>
-                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                              {getEmailStatusTimestamp(item)}
-                            </p>
-                            {item.emailLastError ? (
-                              <p className="mt-1 max-w-[180px] text-[11px] text-red-500 dark:text-red-300">
-                                {item.emailLastError}
-                              </p>
-                            ) : null}
                           </div>
                         </div>
                       ))}

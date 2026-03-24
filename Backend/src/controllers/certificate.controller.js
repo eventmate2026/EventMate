@@ -4,11 +4,9 @@ import Event from "../models/Event.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {
   buildCertificateEmailSlug,
-  buildCertificateDownloadUrl,
   generateCertificatesForEvent,
   generateCertificatesForSelection,
   generateDemoCertificateBuffer,
-  isCertificateDownloadTokenValid,
   normalizeCertificateCustomization
 } from "../services/certificate.service.js";
 
@@ -17,23 +15,6 @@ const normalizeVerificationCode = (value) =>
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
-
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-
-const mapCertificateWithSignedDownloadUrl = (certificate) => {
-  if (!certificate) return certificate;
-  const plainCertificate =
-    typeof certificate.toObject === "function" ? certificate.toObject() : { ...certificate };
-  const signedUrl = buildCertificateDownloadUrl(
-    plainCertificate.eventId,
-    plainCertificate.participantEmail
-  );
-
-  return {
-    ...plainCertificate,
-    certificateUrl: signedUrl || plainCertificate.certificateUrl || "",
-  };
-};
 
 const resolveAuditActorContext = (req) => {
   const role = req?.user?.role || "PUBLIC";
@@ -56,16 +37,6 @@ const writeCertificateAuditLog = async (payload) => {
   } catch (error) {
     console.error("Failed to write certificate audit log:", error.message);
   }
-};
-
-const triggerBackgroundCertificateSync = (event) => {
-  if (!event?._id) return;
-  if (String(event?.status || "").trim() !== "Completed") return;
-  if (!event?.certificate?.isEnabled) return;
-
-  generateCertificatesForEvent(event._id).catch((error) => {
-    console.error("Certificate sync trigger failed:", error.message);
-  });
 };
 
 const sanitizeFileName = (value, fallback) => {
@@ -125,23 +96,14 @@ const autoArrangeCertificateSignatures = (customizationValue) => {
 ================================================ */
 export const getMyCertificates = async (req, res, next) => {
   try {
-    const participantEmail = String(req.user?.email || "").trim().toLowerCase();
-    if (!participantEmail) {
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        data: []
-      });
-    }
-
     const certificates = await Certificate.find({
-      participantEmail
+      participantEmail: req.user.email
     }).sort({ issuedAt: -1 });
 
     return res.status(200).json({
       success: true,
       count: certificates.length,
-      data: certificates.map(mapCertificateWithSignedDownloadUrl)
+      data: certificates
     });
   } catch (error) {
     next(error);
@@ -175,7 +137,7 @@ export const getEventCertificates = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: certificates.length,
-      data: certificates.map(mapCertificateWithSignedDownloadUrl)
+      data: certificates
     });
   } catch (error) {
     next(error);
@@ -261,7 +223,7 @@ export const generateSelectedCertificates = async (req, res, next) => {
 export const updateEventCertificateCustomization = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy status certificate");
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -284,7 +246,6 @@ export const updateEventCertificateCustomization = async (req, res, next) => {
     }
 
     await event.save();
-    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -305,7 +266,7 @@ export const updateEventCertificateCustomization = async (req, res, next) => {
 export const uploadEventCertificateBackground = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy status certificate");
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -343,7 +304,6 @@ export const uploadEventCertificateBackground = async (req, res, next) => {
     }
 
     await event.save();
-    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -365,7 +325,7 @@ export const uploadEventCertificateBackground = async (req, res, next) => {
 export const uploadEventCertificateLogo = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy status certificate");
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -404,7 +364,6 @@ export const uploadEventCertificateLogo = async (req, res, next) => {
     }
 
     await event.save();
-    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -426,7 +385,7 @@ export const uploadEventCertificateLogo = async (req, res, next) => {
 export const uploadEventCertificateAccreditationLogo = async (req, res, next) => {
   try {
     const { eventId } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy status certificate");
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -465,7 +424,6 @@ export const uploadEventCertificateAccreditationLogo = async (req, res, next) =>
     }
 
     await event.save();
-    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -487,7 +445,7 @@ export const uploadEventCertificateAccreditationLogo = async (req, res, next) =>
 export const uploadEventCertificateSignature = async (req, res, next) => {
   try {
     const { eventId, role } = req.params;
-    const event = await Event.findById(eventId).select("_id createdBy status certificate");
+    const event = await Event.findById(eventId).select("_id createdBy certificate");
     if (!event) {
       return res.status(404).json({ success: false, message: "Event not found" });
     }
@@ -547,7 +505,6 @@ export const uploadEventCertificateSignature = async (req, res, next) => {
     }
 
     await event.save();
-    triggerBackgroundCertificateSync(event);
 
     return res.status(200).json({
       success: true,
@@ -648,7 +605,6 @@ export const downloadCertificate = async (req, res, next) => {
   try {
     const { eventId, emailSlug } = req.params;
     const normalizedSlug = String(emailSlug || "").trim().toLowerCase();
-    const submittedToken = String(req.query?.token || "").trim();
 
     if (!normalizedSlug) {
       return res.status(400).json({
@@ -669,36 +625,6 @@ export const downloadCertificate = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Certificate not found"
-      });
-    }
-
-    const requesterRole = String(req.user?.role || "").trim().toUpperCase();
-    const requesterEmail = normalizeEmail(req.user?.email);
-    const isCertificateOwner =
-      requesterRole === "STUDENT" &&
-      requesterEmail &&
-      requesterEmail === normalizeEmail(certificate.participantEmail);
-    const isAdmin = requesterRole === "MAIN_ADMIN";
-    let isOrganizerOwner = false;
-
-    if (requesterRole === "ORGANIZER") {
-      const event = await Event.findById(eventId).select("_id createdBy organizer");
-      isOrganizerOwner =
-        Boolean(event) &&
-        (String(event?.createdBy || "") === String(req.user?._id || "") ||
-          String(event?.organizer?.organizerId || "") === String(req.user?._id || ""));
-    }
-
-    const hasValidDownloadToken = isCertificateDownloadTokenValid(
-      submittedToken,
-      eventId,
-      certificate.participantEmail
-    );
-
-    if (!hasValidDownloadToken && !isCertificateOwner && !isAdmin && !isOrganizerOwner) {
-      return res.status(403).json({
-        success: false,
-        message: "Certificate download link is invalid or has expired"
       });
     }
 

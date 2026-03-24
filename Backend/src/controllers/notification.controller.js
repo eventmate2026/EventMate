@@ -8,128 +8,6 @@ import mongoose from "mongoose";
 
 const escapeRegex = (value) =>
   String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-const normalizeId = (value) => String(value || "").trim();
-const normalizeName = (value, fallback) =>
-  String(value || "").trim() || fallback;
-const INBOX_NOTIFICATION_FIELDS =
-  "_id title message type refId sender recipient.userId recipient.name recipient.role isRead readAt createdAt updatedAt emailDelivery.status emailDelivery.acceptedAt emailDelivery.deliveredAt emailDelivery.lastError";
-
-export const collectOrganizerEventAudience = (registrations = [], isTeamEvent = false) => {
-  const allowedIds = new Set();
-  const participantEmails = new Set();
-
-  registrations.forEach((reg) => {
-    const registrationOwnerId = normalizeId(reg?.registeredBy);
-    if (registrationOwnerId) {
-      allowedIds.add(registrationOwnerId);
-    }
-
-    const leaderEmail = normalizeEmail(reg?.teamLeader?.email);
-    if (leaderEmail) {
-      participantEmails.add(leaderEmail);
-    }
-
-    if (!isTeamEvent) return;
-
-    const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
-    teamMembers.forEach((member) => {
-      const memberEmail = normalizeEmail(member?.email);
-      if (memberEmail) {
-        participantEmails.add(memberEmail);
-      }
-    });
-  });
-
-  return {
-    allowedIds,
-    participantEmails
-  };
-};
-
-export const buildTeamNoticeRecipientMap = (registrations = []) => {
-  const recipientMap = new Map();
-
-  registrations.forEach((reg) => {
-    const ownerId = normalizeId(reg?.registeredBy);
-    if (!ownerId) return;
-
-    const seenEmails = new Set();
-    const recipients = [];
-
-    const pushRecipient = (emailValue, nameValue, roleValue) => {
-      const email = normalizeEmail(emailValue);
-      if (!email || seenEmails.has(email)) return;
-      seenEmails.add(email);
-      recipients.push({
-        email,
-        name: normalizeName(nameValue, roleValue === "leader" ? "Team Leader" : "Team Member"),
-        role: roleValue
-      });
-    };
-
-    pushRecipient(reg?.teamLeader?.email, reg?.teamLeader?.name, "leader");
-
-    const teamMembers = Array.isArray(reg?.teamMembers) ? reg.teamMembers : [];
-    teamMembers.forEach((member) => {
-      pushRecipient(member?.email, member?.name, "member");
-    });
-
-    if (recipients.length > 0) {
-      recipientMap.set(ownerId, recipients);
-    }
-  });
-
-  return recipientMap;
-};
-
-const buildNotificationReceipt = (item) => ({
-  userId: item.recipient?.userId || null,
-  name: item.recipient?.name || "User",
-  email: item.recipient?.email || "",
-  role: item.recipient?.role || "USER",
-  isRead: Boolean(item.isRead),
-  readAt: item.readAt || null,
-  sentAt: item.createdAt || null,
-  emailStatus: item.emailDelivery?.status || "NOT_REQUESTED",
-  emailTrackingMode: item.emailDelivery?.trackingMode || "PROVIDER_ACCEPTANCE",
-  emailAcceptedAt:
-    item.emailDelivery?.acceptedAt || item.emailDelivery?.deliveredAt || null,
-  emailDeliveredAt: item.emailDelivery?.deliveredAt || null,
-  emailOpenedAt: item.emailDelivery?.openedAt || null,
-  emailOpenCount: Number(item.emailDelivery?.openCount || 0),
-  emailLastAttemptAt: item.emailDelivery?.lastAttemptAt || null,
-  emailAttempts: Number(item.emailDelivery?.attempts || 0),
-  emailLastError: item.emailDelivery?.lastError || ""
-});
-
-const resolveWebhookNotificationId = (event) =>
-  String(
-    event?.notificationId ||
-      event?.custom_args?.notificationId ||
-      event?.customArgs?.notificationId ||
-      ""
-  ).trim();
-
-const getNotificationEmailWebhookSecret = () =>
-  String(process.env.EMAIL_EVENT_WEBHOOK_SECRET || "").trim();
-
-const isNotificationEmailWebhookConfigured = () =>
-  Boolean(getNotificationEmailWebhookSecret());
-
-const isNotificationEmailWebhookAuthorized = (req) => {
-  const configuredSecret = getNotificationEmailWebhookSecret();
-  if (!configuredSecret) return false;
-
-  const providedSecret = String(
-    req.headers["x-email-webhook-secret"] ||
-      req.query?.secret ||
-      req.body?.secret ||
-      ""
-  ).trim();
-
-  return configuredSecret === providedSecret;
-};
 
 // Get all unread notifications for logged in user
 export const getMyNotifications = async (req, res, next) => {
@@ -139,10 +17,7 @@ export const getMyNotifications = async (req, res, next) => {
     const includeAll = String(req.query.all || "").toLowerCase() === "true";
     const baseFilter = { "recipient.userId": req.user._id };
 
-    const query = Notification.find(baseFilter)
-      .select(INBOX_NOTIFICATION_FIELDS)
-      .sort({ createdAt: -1 })
-      .lean();
+    const query = Notification.find(baseFilter).sort({ createdAt: -1 });
     if (!includeAll) {
       query.skip((page - 1) * limit).limit(limit);
     }
@@ -214,6 +89,7 @@ export const markOneRead = async (req, res, next) => {
 // Admin broadcast/message to users
 export const adminSendNotification = async (req, res, next) => {
   try {
+    const normalizeId = (value) => String(value || "").trim();
     const ids = Array.isArray(req.body?.userIds)
       ? req.body.userIds
       : req.body?.userId
@@ -273,8 +149,7 @@ export const adminSendNotification = async (req, res, next) => {
           message,
           type: mode,
           refId: req.user?._id || null,
-          groupId,
-          sendEmailCopy: mode === "NOTICE"
+          groupId
         })
       )
     );
@@ -298,6 +173,7 @@ export const adminSendNotification = async (req, res, next) => {
 // Organizer event-scoped broadcast/message
 export const organizerSendNotification = async (req, res, next) => {
   try {
+    const normalizeId = (value) => String(value || "").trim();
     const ids = Array.isArray(req.body?.userIds)
       ? req.body.userIds
       : req.body?.userId
@@ -378,21 +254,27 @@ export const organizerSendNotification = async (req, res, next) => {
       emailUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
     }
 
-    const registrations = await EventRegistration.find({ event: eventId }).select(
-      "registeredBy teamLeader.name teamLeader.email teamMembers.name teamMembers.email"
-    );
-    const audience = collectOrganizerEventAudience(
-      registrations,
-      Boolean(event?.isTeamEvent)
-    );
+    const registrations = await EventRegistration.find({ event: eventId }).select("registeredBy teamLeader.email");
 
-    audience.allowedIds.forEach((id) => allowedIds.add(id));
+    if (event?.isTeamEvent) {
+      const leaderEmailSet = new Set();
+      registrations.forEach((reg) => {
+        const regId = normalizeId(reg?.registeredBy);
+        if (regId) allowedIds.add(regId);
+        const email = String(reg?.teamLeader?.email || "").trim().toLowerCase();
+        if (email) leaderEmailSet.add(email);
+      });
 
-    if (audience.participantEmails.size) {
-      const participantUsers = await User.find({
-        email: { $in: Array.from(audience.participantEmails) }
-      }).select("_id");
-      participantUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
+      if (leaderEmailSet.size) {
+        const leaderEmails = Array.from(leaderEmailSet);
+        const leaderUsers = await User.find({ email: { $in: leaderEmails } }).select("_id");
+        leaderUsers.forEach((user) => allowedIds.add(normalizeId(user?._id)));
+      }
+    } else {
+      registrations.forEach((reg) => {
+        const regId = normalizeId(reg?.registeredBy);
+        if (regId) allowedIds.add(regId);
+      });
     }
 
     if (requesterId) allowedIds.delete(requesterId);
@@ -405,73 +287,10 @@ export const organizerSendNotification = async (req, res, next) => {
       });
     }
 
-    const directRecipients = await User.find({ _id: { $in: validRecipientIds } }).select(
+    const recipients = await User.find({ _id: { $in: validRecipientIds } }).select(
       "_id fullName role email"
     );
-    const notificationTargets = new Map();
 
-    directRecipients.forEach((user) => {
-      const key = normalizeId(user?._id);
-      if (!key) return;
-      notificationTargets.set(key, {
-        recipientId: user._id,
-        recipientName: user.fullName || "User",
-        recipientRole: user.role || "STUDENT",
-        recipientEmail: user.email || ""
-      });
-    });
-
-    if (mode === "NOTICE" && Boolean(event?.isTeamEvent)) {
-      const teamRecipientMap = buildTeamNoticeRecipientMap(registrations);
-      const expandedEmails = new Map();
-
-      validRecipientIds.forEach((id) => {
-        const recipients = teamRecipientMap.get(id);
-        if (!recipients) return;
-        recipients.forEach((recipient) => {
-          if (recipient?.email) {
-            expandedEmails.set(recipient.email, recipient);
-          }
-        });
-      });
-
-      const expandedEmailList = Array.from(expandedEmails.keys());
-      if (expandedEmailList.length > 0) {
-        const expandedUsers = await User.find({
-          email: { $in: expandedEmailList }
-        }).select("_id fullName role email");
-        const userByEmail = new Map(
-          expandedUsers.map((user) => [normalizeEmail(user?.email), user])
-        );
-        const requesterEmail = normalizeEmail(req.user?.email);
-
-        expandedEmails.forEach((recipient, email) => {
-          const matchedUser = userByEmail.get(email);
-          if (matchedUser?._id) {
-            const matchedUserId = normalizeId(matchedUser._id);
-            if (!matchedUserId || matchedUserId === requesterId) return;
-            notificationTargets.set(matchedUserId, {
-              recipientId: matchedUser._id,
-              recipientName: matchedUser.fullName || recipient.name || "Participant",
-              recipientRole: matchedUser.role || "STUDENT",
-              recipientEmail: matchedUser.email || email
-            });
-            return;
-          }
-
-          if (email && email !== requesterEmail) {
-            notificationTargets.set(`email:${email}`, {
-              recipientId: null,
-              recipientName: recipient.name || "Participant",
-              recipientRole: "STUDENT",
-              recipientEmail: email
-            });
-          }
-        });
-      }
-    }
-
-    const recipients = Array.from(notificationTargets.values());
     if (!recipients.length) {
       return res.status(404).json({
         success: false,
@@ -482,10 +301,10 @@ export const organizerSendNotification = async (req, res, next) => {
     const sendResults = await Promise.all(
       recipients.map((user) =>
         sendNotification({
-          recipientId: user.recipientId,
-          recipientName: user.recipientName,
-          recipientRole: user.recipientRole,
-          recipientEmail: user.recipientEmail,
+          recipientId: user._id,
+          recipientName: user.fullName || "User",
+          recipientRole: user.role,
+          recipientEmail: user.email,
           senderId: req.user?._id || null,
           senderName: req.user?.fullName || "Organizer",
           senderRole: req.user?.role || "ORGANIZER",
@@ -493,16 +312,12 @@ export const organizerSendNotification = async (req, res, next) => {
           message,
           type: mode,
           refId: event._id,
-          groupId,
-          sendEmailCopy: mode === "NOTICE"
+          groupId
         })
       )
     );
 
-    const resolvedIds = recipients
-      .map((user) => normalizeId(user?.recipientId))
-      .filter(Boolean);
-    const emailOnlyCount = recipients.filter((user) => !user?.recipientId).length;
+    const resolvedIds = recipients.map((user) => normalizeId(user?._id));
     const skipped = uniqueIds.filter((id) => !resolvedIds.includes(id));
     const sentCount = sendResults.filter(Boolean).length;
 
@@ -510,7 +325,6 @@ export const organizerSendNotification = async (req, res, next) => {
       success: true,
       count: sentCount,
       sentTo: resolvedIds,
-      emailOnlyCount,
       skipped,
       groupId
     });
@@ -578,25 +392,7 @@ export const getOrganizerSentGroups = async (req, res, next) => {
           type: { $first: "$type" },
           createdAt: { $first: "$createdAt" },
           total: { $sum: 1 },
-          readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
-          emailRequestedCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.requested", true] }, 1, 0] }
-          },
-          emailSentCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "SENT"] }, 1, 0] }
-          },
-          emailFailedCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "FAILED"] }, 1, 0] }
-          },
-          emailPendingCount: {
-            $sum: {
-              $cond: [
-                { $in: ["$emailDelivery.status", ["PENDING", "PROCESSING"]] },
-                1,
-                0
-              ]
-            }
-          }
+          readCount: { $sum: { $cond: ["$isRead", 1, 0] } }
         }
       },
       { $sort: { createdAt: -1 } }
@@ -617,11 +413,7 @@ export const getOrganizerSentGroups = async (req, res, next) => {
         type: group.type,
         createdAt: group.createdAt,
         total: group.total,
-        readCount: group.readCount,
-        emailRequestedCount: group.emailRequestedCount || 0,
-        emailSentCount: group.emailSentCount || 0,
-        emailFailedCount: group.emailFailedCount || 0,
-        emailPendingCount: group.emailPendingCount || 0
+        readCount: group.readCount
       }))
     });
   } catch (error) {
@@ -673,10 +465,18 @@ export const getOrganizerGroupReceipts = async (req, res, next) => {
       "sender.userId": req.user?._id,
       refId: eventId
     })
-      .select("recipient isRead readAt createdAt emailDelivery")
+      .select("recipient isRead readAt createdAt")
       .sort({ "recipient.name": 1 });
 
-    const receipts = notifications.map(buildNotificationReceipt);
+    const receipts = notifications.map((item) => ({
+      userId: item.recipient?.userId,
+      name: item.recipient?.name || "User",
+      email: item.recipient?.email || "",
+      role: item.recipient?.role || "USER",
+      isRead: Boolean(item.isRead),
+      readAt: item.readAt || null,
+      sentAt: item.createdAt || null
+    }));
 
     const readCount = receipts.filter((item) => item.isRead).length;
 
@@ -715,25 +515,7 @@ export const getAdminSentGroups = async (req, res, next) => {
           type: { $first: "$type" },
           createdAt: { $first: "$createdAt" },
           total: { $sum: 1 },
-          readCount: { $sum: { $cond: ["$isRead", 1, 0] } },
-          emailRequestedCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.requested", true] }, 1, 0] }
-          },
-          emailSentCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "SENT"] }, 1, 0] }
-          },
-          emailFailedCount: {
-            $sum: { $cond: [{ $eq: ["$emailDelivery.status", "FAILED"] }, 1, 0] }
-          },
-          emailPendingCount: {
-            $sum: {
-              $cond: [
-                { $in: ["$emailDelivery.status", ["PENDING", "PROCESSING"]] },
-                1,
-                0
-              ]
-            }
-          }
+          readCount: { $sum: { $cond: ["$isRead", 1, 0] } }
         }
       },
       { $sort: { createdAt: -1 } }
@@ -754,11 +536,7 @@ export const getAdminSentGroups = async (req, res, next) => {
         type: group.type,
         createdAt: group.createdAt,
         total: group.total,
-        readCount: group.readCount,
-        emailRequestedCount: group.emailRequestedCount || 0,
-        emailSentCount: group.emailSentCount || 0,
-        emailFailedCount: group.emailFailedCount || 0,
-        emailPendingCount: group.emailPendingCount || 0
+        readCount: group.readCount
       }))
     });
   } catch (error) {
@@ -782,10 +560,18 @@ export const getAdminGroupReceipts = async (req, res, next) => {
       groupId,
       "sender.userId": req.user?._id
     })
-      .select("recipient isRead readAt createdAt emailDelivery")
+      .select("recipient isRead readAt createdAt")
       .sort({ "recipient.name": 1 });
 
-    const receipts = notifications.map(buildNotificationReceipt);
+    const receipts = notifications.map((item) => ({
+      userId: item.recipient?.userId,
+      name: item.recipient?.name || "User",
+      email: item.recipient?.email || "",
+      role: item.recipient?.role || "USER",
+      isRead: Boolean(item.isRead),
+      readAt: item.readAt || null,
+      sentAt: item.createdAt || null
+    }));
 
     const readCount = receipts.filter((item) => item.isRead).length;
 
@@ -794,72 +580,6 @@ export const getAdminGroupReceipts = async (req, res, next) => {
       count: receipts.length,
       readCount,
       data: receipts
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const recordNotificationEmailEvents = async (req, res, next) => {
-  try {
-    if (!isNotificationEmailWebhookConfigured()) {
-      return res.status(404).json({
-        success: false,
-        message: "Not found"
-      });
-    }
-
-    if (!isNotificationEmailWebhookAuthorized(req)) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email webhook secret"
-      });
-    }
-
-    const events = Array.isArray(req.body) ? req.body : [];
-    let updated = 0;
-
-    for (const event of events) {
-      const notificationId = resolveWebhookNotificationId(event);
-      if (!notificationId || !mongoose.Types.ObjectId.isValid(notificationId)) continue;
-
-      const eventName = String(event?.event || "").trim().toLowerCase();
-      const update = {};
-
-      if (eventName === "delivered") {
-        update["emailDelivery.deliveredAt"] = new Date();
-        update["emailDelivery.status"] = "SENT";
-      } else if (eventName === "open") {
-        update["emailDelivery.openedAt"] = new Date();
-      } else if (eventName === "bounce" || eventName === "dropped" || eventName === "spamreport") {
-        update["emailDelivery.status"] = "FAILED";
-        update["emailDelivery.lastError"] = String(
-          event?.reason || event?.response || eventName
-        ).slice(0, 500);
-      } else if (eventName === "deferred") {
-        update["emailDelivery.status"] = "PROCESSING";
-        update["emailDelivery.lastError"] = String(
-          event?.reason || event?.response || "Delivery deferred"
-        ).slice(0, 500);
-      } else {
-        continue;
-      }
-
-      const updateOperation = { $set: update };
-      if (eventName === "open") {
-        updateOperation.$inc = { "emailDelivery.openCount": 1 };
-      }
-
-      const result = await Notification.updateOne(
-        { _id: notificationId },
-        updateOperation
-      );
-      updated += Number(result?.modifiedCount || 0);
-    }
-
-    return res.status(200).json({
-      success: true,
-      updated
     });
   } catch (error) {
     next(error);

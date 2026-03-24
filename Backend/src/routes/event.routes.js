@@ -11,7 +11,6 @@ import {
   completeEvent,
   updateEvent,
   getEvent,
-  getEventContactAudience,
   assignCoordinator,
   getMyEvents,
   getMyAssignedEvents
@@ -25,8 +24,7 @@ router.post(
   roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
   eventUpload.fields([
     { name: "poster", maxCount: 1 },
-    { name: "resourceFile", maxCount: 1 },
-    { name: "paymentQr", maxCount: 1 }
+    { name: "resourceFile", maxCount: 1 }
   ]),
   createEventController
 );
@@ -43,13 +41,6 @@ router.get(
   authMiddleware,
   roleMiddleware("STUDENT_COORDINATOR", "STUDENT"),
   getMyAssignedEvents
-);
-
-router.get(
-  "/:id/contact-audience",
-  authMiddleware,
-  roleMiddleware("MAIN_ADMIN", "ORGANIZER"),
-  getEventContactAudience
 );
 
 router.patch(
@@ -77,11 +68,6 @@ router.patch(
 router.patch(
   "/:id",
   authMiddleware,
-  eventUpload.fields([
-    { name: "poster", maxCount: 1 },
-    { name: "resourceFile", maxCount: 1 },
-    { name: "paymentQr", maxCount: 1 }
-  ]),
   updateEvent
 );
 

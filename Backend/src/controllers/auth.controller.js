@@ -10,17 +10,8 @@ import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 import { validateRegister } from "../validators/auth.validator.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
 import { sendPendingTeamInvitesForUser } from "../services/registration.service.js";
-import {
-  createRefreshSessionRecord,
-  ensureRefreshSessions,
-  removeRefreshSession,
-  touchRefreshSession,
-  upsertRefreshSession,
-} from "../utils/sessionTracker.js";
-import { countRecentLogins, recordLoginHistoryEntry } from "../utils/loginHistory.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
-const INTERACTIVE_EMAIL_OPTIONS = Object.freeze({ deliveryProfile: "interactive" });
 
 const clampNumber = (value, min, max, fallback) => {
   const numeric = Number(value);
@@ -64,22 +55,8 @@ const buildAuthUser = (user) => {
     educationLevel: user.educationLevel || "",
     academicProfile: user.academicProfile || {},
     professionalProfile: user.professionalProfile || {},
-    avatar: user.avatar || null,
-    lastLoginAt: user.lastLoginAt || null,
-    loginCount30d: countRecentLogins(user, 30),
+    avatar: user.avatar || null
   };
-};
-
-const AUTH_SELECT_FIELDS = "+password +refreshToken +refreshSessions +loginHistory";
-
-const findSessionByRefreshToken = (user, token) => {
-  const submittedToken = String(token || "").trim();
-  if (!submittedToken) return null;
-  return (
-    ensureRefreshSessions(user).find(
-      (session) => String(session.refreshToken || "").trim() === submittedToken
-    ) || null
-  );
 };
 
 const buildVerificationOtpPayload = () => ({
@@ -97,22 +74,12 @@ const buildEmailDeliveryError = (
 
 const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }) => {
   try {
-    await sendEmail(
-      email,
-      "Verify Email - EventMate",
-      verifyEmailTemplate({ name: fullName, otp }),
-      INTERACTIVE_EMAIL_OPTIONS
-    );
+    await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
   } catch (error) {
     const deliveryError = buildEmailDeliveryError(failureMessage);
     deliveryError.cause = error;
     throw deliveryError;
   }
-};
-
-const logOtpDeliveryIssue = (context, error) => {
-  const rootCause = error?.cause?.message || error?.message || "Unknown email error";
-  console.error(`${context}: ${rootCause}`);
 };
 
 const isSelfRegisteredStudent = (user) =>
@@ -132,18 +99,13 @@ export const registerUserController = asyncHandler(async (req, res) => {
 
   if (existingUser) {
     if (existingUser.emailVerified) {
-      return res.status(200).json({
-        success: true,
-        message: "This email is already registered. Please log in to continue.",
-        nextStep: "login",
-      });
+      return res.status(409).json({ success: false, message: "Email already registered" });
     }
 
     if (!isSelfRegisteredStudent(existingUser)) {
-      return res.status(200).json({
-        success: true,
-        message: "This email is already linked to an invited account. Please verify it or contact the admin.",
-        nextStep: "verify_email",
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered. Please verify the account or contact admin.",
       });
     }
 
@@ -154,30 +116,18 @@ export const registerUserController = asyncHandler(async (req, res) => {
     existingUser.otpExpiry = otpExpiry;
     await persistAuthUser(existingUser);
 
-    try {
-      await sendVerificationOtpEmail({
-        email: normalizedEmail,
-        fullName: normalizedFullName,
-        otp,
-        failureMessage:
-          "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
-      });
+    await sendVerificationOtpEmail({
+      email: normalizedEmail,
+      fullName: normalizedFullName,
+      otp,
+      failureMessage:
+        "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
+    });
 
-      return res.status(200).json({
-        success: true,
-        message: "Your account already exists. A new OTP has been sent to your email.",
-        nextStep: "verify_email",
-      });
-    } catch (error) {
-      logOtpDeliveryIssue("Existing account OTP delivery delayed", error);
-      return res.status(202).json({
-        success: true,
-        message:
-          "Your account already exists, but the OTP could not be delivered right now. Please use resend OTP in a few minutes.",
-        nextStep: "verify_email",
-        deliveryPending: true,
-      });
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Account already exists but isn't verified. A new OTP has been sent to your email.",
+    });
   }
 
   const user = await User.create({
@@ -196,22 +146,12 @@ export const registerUserController = asyncHandler(async (req, res) => {
       failureMessage:
         "We couldn't deliver the verification OTP right now. Please try signing up again in a moment.",
     });
-
-    return res.status(201).json({
-      success: true,
-      message: "Registered successfully. OTP sent to email.",
-      nextStep: "verify_email",
-    });
   } catch (error) {
-    logOtpDeliveryIssue("New account OTP delivery delayed", error);
-    return res.status(202).json({
-      success: true,
-      message:
-        "Your account was created, but the OTP could not be delivered right now. Please use resend OTP in a few minutes.",
-      nextStep: "verify_email",
-      deliveryPending: true,
-    });
+    await User.deleteOne({ _id: user._id });
+    throw error;
   }
+
+  res.status(201).json({ success: true, message: "Registered successfully. OTP sent to email." });
 });
 
 export const resendVerificationOtpController = asyncHandler(async (req, res) => {
@@ -234,25 +174,15 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
   user.otpExpiry = otpExpiry;
   await persistAuthUser(user);
 
-  try {
-    await sendVerificationOtpEmail({
-      email: normalizedEmail,
-      fullName: user.fullName || "User",
-      otp,
-      failureMessage:
-        "We couldn't resend the verification OTP right now. Please try again in a moment.",
-    });
+  await sendVerificationOtpEmail({
+    email: normalizedEmail,
+    fullName: user.fullName || "User",
+    otp,
+    failureMessage:
+      "We couldn't resend the verification OTP right now. Please try again in a moment.",
+  });
 
-    return res.json({ success: true, message: "A new OTP has been sent to your email." });
-  } catch (error) {
-    logOtpDeliveryIssue("Verification OTP resend delayed", error);
-    return res.status(202).json({
-      success: true,
-      message: "We couldn't send a new OTP right now. Please try again in a few minutes.",
-      nextStep: "verify_email",
-      deliveryPending: true,
-    });
-  }
+  res.json({ success: true, message: "A new OTP has been sent to your email." });
 });
 
 // ---------------- VERIFY EMAIL ----------------
@@ -276,11 +206,10 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
 // ---------------- LOGIN ----------------
 export const loginController = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail || !password)
+  if (!email || !password)
     return res.status(400).json({ success: false, message: "Email and password required" });
 
-  const user = await User.findOne({ email: normalizedEmail }).select(AUTH_SELECT_FIELDS);
+  const user = await User.findOne({ email }).select("+password +refreshToken");
   if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
   const settings = await getSecuritySettings();
@@ -347,16 +276,11 @@ export const loginController = asyncHandler(async (req, res) => {
   const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
   const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
-  const sessionRecord = createRefreshSessionRecord(req, "", undefined);
-  const tokenPayload = { userId: user._id, sessionId: sessionRecord.sessionId };
-  const accessToken = generateAccessToken(tokenPayload, `${accessMinutes}m`);
-  const refreshToken = generateRefreshToken(tokenPayload, `${refreshDays}d`);
+  const accessToken = generateAccessToken(user._id, `${accessMinutes}m`);
+  const refreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
 
-  sessionRecord.refreshToken = refreshToken;
-  upsertRefreshSession(user, sessionRecord);
-  user.refreshToken = null;
+  user.refreshToken = refreshToken;
   user.lastLoginAt = new Date();
-  recordLoginHistoryEntry(user, user.lastLoginAt);
   await persistAuthUser(user);
 
   sendPendingTeamInvitesForUser(user).catch((error) => {
@@ -377,12 +301,9 @@ export const logoutController = asyncHandler(async (req, res) => {
   const userId = req.user?._id;
   if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-  const user = await User.findById(userId).select(AUTH_SELECT_FIELDS);
+  const user = await User.findById(userId).select("+refreshToken");
   if (user) {
-    const removedCurrentSession = removeRefreshSession(user, req.authSessionId);
-    if (!removedCurrentSession) {
-      user.refreshToken = null;
-    }
+    user.refreshToken = null;
     await persistAuthUser(user);
   }
 
@@ -397,24 +318,9 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findById(decoded.userId).select(AUTH_SELECT_FIELDS);
+    const user = await User.findById(decoded.userId).select("+refreshToken");
 
-    if (!user) {
-      return res.status(403).json({ success: false, message: "Invalid refresh token" });
-    }
-
-    let session = findSessionByRefreshToken(user, refreshToken);
-    if (!session && user.refreshToken?.trim() === refreshToken?.trim()) {
-      const migratedSession = createRefreshSessionRecord(
-        req,
-        refreshToken,
-        decoded.sessionId || undefined
-      );
-      session = upsertRefreshSession(user, migratedSession);
-      user.refreshToken = null;
-    }
-
-    if (!session) {
+    if (!user || user.refreshToken?.trim() !== refreshToken?.trim()) {
       return res.status(403).json({ success: false, message: "Invalid refresh token" });
     }
 
@@ -422,19 +328,17 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
     const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
     const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
-    const tokenPayload = { userId: user._id, sessionId: session.sessionId };
-    const newAccessToken = generateAccessToken(tokenPayload, `${accessMinutes}m`);
-    const newRefreshToken = generateRefreshToken(tokenPayload, `${refreshDays}d`);
+    // Generate new tokens
+    const newAccessToken = generateAccessToken(user._id, `${accessMinutes}m`);
+    const newRefreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
 
-    touchRefreshSession(user, session.sessionId, req, { refreshToken: newRefreshToken });
-    user.refreshToken = null;
+    user.refreshToken = newRefreshToken;
     await persistAuthUser(user);
 
     res.json({
       success: true,
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      user: buildAuthUser(user),
     });
   } catch (err) {
     return res.status(403).json({ success: false, message: "Invalid or expired refresh token" });

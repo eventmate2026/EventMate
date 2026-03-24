@@ -9,13 +9,10 @@ import {
   MessageSquarePlus,
   Star,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
+import { useNavigate } from "react-router-dom";
+import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { useToast } from "../context/ToastContext";
-import { useToastFeedback } from "../hooks/useToastFeedback";
-import { canSubmitRegistrationFeedback, getEligibleFeedbackRegistrations } from "../lib/feedbackEligibility";
 
 const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
 
@@ -49,6 +46,15 @@ const formatTimeRange = (startTime, endTime) => {
   return "Time TBD";
 };
 
+const isEventCompleted = (row) => {
+  const status = String(row?.eventStatus || "").trim();
+  if (status === "Completed") return true;
+
+  const eventDate = new Date(row?.eventStartDate || 0).getTime();
+  if (Number.isNaN(eventDate)) return false;
+  return Date.now() > eventDate;
+};
+
 const loadSubmittedEventIds = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(FEEDBACK_SUBMITTED_KEY) || "[]");
@@ -64,18 +70,16 @@ const saveSubmittedEventIds = (ids) => {
 
 export default function StudentFeedbackPending() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const toast = useToast();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [modal, setModal] = useState(null);
   const [expandedEventId, setExpandedEventId] = useState("");
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
   const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedEventIds());
-  useToastFeedback(error, { defaultType: "error" });
-  const requestedEventId = String(location.state?.eventId || "").trim();
 
   useEffect(() => {
     const loadRows = async () => {
@@ -86,7 +90,8 @@ export default function StudentFeedbackPending() {
         const response = await fetchMyRegistrations();
         setWarning(response.warning);
         setRows(
-          getEligibleFeedbackRegistrations(response.rows, { submittedEventIds })
+          response.rows
+            .filter((row) => isEventCompleted(row))
             .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
@@ -105,6 +110,10 @@ export default function StudentFeedbackPending() {
     loadRows();
   }, [submittedEventIds]);
 
+  const handleModalClose = () => {
+    setModal(null);
+  };
+
   const feedbackRows = useMemo(
     () =>
       rows.map((row) => {
@@ -114,20 +123,12 @@ export default function StudentFeedbackPending() {
           ...row,
           attended,
           confirmed,
-          canSubmit: canSubmitRegistrationFeedback(row, { submittedEventIds }),
+          canSubmit: attended && confirmed && Boolean(row?.eventId),
           badgeDate: formatMonthDay(row?.eventStartDate),
         };
       }),
-    [rows, submittedEventIds]
+    [rows]
   );
-
-  useEffect(() => {
-    if (!requestedEventId) return;
-    const hasRequestedRow = feedbackRows.some((row) => String(row?.eventId || "").trim() === requestedEventId);
-    if (hasRequestedRow) {
-      setExpandedEventId(requestedEventId);
-    }
-  }, [feedbackRows, requestedEventId]);
 
   const markEventAsSubmitted = (eventId) => {
     const normalized = String(eventId || "").trim();
@@ -167,16 +168,24 @@ export default function StudentFeedbackPending() {
     const draft = drafts[eventId] || { rating: "", comment: "" };
     const rating = Number(draft.rating);
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
-      toast.error("Please select a rating between 1 and 5.");
+      const payload = { type: "error", text: "Please select a rating between 1 and 5." };
+      setNotice(payload);
+      setModal(payload);
       return;
     }
 
     if (!row?.canSubmit) {
-      toast.error("Feedback requires confirmed registration and marked attendance.");
+      const payload = {
+        type: "error",
+        text: "Feedback requires confirmed registration and marked attendance.",
+      };
+      setNotice(payload);
+      setModal(payload);
       return;
     }
 
     setSubmittingEventId(eventId);
+    setNotice(null);
     try {
       const response = await api({
         ...SummaryApi.submit_feedback,
@@ -186,17 +195,27 @@ export default function StudentFeedbackPending() {
           comment: String(draft.comment || "").trim() || undefined,
         },
       });
-      toast.success(response.data?.message || "Feedback submitted successfully.");
-      invalidateMyRegistrationsCache();
+      const payload = {
+        type: "success",
+        text: response.data?.message || "Feedback submitted successfully.",
+      };
+      setNotice(payload);
+      setModal(payload);
       markEventAsSubmitted(eventId);
     } catch (submitError) {
       const backendMessage = submitError?.response?.data?.message || "Unable to submit feedback.";
       if (/already submitted/i.test(backendMessage)) {
-        toast.success("Feedback for this event was already submitted. Removed from pending queue.");
-        invalidateMyRegistrationsCache();
+        const payload = {
+          type: "success",
+          text: "Feedback for this event was already submitted. Removed from pending queue.",
+        };
+        setNotice(payload);
+        setModal(payload);
         markEventAsSubmitted(eventId);
       } else {
-        toast.error(backendMessage);
+        const payload = { type: "error", text: backendMessage };
+        setNotice(payload);
+        setModal(payload);
       }
     } finally {
       setSubmittingEventId("");
@@ -210,7 +229,37 @@ export default function StudentFeedbackPending() {
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-4 pb-12">
+    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
+                modal.type === "success"
+                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
+                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
+              }`}
+            >
+              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
+            </div>
+            <h2 className="mt-4 text-xl font-semibold">
+              {modal.type === "success" ? "Thank You!" : "Unable to Submit"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
+                modal.type === "success"
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-rose-500 hover:bg-rose-600"
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 space-y-6">
         <button
           type="button"
@@ -227,6 +276,18 @@ export default function StudentFeedbackPending() {
             Submit feedback for completed events to unlock certificate flow.
           </p>
         </header>
+
+        {notice && (
+          <p
+            className={`rounded-lg px-3 py-2 text-sm ${
+              notice.type === "success"
+                ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
+            }`}
+          >
+            {notice.text}
+          </p>
+        )}
 
         {warning && (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
@@ -316,9 +377,9 @@ export default function StudentFeedbackPending() {
 
                         {expanded && (
                           <div className="mt-4 space-y-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/5 p-3">
-                            <fieldset>
-                              <legend className="text-xs font-medium text-slate-600 dark:text-slate-300">Rating (1 to 5)</legend>
-                              <div className="mt-2 flex items-center gap-2" role="group" aria-label="Rating from 1 to 5">
+                            <div>
+                              <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Rating (1 to 5)</label>
+                              <div className="mt-2 flex items-center gap-2">
                                 {[1, 2, 3, 4, 5].map((ratingValue) => (
                                   <button
                                     key={`${eventId}-rating-${ratingValue}`}
@@ -335,17 +396,10 @@ export default function StudentFeedbackPending() {
                                   </button>
                                 ))}
                               </div>
-                            </fieldset>
+                            </div>
                             <div>
-                              <label
-                                htmlFor={`feedback-comment-${eventId}`}
-                                className="text-xs font-medium text-slate-600 dark:text-slate-300"
-                              >
-                                Comment (optional)
-                              </label>
+                              <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Comment (optional)</label>
                               <textarea
-                                id={`feedback-comment-${eventId}`}
-                                name={`feedbackComment-${eventId}`}
                                 rows={3}
                                 value={draft.comment}
                                 onChange={(inputEvent) => updateDraft(eventId, { comment: inputEvent.target.value })}

@@ -1,7 +1,6 @@
 import api from "./api";
 import SummaryApi from "../api/SummaryApi";
 import { clearAuth } from "./auth";
-import { invalidateMyRegistrationsCache } from "./registrationApi";
 
 export const logoutUser = async () => {
   try {
@@ -9,7 +8,6 @@ export const logoutUser = async () => {
   } catch {
     // Ignore logout errors and still clear local state.
   } finally {
-    invalidateMyRegistrationsCache();
     clearAuth();
   }
 };

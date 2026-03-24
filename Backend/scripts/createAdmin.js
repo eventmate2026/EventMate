@@ -8,11 +8,11 @@ dotenv.config();
 const createAdmin = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ Connected to MongoDB");
+    console.log("Connected to MongoDB");
 
     const adminExists = await User.findOne({ role: "MAIN_ADMIN" });
     if (adminExists) {
-      console.log("⚠️ MAIN_ADMIN already exists");
+      console.log("MAIN_ADMIN already exists");
       process.exit(0);
     }
 
@@ -26,10 +26,10 @@ const createAdmin = async () => {
       emailVerified: true
     });
 
-    console.log("✅ MAIN_ADMIN created successfully");
+    console.log("MAIN_ADMIN created successfully");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error creating MAIN_ADMIN:", err.message);
+    console.error("Error creating MAIN_ADMIN:", err.message);
     process.exit(1);
   }
 };

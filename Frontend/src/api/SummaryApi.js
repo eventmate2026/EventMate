@@ -45,11 +45,6 @@ const SummaryApi = {
     method: "put",
   },
 
-  revoke_profile_session: {
-    url: "/api/user/profile/sessions/:sessionId",
-    method: "delete",
-  },
-
   upload_avatar: {
     url: "/api/user/avatar",
     method: "post",
@@ -73,16 +68,6 @@ const SummaryApi = {
 
   get_contacts: {
     url: "/api/contact",
-    method: "get",
-  },
-
-  get_my_contacts: {
-    url: "/api/contact/my",
-    method: "get",
-  },
-
-  get_contact_admins: {
-    url: "/api/contact/admins",
     method: "get",
   },
 
@@ -168,11 +153,6 @@ const SummaryApi = {
     method: "get",
   },
 
-  get_event_contact_audience: {
-    url: "/api/events/:eventId/contact-audience",
-    method: "get",
-  },
-
   publish_event: {
     url: "/api/events/:eventId/publish",
     method: "patch",
@@ -196,18 +176,6 @@ const SummaryApi = {
   get_team_registration_status: {
     url: "/api/registrations/team/:registrationId/status",
     method: "get",
-  },
-  get_registration_payment: {
-    url: "/api/registrations/:registrationId/payment",
-    method: "get",
-  },
-  submit_registration_payment: {
-    url: "/api/registrations/:registrationId/payment",
-    method: "post",
-  },
-  review_registration_payment: {
-    url: "/api/registrations/:registrationId/payment/review",
-    method: "patch",
   },
 
   confirm_team_registration: {
@@ -246,10 +214,6 @@ const SummaryApi = {
   mark_attendance_by_token: {
     url: "/api/registrations/attendance/:token",
     method: "patch",
-  },
-  preview_attendance_by_token: {
-    url: "/api/registrations/attendance/:token/preview",
-    method: "get",
   },
 
   get_event_registrations: {

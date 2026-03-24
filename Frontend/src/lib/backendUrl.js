@@ -1,11 +1,6 @@
 const trimTrailingSlash = (value) => String(value || "").trim().replace(/\/+$/, "");
 
-const injectedApiUrl =
-  typeof __EVENTMATE_API_URL__ !== "undefined" ? __EVENTMATE_API_URL__ : "";
-
-const configuredBaseUrl = trimTrailingSlash(
-  import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || injectedApiUrl
-);
+const configuredBaseUrl = trimTrailingSlash(import.meta.env.VITE_API_URL);
 
 export const API_BASE_URL = configuredBaseUrl;
 

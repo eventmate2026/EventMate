@@ -1,5 +1,4 @@
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { buildScheduleDateTime } from "../lib/eventSchedule";
 
 const DEFAULT_EVENT_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80";
@@ -54,22 +53,12 @@ export const deriveEventStatus = (event) => {
   const workflowStatus = String(event?.status || "");
   if (workflowStatus === "Completed" || workflowStatus === "Cancelled") return "completed";
 
-  const startDateTime = buildScheduleDateTime(
-    event?.schedule?.startDate || event?.createdAt || 0,
-    event?.schedule?.startTime
-  );
-  const endDateTime = buildScheduleDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0,
-    event?.schedule?.endTime,
-    { fallbackToEndOfDay: true }
-  );
-  const nowTime = Date.now();
+  const startDate = toLocalDate(event?.schedule?.startDate || event?.createdAt || 0);
+  const endDate = toLocalDate(event?.schedule?.endDate || event?.schedule?.startDate || event?.createdAt || 0);
+  const now = toLocalDate(new Date());
 
-  if (endDateTime && nowTime > endDateTime.getTime()) return "completed";
-  if (startDateTime && endDateTime && nowTime >= startDateTime.getTime() && nowTime <= endDateTime.getTime()) {
-    return "current";
-  }
-
+  if (endDate && now && now > endDate) return "completed";
+  if (startDate && endDate && now && now >= startDate && now <= endDate) return "current";
   return "upcoming";
 };
 
@@ -107,31 +96,6 @@ const resolveRegistrationOpen = (event) => {
   const deadline = resolveRegistrationDeadline(event?.registration?.lastDate);
   if (!deadline) return true;
   return Date.now() <= deadline.getTime();
-};
-
-const mapPersonEntries = (entries) => {
-  if (!Array.isArray(entries)) return [];
-
-  return entries.reduce((rows, entry) => {
-    if (typeof entry === "string") {
-      const name = entry.trim();
-      if (name) rows.push({ name, organization: "", department: "", occupation: "" });
-      return rows;
-    }
-
-    if (!entry || typeof entry !== "object") return rows;
-
-    const name = String(entry?.name || entry?.fullName || "").trim();
-    const organization = String(entry?.organization || entry?.college || "").trim();
-    const department = String(entry?.department || entry?.branch || "").trim();
-    const occupation = String(entry?.occupation || entry?.role || "").trim();
-
-    if (name || organization || department || occupation) {
-      rows.push({ name: name || "TBA", organization, department, occupation });
-    }
-
-    return rows;
-  }, []);
 };
 
 const fallbackRequirements = (event) => {
@@ -229,8 +193,8 @@ export const mapApiEventToDetails = (event) => {
     description: event?.description || "No description available.",
     longDescription: event?.description || "No description available.",
     requirements: fallbackRequirements(event),
-    mentors: mapPersonEntries(event?.mentors),
-    judges: mapPersonEntries(event?.judges),
+    mentors: [],
+    judges: [],
     venue: event?.venue?.location || "Venue TBD",
     time: formatTimeRange(event?.schedule),
     startDate: event?.schedule?.startDate || event?.createdAt,

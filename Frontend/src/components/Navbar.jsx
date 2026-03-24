@@ -7,12 +7,7 @@ import {
   LogOut, 
   ChevronDown,
   Moon,
-  Sun,
-  Home,
-  Calendar,
-  Mail,
-  Users,
-  Shield
+  Sun
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -20,7 +15,6 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { getStoredToken } from "../lib/auth";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -43,12 +37,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const isPrivileged = isAdmin || isOrganizer;
   const displayName = user?.fullName || user?.name || 'User';
   const avatarUrl = user?.avatar || "";
-  const roleLabelMap = {
-    MAIN_ADMIN: "Main Admin",
-    ORGANIZER: "Organizer",
-    STUDENT_COORDINATOR: "Coordinator",
-    STUDENT: "Student",
-  };
   const avatarInitials = (displayName || "US")
     .split(" ")
     .filter(Boolean)
@@ -59,8 +47,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const isDark = theme === "dark";
   const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
-    "p-2 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
-    "dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
+    "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
+    "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
 
   const roleHomePath = {
     MAIN_ADMIN: "/admin-dashboard",
@@ -131,44 +119,14 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
     const unreadEventName = roleEventMap[user?.role];
     let mounted = true;
-    let requestInFlight = false;
-    let activeController = null;
 
     const fetchUnreadCount = async () => {
-      if (!getStoredToken()) {
-        if (mounted) setRoleUnreadCount(0);
-        return;
-      }
-
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-
-      if (requestInFlight) {
-        return;
-      }
-
-      activeController?.abort?.();
-      activeController = new AbortController();
-      requestInFlight = true;
-
       try {
-        const response = await api({
-          ...SummaryApi.get_my_notifications,
-          cacheTTL: 15000,
-          skipRetry: true,
-          timeout: 8000,
-          signal: activeController.signal,
-        });
+        const response = await api({ ...SummaryApi.get_my_notifications, cacheTTL: 8000 });
         const nextCount = Number(response?.data?.unreadCount || 0);
         if (mounted) setRoleUnreadCount(Number.isFinite(nextCount) ? Math.max(0, nextCount) : 0);
-      } catch (error) {
-        if (activeController?.signal?.aborted || error?.code === "ERR_CANCELED") {
-          return;
-        }
+      } catch {
         if (mounted) setRoleUnreadCount(0);
-      } finally {
-        requestInFlight = false;
       }
     };
 
@@ -179,17 +137,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void fetchUnreadCount();
-      }
-    };
-
     if (unreadEventName) {
       window.addEventListener(unreadEventName, handleUnreadEvent);
-    }
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", handleVisibilityChange);
     }
 
     fetchUnreadCount();
@@ -197,13 +146,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
     return () => {
       mounted = false;
-      activeController?.abort?.();
       clearInterval(intervalId);
       if (unreadEventName) {
         window.removeEventListener(unreadEventName, handleUnreadEvent);
-      }
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
       }
     };
   }, [isAuthenticated, isStudent, user?.role, location.pathname]);
@@ -241,102 +186,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     closeAdminUsersMenuImmediately();
   };
 
-  const scrollWindowTo = (top) => {
-    const nextTop = Math.max(0, Number(top) || 0);
-    const behavior = prefersReducedMotion ? "auto" : "smooth";
-    const scrollOptions = { top: nextTop, left: 0, behavior };
-
-    window.scrollTo(scrollOptions);
-
-    if (typeof document !== "undefined") {
-      document.documentElement?.scrollTo?.(scrollOptions);
-      document.body?.scrollTo?.(scrollOptions);
-    }
-  };
-
-  const scrollToTop = () => {
-    scrollWindowTo(0);
-  };
-
-  const scrollToPublicSection = (sectionId) => {
-    if (typeof document === "undefined") return false;
-
-    const targetElement = document.getElementById(String(sectionId || "").trim());
-    if (!targetElement) return false;
-
-    const navElement = document.querySelector("nav");
-    const navOffset = navElement instanceof HTMLElement ? navElement.offsetHeight : 72;
-    const top =
-      targetElement.getBoundingClientRect().top + window.scrollY - navOffset - 12;
-
-    scrollWindowTo(top);
-    return true;
-  };
-
-  const handlePublicSectionNavigation = (sectionId, event) => {
-    closeMenus();
-    event?.preventDefault?.();
-
-    const normalizedSection = String(sectionId || "home").trim().toLowerCase();
-    if (normalizedSection === "home") {
-      if (location.pathname !== "/" || location.hash) {
-        navigate("/", { replace: location.pathname === "/" });
-        requestAnimationFrame(() => {
-          requestAnimationFrame(scrollToTop);
-        });
-        return;
-      }
-
-      scrollToTop();
-      return;
-    }
-
-    const targetHash = `#${normalizedSection}`;
-    if (location.pathname === "/") {
-      if (location.hash !== targetHash) {
-        navigate({ pathname: "/", hash: targetHash });
-      }
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          scrollToPublicSection(normalizedSection);
-        });
-      });
-      return;
-    }
-
-    navigate({ pathname: "/", hash: targetHash });
-  };
-
-  const handlePublicHomeClick = (event) => {
-    handlePublicSectionNavigation("home", event);
-  };
-
   useEffect(() => {
     closeMenus();
   }, [location.pathname, location.hash, location.search]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return undefined;
-    }
-
-    const shouldLockScroll = isMobileMenuOpen || isMobileProfileOpen;
-    if (!shouldLockScroll) {
-      return undefined;
-    }
-
-    const { body, documentElement } = document;
-    const previousBodyOverflow = body.style.overflow;
-    const previousHtmlOverflow = documentElement.style.overflow;
-
-    body.style.overflow = "hidden";
-    documentElement.style.overflow = "hidden";
-
-    return () => {
-      body.style.overflow = previousBodyOverflow;
-      documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, [isMobileMenuOpen, isMobileProfileOpen]);
 
   const handleNavClick = (pageName) => {
     if (typeof setActivePage === "function") {
@@ -352,10 +204,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     }
 
     closeMenus();
-    const resetScroll = { top: 0, left: 0, behavior: "auto" };
-    window.scrollTo(resetScroll);
-    document.documentElement?.scrollTo?.(resetScroll);
-    document.body?.scrollTo?.(resetScroll);
+    window.scrollTo(0, 0);
   };
 
   // Helper to check active state
@@ -397,11 +246,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const navClass = isPublic
     ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm"
     : isPrivileged
-      ? "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
-      : "sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm";
+      ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
+      : "fixed inset-x-0 top-0 z-[110] bg-white/85 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.6)]";
   const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
-  const showMobileNotificationShortcut =
-    Boolean(isAuthenticated && !isPublic && currentNotificationsPath && !hideNavExtras);
   const isAdminUsersRoute =
     location.pathname.startsWith("/admin-dashboard/user-management") ||
     location.pathname.startsWith("/admin-dashboard/organizer-management") ||
@@ -411,24 +258,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const isAdminSecurityRoute = location.pathname.startsWith("/admin-dashboard/security-reports");
   const isAdminNotificationsRoute = location.pathname.startsWith("/admin-dashboard/notifications");
   const isAdminContactRoute = location.pathname.startsWith("/admin-dashboard/contact-center");
-  const isPublicHomeRoute = location.pathname === "/" && !location.hash;
-  const isPublicEventsRoute = location.hash === "#events";
-  const isPublicContactRoute = location.hash === "#contact";
-  const isOrganizerHomeRoute =
-    location.pathname === "/organizer-dashboard" ||
-    location.pathname === "/organizer-dashboard/";
-  const isOrganizerCoordinatorsRoute = location.pathname.startsWith("/organizer-dashboard/coordinator-management");
-  const isOrganizerContactRoute = location.pathname.startsWith("/organizer-dashboard/contact-admin");
-  const isCoordinatorHomeRoute =
-    location.pathname === "/coordinator-dashboard" ||
-    location.pathname === "/coordinator-dashboard/";
-  const isCoordinatorContactRoute = location.pathname.startsWith("/coordinator-dashboard/contact-admin");
-  const isStudentHomeRoute =
-    location.pathname === "/student-dashboard" ||
-    location.pathname === "/student-dashboard/";
-  const isStudentEventsRoute = location.pathname.startsWith("/student-dashboard/events");
-  const isStudentMyEventsRoute = location.pathname.startsWith("/student-dashboard/my-events");
-  const isStudentContactRoute = location.pathname.startsWith("/student-dashboard/contact-us");
   const chromeMotion = prefersReducedMotion
     ? {
         initial: { opacity: 1, y: 0 },
@@ -455,388 +284,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
   const mobileProfilePanelTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
-  const mobileMenuPanelMotion = prefersReducedMotion
-    ? {
-        initial: false,
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: 0, scale: 1 },
-      }
-    : {
-        initial: { opacity: 0, y: -12, scale: 0.97 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -10, scale: 0.985 },
-      };
-  const mobileMenuPanelTransition = prefersReducedMotion
-    ? { duration: 0 }
-    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
-  const mobileThemeButtonClass =
-    "inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white p-2 text-indigo-700 shadow-sm hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
-  const mobileMenuItemClass = (active = false) =>
-    `group flex w-full items-start gap-3 rounded-[22px] border px-3.5 py-3.5 text-left transition-all duration-200 ${
-      active
-        ? "border-indigo-200 bg-indigo-50/90 text-indigo-700 shadow-[0_16px_30px_-24px_rgba(79,70,229,0.65)] dark:border-indigo-400/35 dark:bg-indigo-500/15 dark:text-indigo-200"
-        : "border-transparent bg-slate-50/80 text-slate-700 hover:border-slate-200 hover:bg-white dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/10 dark:hover:bg-white/[0.07]"
-    }`;
-  const mobileMenuIconShellClass = (active = false) =>
-    `mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${
-      active
-        ? "border-indigo-200 bg-white text-indigo-600 dark:border-indigo-400/30 dark:bg-slate-950/60 dark:text-indigo-200"
-        : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-300"
-    }`;
-  const mobileMenuTitleClass = "block text-sm font-semibold leading-5";
-  const mobileMenuDescriptionClass = (active = false) =>
-    `block mt-1 text-[11px] leading-5 ${
-      active ? "text-indigo-500/90 dark:text-indigo-200/80" : "text-slate-500 dark:text-slate-400"
-    }`;
-  const mobileMenuSectionLabelClass =
-    "px-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500";
-  const mobileQuickActionClass =
-    "inline-flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-indigo-400/30 dark:hover:text-indigo-200";
-  const mobileMenuSections = isPublic
-    ? [
-        {
-          title: "Explore",
-          items: [
-            {
-              key: "public-home",
-              label: "Home",
-              description: "Jump to the main landing page.",
-              icon: Home,
-              to: "/",
-              onClick: (event) => handlePublicSectionNavigation("home", event),
-              active: isPublicHomeRoute,
-            },
-            {
-              key: "public-events",
-              label: "Events",
-              description: "Browse featured and upcoming experiences.",
-              icon: Calendar,
-              to: "/#events",
-              onClick: (event) => handlePublicSectionNavigation("events", event),
-              active: isPublicEventsRoute,
-            },
-            {
-              key: "public-contact",
-              label: "Contact us",
-              description: "Reach the team if you need help.",
-              icon: Mail,
-              to: "/#contact",
-              onClick: (event) => handlePublicSectionNavigation("contact", event),
-              active: isPublicContactRoute,
-            },
-          ],
-        },
-      ]
-    : isAdmin
-      ? [
-          {
-            title: "Control Center",
-            items: [
-              {
-                key: "admin-home",
-                label: "Home",
-                description: "Overview, metrics, and platform health.",
-                icon: Home,
-                to: "/admin-dashboard",
-                onClick: closeMenus,
-                active: location.pathname === "/admin-dashboard",
-              },
-              {
-                key: "admin-notifications",
-                label: "Notifications",
-                description: "Review alerts and outbound updates.",
-                icon: Bell,
-                to: "/admin-dashboard/notifications",
-                onClick: closeMenus,
-                active: isAdminNotificationsRoute,
-              },
-              {
-                key: "admin-contact",
-                label: "Contact Center",
-                description: "Handle user communication from one inbox.",
-                icon: Mail,
-                to: "/admin-dashboard/contact-center",
-                onClick: closeMenus,
-                active: isAdminContactRoute,
-              },
-            ],
-          },
-          {
-            title: "Management",
-            items: [
-              {
-                key: "admin-system",
-                label: "System Oversight",
-                description: "Monitor platform-wide operational data.",
-                icon: Shield,
-                to: "/admin-dashboard/system-oversight",
-                onClick: closeMenus,
-                active: isAdminSystemRoute,
-              },
-              {
-                key: "admin-users",
-                label: "User Management",
-                description: "View and manage the main user directory.",
-                icon: Users,
-                to: "/admin-dashboard/user-management",
-                onClick: closeMenus,
-                active: location.pathname.startsWith("/admin-dashboard/user-management"),
-              },
-              {
-                key: "admin-organizers",
-                label: "Organizer Management",
-                description: "Manage organizer accounts and access.",
-                icon: Users,
-                to: "/admin-dashboard/organizer-management",
-                onClick: closeMenus,
-                active: location.pathname.startsWith("/admin-dashboard/organizer-management"),
-              },
-              {
-                key: "admin-coordinators",
-                label: "Coordinator Management",
-                description: "Review and organize coordinator accounts.",
-                icon: Users,
-                to: "/admin-dashboard/coordinator-management",
-                onClick: closeMenus,
-                active: location.pathname.startsWith("/admin-dashboard/coordinator-management"),
-              },
-            ],
-          },
-          {
-            title: "Security",
-            items: [
-              {
-                key: "admin-certificates",
-                label: "Certificates & Audit Logs",
-                description: "Inspect verification and certificate activity.",
-                icon: Shield,
-                to: "/admin-dashboard/certificates-audit",
-                onClick: closeMenus,
-                active: isAdminCertificatesRoute,
-              },
-              {
-                key: "admin-security",
-                label: "Security & Reports",
-                description: "Review lockouts, sessions, and system reports.",
-                icon: Shield,
-                to: "/admin-dashboard/security-reports",
-                onClick: closeMenus,
-                active: isAdminSecurityRoute,
-              },
-            ],
-          },
-        ]
-      : isOrganizer
-        ? [
-            {
-              title: "Workspace",
-              items: [
-                {
-                  key: "organizer-home",
-                  label: "Home",
-                  description: "Manage your events and performance at a glance.",
-                  icon: Home,
-                  to: "/organizer-dashboard",
-                  onClick: closeMenus,
-                  active: isOrganizerHomeRoute,
-                },
-                {
-                  key: "organizer-coordinators",
-                  label: "Coordinators",
-                  description: "Assign and manage your event support team.",
-                  icon: Users,
-                  to: "/organizer-dashboard/coordinator-management",
-                  onClick: closeMenus,
-                  active: isOrganizerCoordinatorsRoute,
-                },
-              ],
-            },
-            {
-              title: "Support",
-              items: [
-                {
-                  key: "organizer-contact",
-                  label: "Contact Admin",
-                  description: "Reach admin support without leaving your flow.",
-                  icon: Mail,
-                  to: "/organizer-dashboard/contact-admin",
-                  onClick: closeMenus,
-                  active: isOrganizerContactRoute,
-                },
-              ],
-            },
-          ]
-        : isCoordinator
-          ? [
-              {
-                title: "Workspace",
-                items: [
-                  {
-                    key: "coordinator-home",
-                    label: "Home",
-                    description: "Check assigned event activity and tasks.",
-                    icon: Home,
-                    to: "/coordinator-dashboard",
-                    onClick: closeMenus,
-                    active: isCoordinatorHomeRoute,
-                  },
-                ],
-              },
-              {
-                title: "Support",
-                items: [
-                  {
-                    key: "coordinator-contact",
-                    label: "Contact Admin",
-                    description: "Send questions or escalation requests quickly.",
-                    icon: Mail,
-                    to: "/coordinator-dashboard/contact-admin",
-                    onClick: closeMenus,
-                    active: isCoordinatorContactRoute,
-                  },
-                ],
-              },
-            ]
-          : [
-              {
-                title: "Explore",
-                items: [
-                  {
-                    key: "student-home",
-                    label: "Home",
-                    description: "Return to your dashboard overview.",
-                    icon: Home,
-                    onSelect: () => handleNavClick("home"),
-                    active: isStudentHomeRoute,
-                  },
-                  {
-                    key: "student-events",
-                    label: "Events",
-                    description: "Browse active registrations and listings.",
-                    icon: Calendar,
-                    onSelect: () => handleNavClick("events"),
-                    active: isStudentEventsRoute,
-                  },
-                  {
-                    key: "student-my-events",
-                    label: "My Events",
-                    description: "Open your registered and attended events.",
-                    icon: Calendar,
-                    to: "/student-dashboard/my-events",
-                    onClick: closeMenus,
-                    active: isStudentMyEventsRoute,
-                  },
-                ],
-              },
-              {
-                title: "Support",
-                items: [
-                  {
-                    key: "student-contact",
-                    label: "Contact us",
-                    description: "Get help from the EventMate team.",
-                    icon: Mail,
-                    to: "/student-dashboard/contact-us",
-                    onClick: closeMenus,
-                    active: isStudentContactRoute,
-                  },
-                ],
-              },
-            ];
-  const mobileMenuQuickActions = isPublic
-    ? [
-        {
-          key: "public-login",
-          label: "Login",
-          to: "/login",
-          onClick: closeMenus,
-        },
-        {
-          key: "public-signup",
-          label: "Sign Up",
-          to: "/signup",
-          onClick: closeMenus,
-        },
-        {
-          key: "public-theme",
-          label: isDark ? "Light" : "Dark",
-          onSelect: () => {
-            toggleTheme();
-            closeMenus();
-          },
-        },
-      ]
-    : [
-        {
-          key: "profile",
-          label: "Profile",
-          onSelect: () => {
-            navigate(currentProfilePath);
-            closeMenus();
-          },
-        },
-        ...(!showMobileNotificationShortcut && currentNotificationsPath
-          ? [
-              {
-                key: "notifications",
-                label: roleUnreadCount > 0 ? `Alerts (${roleUnreadCount > 99 ? "99+" : roleUnreadCount})` : "Alerts",
-                onSelect: () => {
-                  navigate(currentNotificationsPath);
-                  closeMenus();
-                },
-              },
-            ]
-          : []),
-        {
-          key: "theme",
-          label: isDark ? "Light" : "Dark",
-          onSelect: () => {
-            toggleTheme();
-            closeMenus();
-          },
-        },
-      ];
-  const renderMobileMenuEntry = (item) => {
-    if (!item) return null;
-    const Icon = item.icon || Home;
-    const entryContent = (
-      <>
-        <span className={mobileMenuIconShellClass(item.active)}>
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <span className="min-w-0 flex flex-1 flex-col">
-          <span className={mobileMenuTitleClass}>{item.label}</span>
-          {item.description ? (
-            <span className={mobileMenuDescriptionClass(item.active)}>{item.description}</span>
-          ) : null}
-        </span>
-      </>
-    );
-
-    if (item.to) {
-      return (
-        <Link
-          key={item.key}
-          to={item.to}
-          onClick={item.onClick || closeMenus}
-          className={mobileMenuItemClass(item.active)}
-        >
-          {entryContent}
-        </Link>
-      );
-    }
-
-    return (
-      <button
-        key={item.key}
-        type="button"
-        onClick={item.onSelect}
-        className={mobileMenuItemClass(item.active)}
-      >
-        {entryContent}
-      </button>
-    );
-  };
 
   return (
     <>
@@ -845,9 +292,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         initial={chromeMotion.initial}
         animate={chromeMotion.animate}
         transition={chromeTransition}
-        className={`${navClass} ${
-          isPublic && isMobileMenuOpen ? "border-b-transparent dark:border-b-transparent shadow-none" : ""
-        }`}
+        className={navClass}
       >
       {!isPublic && !isPrivileged && (
         <>
@@ -869,23 +314,21 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
         </>
       )}
-        <div className="relative mx-auto max-w-[1400px] px-2.5 max-[320px]:px-2 min-[380px]:px-4 sm:px-6 lg:px-10">
-          <div className="flex h-16 items-center justify-between gap-1 max-[320px]:gap-0.5 min-[380px]:gap-2 sm:h-[72px] sm:gap-3">
+      <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between h-16 sm:h-[72px]">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex min-w-0 items-center gap-1.5 max-[320px]:gap-1 min-[380px]:gap-3 sm:gap-4">
+          <div className="flex items-center gap-4">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
-              onClick={(event) =>
-                isPublic ? handlePublicSectionNavigation("home", event) : handleNavClick("home")
-              }
+              onClick={() => handleNavClick('home')}
             >
-              <span className="relative font-extrabold text-[clamp(1.05rem,7vw,1.75rem)] leading-none tracking-[-0.045em] max-[320px]:text-[0.95rem] sm:text-2xl">
+              <span className="font-extrabold text-2xl tracking-tight relative">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
-                <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-indigo-400/25 blur-lg max-[320px]:-left-1.5 max-[320px]:-top-1.5 max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:-left-3 min-[380px]:-top-3 min-[380px]:h-6 min-[380px]:w-6" />
+                <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-indigo-400/25 blur-lg" />
                 {isPublic && null}
               </span>
             </div>
@@ -965,7 +408,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   <Link
                     key={item.key}
                     to={item.to}
-                    onClick={(event) => handlePublicSectionNavigation(item.key, event)}
                     className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
                       isCurrent
                         ? "text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500"
@@ -1043,7 +485,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 </button>
 
                 {isAdminUsersMenuOpen && (
-                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-900">
+                  <div className="absolute left-1/2 top-[calc(100%+8px)] z-50 w-56 -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-1.5 shadow-xl dark:border-white/10 dark:bg-gray-900/95">
                     <Link
                       to="/admin-dashboard/user-management"
                       onClick={closeAdminUsersMenuImmediately}
@@ -1160,11 +602,13 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 { label: "Home", to: "/organizer-dashboard", key: "home" },
                 { label: "Coordinators", to: "/organizer-dashboard/coordinator-management", key: "coordinator-management" },
                 { label: "Contact Admin", to: "/organizer-dashboard/contact-admin", key: "contact-admin" },
+                { label: "Profile", to: "/organizer-dashboard/profile", key: "profile" },
               ].map((item) => {
                 const isCurrent =
                   (item.key === "home" && location.pathname === "/organizer-dashboard") ||
                   (item.key === "coordinator-management" && location.pathname.startsWith("/organizer-dashboard/coordinator-management")) ||
-                  (item.key === "contact-admin" && location.pathname.startsWith("/organizer-dashboard/contact-admin"));
+                  (item.key === "contact-admin" && location.pathname.startsWith("/organizer-dashboard/contact-admin")) ||
+                  (item.key === "profile" && location.pathname.startsWith("/organizer-dashboard/profile"));
 
                 return (
                   <Link
@@ -1294,7 +738,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     </div>
                     <input 
                       type="text" 
-                      name="navbarSearch"
                       className="block w-48 lg:w-64 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-full leading-5 bg-gray-50 dark:bg-gray-800/70 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:bg-white dark:focus:bg-gray-800 focus:ring-1 focus:ring-purple-500 dark:focus:ring-indigo-400 focus:border-purple-500 dark:focus:border-indigo-400 sm:text-sm transition-all duration-200" 
                       placeholder="Search events..."
                     />
@@ -1335,11 +778,13 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 >
                   {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 </button>
+
+                {/* User Profile Dropdown */}
                 <div className="relative ml-3 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                    className="flex rounded-full border-2 border-transparent text-sm transition duration-150 ease-in-out focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300"
+                    className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 dark:focus:border-indigo-300 transition duration-150 ease-in-out"
                     aria-label="Toggle user menu"
                   >
                     <AvatarWithFrame
@@ -1351,18 +796,24 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     />
                   </button>
 
+                  {/* Dropdown Menu */}
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-12 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 dark:bg-gray-900 dark:ring-white/10">
-                      <div className="border-b border-gray-100 px-4 py-2 dark:border-white/10">
-                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{displayName}</p>
-                        <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</p>
+                    <div className="origin-top-right absolute right-0 mt-12 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 dark:ring-white/10 focus:outline-none z-50">
+                      <div className="px-4 py-2 border-b border-gray-100 dark:border-white/10">
+                        <p className="text-sm text-gray-900 dark:text-gray-100 font-bold">{displayName}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || 'student@college.com'}</p>
                       </div>
+
+                      <Link
+                        to={currentProfilePath}
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5"
+                      >
+                        Your Profile
+                      </Link>
                       <button
-                        onClick={() => {
-                          onLogout?.();
-                          setIsUserMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        onClick={() => { onLogout?.(); setIsUserMenuOpen(false); }}
+                        className="w-full text-left block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                       >
                         <LogOut size={16} /> Sign out
                       </button>
@@ -1397,13 +848,37 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-1 flex shrink-0 items-center gap-1 max-[360px]:gap-0.5 min-[380px]:gap-1.5 sm:-mr-2 ${mobileVisibilityClass}`}>
-            {showMobileNotificationShortcut && (
+          <div className={`-mr-2 flex items-center gap-2 ${mobileVisibilityClass}`}>
+            {isPublic && !isAuthenticated && (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+                >
+                  Sign Up
+                </Link>
+                <button
+                  type="button"
+                  aria-label="Toggle theme"
+                  onClick={toggleTheme}
+                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </button>
+              </div>
+            )}
+            {isAuthenticated && !isPublic && currentNotificationsPath && !hideNavExtras && (
               <Link
                 to={currentNotificationsPath}
                 onClick={closeMenus}
                 aria-label="Notifications"
-                className="relative inline-flex shrink-0 items-center justify-center rounded-full p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
+                className="relative inline-flex items-center justify-center rounded-full p-2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-indigo-300"
               >
                 <Bell className="h-5 w-5" />
                 {roleUnreadCount > 0 && (
@@ -1413,147 +888,332 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 )}
               </Link>
             )}
+            {isAuthenticated && !isPublic && (
+              <button
+                type="button"
+                aria-label="Toggle theme"
+                onClick={() => {
+                  setIsMobileProfileOpen(false);
+                  toggleTheme();
+                }}
+                className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            )}
+            {isAuthenticated && !isPublic && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={handleMobileProfileClick}
+                  aria-label="Open profile menu"
+                  aria-expanded={isMobileProfileOpen}
+                  aria-haspopup="menu"
+                  className="relative h-9 w-9 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                >
+                  <AvatarWithFrame
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="h-9 w-9"
+                    coreClassName="h-full w-full border border-indigo-300 text-indigo-700 bg-indigo-50 dark:border-indigo-400/60 dark:bg-indigo-500/20 dark:text-indigo-200 flex items-center justify-center text-xs font-semibold"
+                    fallback={<span>{avatarInitials || "U"}</span>}
+                  />
+                </button>
+                <AnimatePresence>
+                  {isMobileProfileOpen && (
+                    <motion.div
+                      initial={mobileProfilePanelMotion.initial}
+                      animate={mobileProfilePanelMotion.animate}
+                      exit={mobileProfilePanelMotion.exit}
+                      transition={mobileProfilePanelTransition}
+                      role="menu"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                    >
+                      <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-300 truncate">
+                          {user?.email || "student@college.com"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsMobileProfileOpen(false);
+                          navigate(currentProfilePath);
+                        }}
+                        className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                      >
+                        Your Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onLogout?.();
+                          setIsMobileProfileOpen(false);
+                        }}
+                        className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15 flex items-center gap-2"
+                      >
+                        <LogOut size={16} /> Sign out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
             <button
               onClick={() => {
                 setIsMobileProfileOpen(false);
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className="inline-flex shrink-0 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 p-1.5 text-slate-500 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300 dark:hover:border-indigo-400/40 dark:hover:text-indigo-200 max-[320px]:p-1 min-[380px]:p-2"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
-              {isMobileMenuOpen ? (
-                <X className="block h-[1.1rem] w-[1.1rem] max-[320px]:h-4 max-[320px]:w-4 min-[380px]:h-6 min-[380px]:w-6" />
-              ) : (
-                <Menu className="block h-[1.1rem] w-[1.1rem] max-[320px]:h-4 max-[320px]:w-4 min-[380px]:h-6 min-[380px]:w-6" />
-              )}
+              {isMobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
       {/* --- MOBILE MENU PANEL --- */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.button
-              type="button"
-              aria-label="Close mobile menu"
-              onClick={closeMenus}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-              className={`${mobileVisibilityClass} fixed inset-0 top-16 z-[105] bg-slate-950/40 backdrop-blur-[2px]`}
-            />
-            <motion.div
-              initial={mobileMenuPanelMotion.initial}
-              animate={mobileMenuPanelMotion.animate}
-              exit={mobileMenuPanelMotion.exit}
-              transition={mobileMenuPanelTransition}
-              className={`${mobileVisibilityClass} fixed right-3 top-[4.35rem] z-[109] w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(30rem,calc(100svh-5.5rem))] overflow-y-auto overscroll-contain rounded-[30px] ${
-                isPublic
-                  ? "nav-public-mobile-panel border border-white/12 bg-slate-950/94 shadow-[0_36px_90px_-40px_rgba(15,23,42,1)] backdrop-blur-2xl"
-                  : "border border-slate-200/80 bg-white/96 shadow-[0_32px_80px_-38px_rgba(15,23,42,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/96"
-              }`}
-            >
-              <div className="p-3">
-                <div
-                  className={`rounded-[26px] border p-4 ${
-                    isPublic
-                      ? "border-white/12 bg-gradient-to-br from-white/10 via-white/[0.06] to-transparent"
-                      : "border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-white dark:border-white/10 dark:from-white/[0.08] dark:via-white/[0.04] dark:to-transparent"
-                  }`}
+      {isMobileMenuOpen && (
+        <div
+          className={`${mobileVisibilityClass} max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}
+        >
+          <div className="pt-2 pb-3 space-y-1">
+            {isPublic ? (
+              <>
+                <Link
+                  to="/"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                 >
-                  {isPublic ? (
-                    <>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-200/80">
-                        Mobile Navigation
-                      </p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">Explore EventMate faster</h2>
-                      <p className="mt-1 text-sm leading-6 text-slate-300">
-                        A compact menu inspired by modern floating navigation patterns.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="flex items-start gap-3">
-                      <AvatarWithFrame
-                        src={avatarUrl}
-                        alt={`${displayName} avatar`}
-                        className="h-11 w-11 shrink-0"
-                        coreClassName="h-full w-full border border-indigo-200 bg-white text-indigo-700 dark:border-indigo-400/40 dark:bg-slate-950/70 dark:text-indigo-200 flex items-center justify-center text-sm font-semibold"
-                        fallback={<span>{avatarInitials || "U"}</span>}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                          {roleLabelMap[user?.role] || "Account"}
-                        </p>
-                        <h2 className="mt-1 truncate text-base font-semibold text-slate-900 dark:text-white">
-                          {displayName}
-                        </h2>
-                        <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-300">
-                          {user?.email || "account@eventmate.app"}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {mobileMenuQuickActions.map((action) =>
-                      action.to ? (
-                        <Link
-                          key={action.key}
-                          to={action.to}
-                          onClick={action.onClick || closeMenus}
-                          className={mobileQuickActionClass}
-                        >
-                          <span className="block max-w-full truncate whitespace-nowrap">
-                            {action.label}
-                          </span>
-                        </Link>
-                      ) : (
-                        <button
-                          key={action.key}
-                          type="button"
-                          onClick={action.onSelect}
-                          className={mobileQuickActionClass}
-                        >
-                          <span className="block max-w-full truncate whitespace-nowrap">
-                            {action.label}
-                          </span>
-                        </button>
-                      )
-                    )}
+                  Home
+                </Link>
+                <Link
+                  to="/#events"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Events
+                </Link>
+                <Link
+                  to="/#contact"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Contact us
+                </Link>
+              </>
+            ) : isAdmin ? (
+              <>
+                <Link
+                  to="/admin-dashboard"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Home
+                </Link>
+                <Link
+                  to="/admin-dashboard/system-oversight"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  System Oversight
+                </Link>
+                <Link
+                  to="/admin-dashboard/user-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  User Management
+                </Link>
+                <Link
+                  to="/admin-dashboard/organizer-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Organizer Management
+                </Link>
+                <Link
+                  to="/admin-dashboard/coordinator-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-7 pr-4 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-300 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Coordinator Management
+                </Link>
+                <Link
+                  to="/admin-dashboard/notifications"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Notifications
+                </Link>
+                <Link
+                  to="/admin-dashboard/contact-center"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Contact Center
+                </Link>
+                <Link
+                  to="/admin-dashboard/certificates-audit"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Certificates & Audit Logs
+                </Link>
+                <Link
+                  to="/admin-dashboard/security-reports"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Security & Reports
+                </Link>
+              </>
+            ) : isOrganizer ? (
+              <>
+                <Link
+                  to="/organizer-dashboard"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Home
+                </Link>
+                <Link
+                  to="/organizer-dashboard/coordinator-management"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Coordinators
+                </Link>
+                <Link
+                  to="/organizer-dashboard/contact-admin"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Contact Admin
+                </Link>
+                <Link
+                  to="/organizer-dashboard/profile"
+                  onClick={closeMenus}
+                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <>
+                {isCoordinator && (
+                  <>
+                    <Link
+                      to="/coordinator-dashboard"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
+                      Home
+                    </Link>
+                    <Link
+                      to="/coordinator-dashboard/contact-admin"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
+                      Contact Admin
+                    </Link>
+                  </>
+                )}
+                {!isCoordinator && (
+                  <button onClick={() => handleNavClick('home')} className="w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">Home</button>
+                )}
+                {isStudent && (
+                  <>
+                    <button onClick={() => handleNavClick('events')} className="w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                      Events
+                    </button>
+                    <Link
+                      to="/student-dashboard/my-events"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
+                      My Events
+                    </Link>
+                    <Link
+                      to="/student-dashboard/contact-us"
+                      onClick={closeMenus}
+                      className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                    >
+                      Contact us
+                    </Link>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+          <div className="pt-4 pb-4 border-t border-gray-200 dark:border-white/10">
+            {isAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMenus();
+                    navigate(currentProfilePath);
+                  }}
+                  className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
+                  aria-label="Open profile"
+                >
+                  <AvatarWithFrame
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="h-10 w-10"
+                    coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
+                    fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
+                  />
+                  <div className="ml-3">
+                    <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
+                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
                   </div>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {mobileMenuSections.map((section) => (
-                    <div key={section.title} className="space-y-2.5">
-                      <p className={mobileMenuSectionLabelClass}>{section.title}</p>
-                      <div className="space-y-2">
-                        {section.items.map((item) => renderMobileMenuEntry(item))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {!isPublic && (
+                </button>
+                <div className="mt-3 space-y-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      onLogout?.();
-                      closeMenus();
-                    }}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/12 dark:text-red-300 dark:hover:bg-red-500/18"
+                    onClick={toggleTheme}
+                    className="w-full flex items-center gap-2 px-4 py-2 text-base font-medium text-gray-700 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-500/25"
                   >
-                    <LogOut size={16} />
-                    Sign out
+                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    Toggle theme
                   </button>
-                )}
+                  <button onClick={() => { onLogout?.(); setIsMobileMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800 flex items-center gap-2">
+                    <LogOut size={18} /> Sign out
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="px-4 space-y-2">
+                <Link
+                  to="/login"
+                  onClick={closeMenus}
+                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/signup"
+                  onClick={closeMenus}
+                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                >
+                  Sign Up
+                </Link>
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-500/25"
+                >
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  Toggle theme
+                </button>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            )}
+          </div>
+        </div>
+      )}
 
       {!isPublic && (
         <style jsx>{`

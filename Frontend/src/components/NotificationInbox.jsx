@@ -1,37 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, CheckCheck, Loader2, RefreshCcw, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
+import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { getStoredToken, getStoredUser } from "../lib/auth";
+import { SOCKET_BASE_URL } from "../lib/backendUrl";
+import { getStoredUser } from "../lib/auth";
 
 const parseNotifications = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.notifications)) return payload.notifications;
   if (Array.isArray(payload?.data?.notifications)) return payload.data.notifications;
   return [];
-};
-
-const sanitizeNotificationCopy = (value, fallback) => {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-
-  return text
-    .replace(/\bbackend notifications\b/gi, "notifications")
-    .replace(/\bsent from backend\b/gi, "sent by EventMate")
-    .replace(/\bfrom backend\b/gi, "from EventMate")
-    .replace(/\bbackend server\b/gi, "service")
-    .replace(/\bbackend\b/gi, "system")
-    .replace(/\bapi\b/gi, "service")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-};
-
-const getSafeNotificationError = (error, fallback) => {
-  const status = Number(error?.response?.status || 0);
-  if (status === 401 || status === 403) return "";
-  if (status >= 500) return "Something went wrong while loading your updates. Please try again.";
-  return fallback;
 };
 
 const formatDateTime = (value) => {
@@ -73,18 +52,12 @@ const getUserId = () => {
   return String(user?._id || user?.id || "").trim();
 };
 
-export default function NotificationInbox({
-  title,
-  subtitle,
-  unreadEventName,
-  backPath = "/",
-  backLabel = "Back",
-}) {
-  const navigate = useNavigate();
+export default function NotificationInbox({ title, subtitle, unreadEventName }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
   const [warning, setWarning] = useState("");
+  const socketRef = useRef(null);
   const pollRef = useRef(null);
 
   const unreadCount = useMemo(
@@ -101,19 +74,11 @@ export default function NotificationInbox({
   );
 
   const fetchNotifications = useCallback(async () => {
-    if (!getStoredToken()) {
-      setItems([]);
-      emitUnreadCount(0);
-      setWarning("");
-      setLoading(false);
-      return;
-    }
-
     setWarning("");
     try {
       const response = await api({
         ...SummaryApi.get_my_notifications,
-        params: { page: 1, limit: 100 },
+        params: { all: true },
         cacheTTL: 6000,
         skipDedupe: true
       });
@@ -125,7 +90,7 @@ export default function NotificationInbox({
     } catch (error) {
       setItems([]);
       emitUnreadCount(0);
-      setWarning(getSafeNotificationError(error, "Unable to load your updates right now."));
+      setWarning(error?.response?.data?.message || "Unable to load notifications.");
     } finally {
       setLoading(false);
     }
@@ -138,12 +103,42 @@ export default function NotificationInbox({
 
   useEffect(() => {
     const userId = getUserId();
-    if (!userId || !getStoredToken()) return undefined;
+    if (!userId) return undefined;
+
+    if (SOCKET_BASE_URL !== null) {
+      const socket = io(SOCKET_BASE_URL, {
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 800,
+        timeout: 8000,
+      });
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        socket.emit("join", userId);
+      });
+
+      socket.on("notification", (payload) => {
+        if (!payload?._id) return;
+        setItems((prev) => {
+          const exists = prev.some((item) => String(item?._id || "") === String(payload._id));
+          if (exists) return prev;
+          return [payload, ...prev];
+        });
+      });
+    }
 
     pollRef.current = setInterval(fetchNotifications, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [fetchNotifications]);
 
@@ -164,7 +159,7 @@ export default function NotificationInbox({
         prev.map((item) => (String(item?._id || "") === normalizedId ? { ...item, isRead: true } : item))
       );
     } catch (error) {
-      setWarning(getSafeNotificationError(error, "Unable to update this notification right now."));
+      setWarning(error?.response?.data?.message || "Unable to mark notification as read.");
     }
   };
 
@@ -175,33 +170,15 @@ export default function NotificationInbox({
       await api({ ...SummaryApi.mark_all_notifications_read });
       setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch (error) {
-      setWarning(getSafeNotificationError(error, "Unable to update your notifications right now."));
+      setWarning(error?.response?.data?.message || "Unable to mark all notifications as read.");
     } finally {
       setMarkingAll(false);
     }
   };
 
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
-    navigate(backPath, { replace: true });
-  };
-
   return (
-    <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 pt-4 pb-8">
+    <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-indigo-600 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
-        >
-          <ArrowLeft size={16} />
-          {backLabel}
-        </button>
-
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -273,14 +250,14 @@ export default function NotificationInbox({
                       <div className="min-w-0">
                         <div className="inline-flex flex-wrap items-center gap-2">
                           <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {sanitizeNotificationCopy(item?.title, "Notification")}
+                            {item?.title || "Notification"}
                           </p>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeBadgeClass(item?.type)}`}>
                             {String(item?.type || "GENERAL")}
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap">
-                          {sanitizeNotificationCopy(item?.message, "No message available.")}
+                          {String(item?.message || "No message.")}
                         </p>
                         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                           Received: {formatDateTime(item?.createdAt)}

@@ -16,7 +16,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -67,12 +66,6 @@ const resolveTokenFromQrImageUrl = (value) => {
   if (fromCloudinarySegment) return fromCloudinarySegment;
 
   return "";
-};
-
-const resolveParticipantToken = (participant) => {
-  const explicitToken = String(participant?.token || "").trim();
-  if (explicitToken) return explicitToken;
-  return resolveTokenFromQrImageUrl(participant?.qrImageUrl);
 };
 
 const toParticipantRows = (registration) => {
@@ -129,7 +122,7 @@ const toParticipantRows = (registration) => {
       role: String(participant?.role || "participant").trim(),
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
-      token: resolveParticipantToken(participant),
+      token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
     };
   });
 };
@@ -267,9 +260,6 @@ export default function CoordinatorAttendanceScanner() {
   const [cameraError, setCameraError] = useState(null);
   const [cameraSupported, setCameraSupported] = useState(true);
   const [scannerEngineLabel, setScannerEngineLabel] = useState("Auto");
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(cameraError, { defaultType: "error" });
 
   const [pendingScan, setPendingScan] = useState(null);
   const [lastResult, setLastResult] = useState(null);
@@ -371,7 +361,7 @@ export default function CoordinatorAttendanceScanner() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const queuePendingToken = useCallback(async (rawValue, sourceLabel) => {
+  const queuePendingToken = useCallback((rawValue, sourceLabel) => {
     const token = parseAttendanceToken(rawValue);
     if (!token) {
       setMessage({ type: "error", text: "QR detected, but attendance token could not be parsed." });
@@ -388,7 +378,7 @@ export default function CoordinatorAttendanceScanner() {
     duplicateScanGuardRef.current = { token, at: now };
 
     const participant = lookupRef.current.get(token);
-    const initialPendingScan = {
+    setPendingScan({
       token,
       sourceLabel,
       participantName: participant?.participantName || "Unknown participant",
@@ -396,44 +386,8 @@ export default function CoordinatorAttendanceScanner() {
       participantDepartment: participant?.participantDepartment || "",
       registrationStatus: participant?.registrationStatus || "Unknown",
       alreadyMarked: Boolean(participant?.attendanceMarked),
-    };
-    pendingScanRef.current = initialPendingScan;
-    setPendingScan(initialPendingScan);
+    });
     setMessage(null);
-
-    try {
-      const response = await api({
-        ...SummaryApi.preview_attendance_by_token,
-        url: SummaryApi.preview_attendance_by_token.url.replace(":token", encodeURIComponent(token)),
-      });
-      const preview = response?.data?.data || {};
-
-      setPendingScan((current) => {
-        if (String(current?.token || "").trim() !== token) return current;
-        return {
-          ...current,
-          participantName: preview?.participantName || current.participantName,
-          participantEmail: preview?.email || current.participantEmail,
-          participantDepartment: preview?.participantDepartment || current.participantDepartment,
-          registrationStatus: preview?.registrationStatus || current.registrationStatus,
-          alreadyMarked: Boolean(preview?.attendanceMarked),
-        };
-      });
-    } catch (previewError) {
-      const previewMessage =
-        previewError?.response?.data?.message || "Unable to verify this QR code right now.";
-      const hasFallbackDetails =
-        Boolean(initialPendingScan.participantEmail) ||
-        initialPendingScan.participantName !== "Unknown participant";
-
-      if (!hasFallbackDetails) {
-        pendingScanRef.current = null;
-        setPendingScan(null);
-        setMessage({ type: "error", text: previewMessage });
-        return false;
-      }
-    }
-
     return true;
   }, []);
 
@@ -545,7 +499,7 @@ export default function CoordinatorAttendanceScanner() {
             rawValue = await decodeSourceWithJsQr(videoNode, resolvedDecoder, decodeCanvasRef);
           }
 
-          if (rawValue) void queuePendingToken(rawValue, "Live camera");
+          if (rawValue) queuePendingToken(rawValue, "Live camera");
         } catch {
           // Swallow scanner frame errors to keep loop alive.
         } finally {
@@ -769,7 +723,7 @@ export default function CoordinatorAttendanceScanner() {
         return;
       }
 
-      await queuePendingToken(rawValue, "Image upload");
+      queuePendingToken(rawValue, "Image upload");
     } catch {
       setMessage({ type: "error", text: "Unable to scan QR from image. Try another image." });
     }
@@ -907,7 +861,6 @@ export default function CoordinatorAttendanceScanner() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      name="scannerImageFile"
                       accept="image/*"
                       onChange={handleScanImageFile}
                       className="hidden"

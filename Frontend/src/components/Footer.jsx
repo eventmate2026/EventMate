@@ -33,7 +33,7 @@ export default function Footer() {
       animate="show"
       variants={reveal}
       transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      className="relative shrink-0 overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-gray-950 border-t border-gray-300/90 dark:border-indigo-300/20 shadow-[inset_0_1px_0_rgba(99,102,241,0.08)]"
+      className="relative overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-gray-950 border-t border-gray-300/90 dark:border-indigo-300/20 shadow-[inset_0_1px_0_rgba(99,102,241,0.08)]"
     >
       <div className="pointer-events-none absolute -top-24 -left-24 h-56 w-56 rounded-full bg-blue-400/10 blur-3xl dark:bg-cyan-400/15" />
       <div className="pointer-events-none absolute -bottom-24 -right-20 h-56 w-56 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/20" />

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
+import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { getStoredToken, getStoredUser } from "../lib/auth";
+import { SOCKET_BASE_URL } from "../lib/backendUrl";
+import { getStoredUser } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 
 const parseNotifications = (payload) => {
@@ -11,28 +12,6 @@ const parseNotifications = (payload) => {
   if (Array.isArray(payload?.notifications)) return payload.notifications;
   if (Array.isArray(payload?.data?.notifications)) return payload.data.notifications;
   return [];
-};
-
-const sanitizeNotificationCopy = (value, fallback) => {
-  const text = String(value || "").trim();
-  if (!text) return fallback;
-
-  return text
-    .replace(/\bbackend notifications\b/gi, "notifications")
-    .replace(/\bsent from backend\b/gi, "sent by EventMate")
-    .replace(/\bfrom backend\b/gi, "from EventMate")
-    .replace(/\bbackend server\b/gi, "service")
-    .replace(/\bbackend\b/gi, "system")
-    .replace(/\bapi\b/gi, "service")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-};
-
-const getSafeNotificationError = (error, fallback) => {
-  const status = Number(error?.response?.status || 0);
-  if (status === 401 || status === 403) return "";
-  if (status >= 500) return "Something went wrong while loading updates. Please try again.";
-  return fallback;
 };
 
 const parseContacts = (payload) => {
@@ -99,13 +78,13 @@ const getUserId = () => {
 };
 
 export default function AdminNotifications() {
-  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [contactsMap, setContactsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
   const [warning, setWarning] = useState("");
   const pollRef = useRef(null);
+  const socketRef = useRef(null);
 
   const unreadCount = useMemo(
     () => items.filter((item) => !item?.isRead).length,
@@ -117,21 +96,12 @@ export default function AdminNotifications() {
   }, []);
 
   const fetchNotificationsAndContacts = useCallback(async () => {
-    if (!getStoredToken()) {
-      setItems([]);
-      setContactsMap({});
-      emitUnreadCount(0);
-      setWarning("");
-      setLoading(false);
-      return;
-    }
-
     setWarning("");
     try {
       const [notificationResponse, contactResponse, eventsResponse] = await Promise.all([
         api({
           ...SummaryApi.get_my_notifications,
-          params: { page: 1, limit: 100 },
+          params: { all: true },
           cacheTTL: 6000,
           skipDedupe: true
         }),
@@ -205,7 +175,7 @@ export default function AdminNotifications() {
       setItems([]);
       setContactsMap({});
       emitUnreadCount(0);
-      setWarning(getSafeNotificationError(error, "Unable to load updates right now."));
+      setWarning(error?.response?.data?.message || "Unable to load notifications.");
     } finally {
       setLoading(false);
     }
@@ -218,12 +188,37 @@ export default function AdminNotifications() {
 
   useEffect(() => {
     const userId = getUserId();
-    if (!userId || !getStoredToken()) return undefined;
+    if (!userId) return undefined;
+
+    if (SOCKET_BASE_URL !== null) {
+      const socket = io(SOCKET_BASE_URL, {
+        transports: ["websocket", "polling"],
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 800,
+        timeout: 8000,
+      });
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        socket.emit("join", userId);
+      });
+
+      socket.on("notification", () => {
+        fetchNotificationsAndContacts();
+      });
+    }
 
     pollRef.current = setInterval(fetchNotificationsAndContacts, 30000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
     };
   }, [fetchNotificationsAndContacts]);
 
@@ -244,7 +239,7 @@ export default function AdminNotifications() {
         prev.map((item) => (normalizeId(item?._id || item?.id) === normalizedId ? { ...item, isRead: true } : item))
       );
     } catch (error) {
-      setWarning(getSafeNotificationError(error, "Unable to update this notification right now."));
+      setWarning(error?.response?.data?.message || "Unable to mark notification as read.");
     }
   };
 
@@ -255,7 +250,7 @@ export default function AdminNotifications() {
       await api({ ...SummaryApi.mark_all_notifications_read });
       setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     } catch (error) {
-      setWarning(getSafeNotificationError(error, "Unable to update notifications right now."));
+      setWarning(error?.response?.data?.message || "Unable to mark all notifications as read.");
     } finally {
       setMarkingAll(false);
     }
@@ -263,11 +258,11 @@ export default function AdminNotifications() {
 
   const resolveBody = (item) => {
     const type = String(item?.type || "").toUpperCase();
-    if (type !== "CONTACT") return sanitizeNotificationCopy(item?.message, "No message available.");
+    if (type !== "CONTACT") return String(item?.message || "No message.");
 
     const refId = normalizeId(item?.refId);
     const contact = contactsMap[refId];
-    if (!contact) return sanitizeNotificationCopy(item?.message, "No message available.");
+    if (!contact) return String(item?.message || "No message.");
 
     const fullName = String(contact?.fullName || "").trim();
     const email = String(contact?.email || "").trim();
@@ -275,39 +270,20 @@ export default function AdminNotifications() {
 
     if (contactMessage) {
       const senderLine = [fullName, email ? `<${email}>` : ""].filter(Boolean).join(" ").trim();
-      const combinedMessage = senderLine ? `${senderLine}\n\n${contactMessage}` : contactMessage;
-      return sanitizeNotificationCopy(combinedMessage, "No message available.");
+      return senderLine ? `${senderLine}\n\n${contactMessage}` : contactMessage;
     }
 
-    return sanitizeNotificationCopy(item?.message, "No message available.");
-  };
-
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
-    navigate("/admin-dashboard", { replace: true });
+    return String(item?.message || "No message.");
   };
 
   return (
     <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-white hover:text-indigo-600 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-indigo-300"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </button>
-
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Admin Notifications</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">Review platform alerts, contact requests, and recent activity updates.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">All backend notifications, including full contact messages.</p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -373,9 +349,7 @@ export default function AdminNotifications() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="inline-flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                            {sanitizeNotificationCopy(item?.title, "Notification")}
-                          </p>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{item?.title || "Notification"}</p>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeBadgeClass(item?.type)}`}>
                             {String(item?.type || "GENERAL")}
                           </span>

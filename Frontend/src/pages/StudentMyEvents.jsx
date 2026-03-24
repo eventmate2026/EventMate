@@ -1,12 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
-import { hasRegistrationEventEnded } from "../lib/eventSchedule";
-import { getStoredUser } from "../lib/auth";
-import { downloadCertificateAsset } from "../lib/certificateDownload";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 import { fetchMyRegistrations } from "../lib/registrationApi";
-import { canSubmitRegistrationFeedback } from "../lib/feedbackEligibility";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -61,69 +56,44 @@ const normalizeStatus = (value) => {
 };
 
 const deriveEventPhase = (registration) => {
-  return hasRegistrationEventEnded(registration) ? "completed" : "upcoming";
+  const explicitStatus = String(registration?.eventStatus || "").trim();
+  if (explicitStatus === "Completed" || explicitStatus === "Cancelled") return "completed";
+
+  const parsedDate = parseDateValue(registration?.eventStartDate);
+  const dateValue = parsedDate ? parsedDate.getTime() : Number.NaN;
+  if (Number.isNaN(dateValue)) return "upcoming";
+  return Date.now() > dateValue ? "completed" : "upcoming";
 };
 
 const mapToUiRow = (registration) => {
   const phase = deriveEventPhase(registration);
-  const eventEnded = hasRegistrationEventEnded(registration);
   const registrationStatus = normalizeStatus(registration?.status);
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
-  const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
-  const certificateReady = Boolean(registration?.certificate);
-  const canGiveFeedback = canSubmitRegistrationFeedback(registration);
-  const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim() || "NotRequired";
-  const paymentRequired = Number(registration?.payment?.amount || registration?.eventFee || 0) > 0;
-  const paymentRejected = paymentRequired && paymentStatus === "Rejected";
-  const paymentUnderReview =
-    paymentRequired &&
-    (paymentStatus === "UnderReview" || String(registration?.status || "").trim() === "PendingPaymentVerification");
-  const paymentPending =
-    paymentRequired &&
-    (paymentStatus === "Pending" || paymentRejected || String(registration?.status || "").trim() === "PendingPayment");
-  const canManagePayment = paymentRequired && Boolean(registration?.isTeamLeader);
-  let primaryLabel = registrationStatus === "Confirmed" ? "Registered" : registrationStatus;
-  let primaryLabelClass =
-    registrationStatus === "Confirmed"
+
+  const primaryLabel = attendanceMarked
+    ? "Attended"
+    : registrationStatus === "Confirmed"
+      ? "Registered"
+      : registrationStatus;
+
+  const primaryLabelClass = attendanceMarked
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+    : registrationStatus === "Confirmed"
       ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
       : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
-
-  if (paymentPending) {
-    primaryLabel = "Payment Pending";
-    primaryLabelClass = "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
-  }
-
-  if (paymentUnderReview) {
-    primaryLabel = "Payment Review";
-    primaryLabelClass = "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300";
-  }
-
-  if (attendanceMarked) {
-    primaryLabel = "Attended";
-    primaryLabelClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
-  }
 
   return {
     ...registration,
     phase,
-    eventEnded,
     registrationStatus,
     primaryLabel,
     primaryLabelClass,
     hasQr: Boolean(registration?.qr?.qrImageUrl),
-    feedbackSubmitted,
-    certificateReady,
-    canGiveFeedback,
-    paymentStatus,
-    paymentPending,
-    paymentRejected,
-    paymentUnderReview,
-    canManagePayment,
     monthDay: formatMonthDay(registration?.eventStartDate),
   };
 };
 
-const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadCertificate, onViewPayment }) => (
+const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
   <article className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-3 sm:p-4">
     <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
       <div className="relative h-28 sm:h-28 overflow-hidden rounded-xl">
@@ -146,27 +116,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
             {row.eventCategory || "Event"}
           </span>
-          {row.certificateReady ? (
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-              Certificate Ready
-            </span>
-          ) : row.paymentUnderReview ? (
-            <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-              Payment Review
-            </span>
-          ) : row.paymentPending ? (
-            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-              Payment Needed
-            </span>
-          ) : row.canGiveFeedback ? (
-            <span className="rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-semibold text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
-              Feedback Ready
-            </span>
-          ) : row.feedbackSubmitted ? (
-            <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:bg-sky-500/20 dark:text-sky-300">
-              Feedback Submitted
-            </span>
-          ) : row.hasQr ? (
+          {row.hasQr ? (
             <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
               QR Ready
             </span>
@@ -190,21 +140,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
         </div>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
-          {row.certificateReady
-            ? "Your certificate is ready to download."
-            : row.paymentUnderReview
-            ? "Your payment proof is under review. QR will appear after approval."
-            : row.paymentPending
-            ? row.canManagePayment
-              ? "Complete payment to confirm your registration and unlock the QR pass."
-              : "Your team leader needs to complete payment before the QR pass is issued."
-            : row.canGiveFeedback
-            ? "Your event is completed and feedback is now available."
-            : row.feedbackSubmitted
-            ? "Feedback is submitted. Your certificate will appear once the organizer finishes certificate setup."
-            : row.eventEnded
-            ? "This event has ended. Any attendance, feedback, or certificate updates will appear here soon."
-            : row.qr?.attendanceMarked
+          {row.qr?.attendanceMarked
             ? "Attendance has been marked for this event."
             : "Use your QR code at check-in when the event starts."}
         </p>
@@ -212,43 +148,11 @@ const MyEventCard = ({ row, onViewQr, onViewDetails, onGiveFeedback, onDownloadC
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
           <button
             type="button"
-            onClick={() => {
-              if (row.certificateReady) {
-                void onDownloadCertificate(row);
-                return;
-              }
-              if (row.paymentPending || row.paymentUnderReview) {
-                onViewPayment(row.id);
-                return;
-              }
-              if (row.canGiveFeedback) {
-                onGiveFeedback(row.eventId);
-                return;
-              }
-              onViewQr(row.id);
-            }}
-            disabled={
-              !row.certificateReady &&
-              !row.paymentPending &&
-              !row.paymentUnderReview &&
-              !row.canGiveFeedback &&
-              !row.hasQr
-            }
+            onClick={() => onViewQr(row.id)}
+            disabled={!row.hasQr}
             className="rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
           >
-            {row.certificateReady
-              ? "Download Certificate"
-              : row.paymentPending
-              ? row.canManagePayment
-                ? "Complete Payment"
-                : "View Payment"
-              : row.paymentUnderReview
-              ? "View Payment"
-              : row.canGiveFeedback
-              ? "Give Feedback"
-              : row.hasQr
-              ? "View QR"
-              : "QR Pending"}
+            {row.hasQr ? "View QR" : "QR Pending"}
           </button>
           <button
             type="button"
@@ -272,56 +176,29 @@ export default function StudentMyEvents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
-  const [notice, setNotice] = useState(null);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(notice, { defaultType: "error" });
-
-  const loadMyEvents = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
-    }
-    setError(null);
-    setWarning(null);
-    try {
-      const response = await fetchMyRegistrations({ bypassCache: silent });
-      setWarning(response.warning);
-      const nextRows = response.rows
-        .map(mapToUiRow)
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-      setRows(nextRows);
-    } catch (fetchError) {
-      setError(fetchError?.response?.data?.message || "Unable to load your registrations.");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
+    const loadMyEvents = async () => {
+      setLoading(true);
+      setError(null);
+      setWarning(null);
+      try {
+        const response = await fetchMyRegistrations();
+        setWarning(response.warning);
+        const nextRows = response.rows
+          .map(mapToUiRow)
+          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setRows(nextRows);
+      } catch (fetchError) {
+        setError(fetchError?.response?.data?.message || "Unable to load your registrations.");
+        setRows([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadMyEvents();
-
-    const refreshOnFocus = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-      void loadMyEvents({ silent: true });
-    };
-    const intervalId = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      void loadMyEvents({ silent: true });
-    }, 15000);
-
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnFocus);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-    };
-  }, [loadMyEvents]);
+  }, []);
 
   const filteredRows = useMemo(() => {
     const term = String(searchTerm || "").trim().toLowerCase();
@@ -365,55 +242,8 @@ export default function StudentMyEvents() {
     navigate(`/student-dashboard/events/${encodeURIComponent(normalizedId)}`);
   };
 
-  const openFeedback = (eventId) => {
-    const normalizedId = String(eventId || "").trim();
-    navigate("/student-dashboard/feedback-pending", {
-      state: normalizedId ? { eventId: normalizedId, expandFeedback: true } : undefined,
-    });
-  };
-
-  const openPayment = (registrationId) => {
-    const normalizedId = String(registrationId || "").trim();
-    if (!normalizedId) return;
-    navigate(`/student-dashboard/my-events/payment/${encodeURIComponent(normalizedId)}`);
-  };
-
-  const downloadCertificate = async (row) => {
-    const normalizedEventId = String(row?.eventId || "").trim();
-    const participantEmail = String(
-      row?.certificate?.participantEmail || getStoredUser()?.email || ""
-    )
-      .trim()
-      .toLowerCase();
-
-    const result = await downloadCertificateAsset({
-      eventId: normalizedEventId,
-      eventName: row?.eventTitle,
-      certificateType: row?.certificate?.certificateType || "participation",
-      certificateUrl: row?.certificate?.certificateUrl,
-      participantEmail,
-    });
-
-    if (result.ok) {
-      setNotice(null);
-      return;
-    }
-
-    setNotice(result.message);
-    if (!normalizedEventId) {
-      navigate("/student-dashboard/my-certificates");
-      return;
-    }
-
-    if (result.code === "missing" || result.code === "not_found" || result.code === "error") {
-      navigate("/student-dashboard/my-certificates", {
-        state: { eventId: normalizedEventId },
-      });
-    }
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard")}
@@ -422,7 +252,7 @@ export default function StudentMyEvents() {
         <ArrowLeft size={16} />
       </button>
 
-      <section className="mt-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-5 sm:p-6">
+      <section className="mt-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Events</h1>
@@ -435,7 +265,6 @@ export default function StudentMyEvents() {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              name="myEventsSearch"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search my events..."
@@ -513,9 +342,6 @@ export default function StudentMyEvents() {
                 row={row}
                 onViewQr={openQr}
                 onViewDetails={openEventDetails}
-                onGiveFeedback={openFeedback}
-                onDownloadCertificate={downloadCertificate}
-                onViewPayment={openPayment}
               />
             ))}
           </div>

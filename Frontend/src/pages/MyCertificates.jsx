@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarDays, Clock3, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { downloadCertificateAsset } from "../lib/certificateDownload";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const formatDateLabel = (value) => {
   const parsed = new Date(value || "");
@@ -234,60 +232,28 @@ export default function MyCertificates() {
   const [certificateRows, setCertificateRows] = useState([]);
   const [notice, setNotice] = useState(null);
   const [downloadingRowId, setDownloadingRowId] = useState(null);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(notice, { defaultType: "error" });
-
-  const fetchCertificates = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
-    }
-    setError(null);
-    if (!silent) {
-      setNotice(null);
-    }
-    try {
-      const response = await api({
-        ...SummaryApi.get_my_certificates,
-        cacheTTL: 0,
-        skipCache: true,
-      });
-      const rows = toCertificateRows(response.data).sort(
-        (a, b) => new Date(b?.issuedAt || 0).getTime() - new Date(a?.issuedAt || 0).getTime()
-      );
-      setCertificateRows(rows);
-    } catch (fetchError) {
-      setCertificateRows([]);
-      setError(fetchError.response?.data?.message || "Unable to load certificate records.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
+    const fetchCertificates = async () => {
+      setLoading(true);
+      setError(null);
+      setNotice(null);
+      try {
+        const response = await api({ ...SummaryApi.get_my_certificates, cacheTTL: 90000 });
+        const rows = toCertificateRows(response.data).sort(
+          (a, b) => new Date(b?.issuedAt || 0).getTime() - new Date(a?.issuedAt || 0).getTime()
+        );
+        setCertificateRows(rows);
+      } catch (fetchError) {
+        setCertificateRows([]);
+        setError(fetchError.response?.data?.message || "Unable to load certificate records.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchCertificates();
-
-    const refreshOnFocus = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-      void fetchCertificates({ silent: true });
-    };
-    const intervalId = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      void fetchCertificates({ silent: true });
-    }, 15000);
-
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnFocus);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-    };
-  }, [fetchCertificates]);
+  }, []);
 
   const mappedRows = useMemo(
     () =>
@@ -319,13 +285,85 @@ export default function MyCertificates() {
   );
 
   const handleDownloadClick = async (row) => {
+    const urls = Array.isArray(row?.downloadCandidates)
+      ? row.downloadCandidates.filter((value) => String(value || "").trim().length > 0)
+      : [];
+    const inlineCertificateData = resolveCertificateData(row?.rawCertificateData);
+
+    if (urls.length === 0 && !inlineCertificateData) {
+      setNotice("Certificate download details are missing for this entry.");
+      return;
+    }
+
     setNotice(null);
     setDownloadingRowId(row.id);
+
+    let downloadError = null;
     try {
-      const result = await downloadCertificateAsset(row);
-      if (!result.ok) {
-        setNotice(result.message);
+      for (const url of urls) {
+        try {
+          const response = await api({
+            method: "get",
+            url,
+            responseType: "blob",
+            skipAuth: true,
+            skipCache: true,
+            headers: {
+              Accept: "application/pdf,application/octet-stream,*/*",
+            },
+          });
+          const blob = response?.data;
+          const contentDisposition = String(response?.headers?.["content-disposition"] || "");
+
+          if (!(blob instanceof Blob) || blob.size === 0) {
+            throw new Error("Received an empty certificate file.");
+          }
+
+          const mimeType = String(blob.type || "").toLowerCase();
+          if (mimeType.includes("application/json") || mimeType.includes("text/html")) {
+            const apiMessage = await extractErrorMessageFromBlob(blob);
+            throw new Error(apiMessage || "Certificate endpoint returned non-PDF response.");
+          }
+
+          const downloaded = triggerBlobDownload(
+            blob,
+            parseFileNameFromHeader(contentDisposition) || buildDefaultFilename(row)
+          );
+          if (!downloaded) throw new Error("Received an empty certificate file.");
+          return;
+        } catch (errorValue) {
+          if (errorValue?.response?.status === 404) {
+            downloadError = new Error("Certificate file not found on download route.");
+            continue;
+          }
+
+          const blobMessage = await extractErrorMessageFromBlob(errorValue?.response?.data);
+          if (blobMessage) {
+            downloadError = new Error(blobMessage);
+            continue;
+          }
+
+          downloadError = errorValue;
+        }
       }
+
+      if (inlineCertificateData) {
+        try {
+          const blob = decodeBase64ToBlob(inlineCertificateData);
+          const downloaded = triggerBlobDownload(blob, buildDefaultFilename(row));
+          if (downloaded) return;
+        } catch (errorValue) {
+          downloadError = errorValue;
+        }
+      }
+
+      const errorStatus = Number(downloadError?.response?.status || 0);
+      if (errorStatus === 404 || /status code 404/i.test(String(downloadError?.message || ""))) {
+        setNotice("Certificate is not available on the download route yet. Please try again later.");
+        return;
+      }
+
+      setNotice(downloadError?.message || "Unable to download this certificate right now. Please try again.");
     } finally {
       setDownloadingRowId(null);
     }
@@ -338,7 +376,7 @@ export default function MyCertificates() {
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-4 pb-12">
+    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-slate-950 pt-10 pb-12">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 space-y-6">
         <button
           type="button"

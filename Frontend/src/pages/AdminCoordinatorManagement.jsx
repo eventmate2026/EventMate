@@ -5,7 +5,6 @@ import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -53,9 +52,6 @@ export default function AdminCoordinatorManagement() {
   const [formValues, setFormValues] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(formError, { defaultType: "error" });
 
   const fetchCoordinators = async () => {
     setLoading(true);
@@ -295,7 +291,6 @@ export default function AdminCoordinatorManagement() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                name="coordinatorSearch"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name or email..."
@@ -303,6 +298,18 @@ export default function AdminCoordinatorManagement() {
               />
             </label>
           </div>
+
+          {message && (
+            <p
+              className={`mt-4 text-sm rounded-lg py-2 px-3 ${
+                message.type === "success"
+                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
+                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
 
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading coordinators...</p>}
           {error && !loading && <p className="mt-6 text-sm text-red-600 dark:text-red-300">{error}</p>}
@@ -388,7 +395,7 @@ export default function AdminCoordinatorManagement() {
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">{formMode === "create" ? "Create Coordinator" : "Edit Coordinator"}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-                  {formMode === "create" ? "Create a coordinator with name, email, and password." : "Update basic account details."}
+                  {formMode === "create" ? "Backend supports fullName, email, password during coordinator creation." : "Update basic account details."}
                 </p>
               </div>
               <button type="button" onClick={closeForm} disabled={submitting} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/10 disabled:opacity-60" aria-label="Close form">

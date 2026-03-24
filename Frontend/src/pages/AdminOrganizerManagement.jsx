@@ -16,7 +16,6 @@ import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const EMPTY_FORM = {
   fullName: "",
@@ -76,9 +75,6 @@ export default function AdminOrganizerManagement() {
   const [formValues, setFormValues] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(formError, { defaultType: "error" });
 
   const fetchOrganizersWorkspace = async () => {
     setLoading(true);
@@ -299,7 +295,6 @@ export default function AdminOrganizerManagement() {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  name="organizerSearch"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search organizers..."
@@ -316,6 +311,18 @@ export default function AdminOrganizerManagement() {
               </button>
             </div>
           </div>
+
+          {message && (
+            <p
+              className={`mt-4 rounded-lg px-3 py-2 text-sm ${
+                message.type === "success"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
 
           {loading && (
             <p className="mt-6 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">

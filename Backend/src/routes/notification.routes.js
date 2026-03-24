@@ -1,7 +1,6 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
-import { emailWebhookLimiter } from "../middleware/rateLimit.middleware.js";
 import {
   getMyNotifications,
   markAllRead,
@@ -11,8 +10,7 @@ import {
   getOrganizerSentGroups,
   getOrganizerGroupReceipts,
   getAdminSentGroups,
-  getAdminGroupReceipts,
-  recordNotificationEmailEvents
+  getAdminGroupReceipts
 } from "../controllers/notification.controller.js";
 
 const router = express.Router();
@@ -20,7 +18,6 @@ const router = express.Router();
 router.get("/my", authMiddleware, getMyNotifications);
 router.patch("/read-all", authMiddleware, markAllRead);
 router.patch("/:notificationId/read", authMiddleware, markOneRead);
-router.post("/email-events", emailWebhookLimiter, recordNotificationEmailEvents);
 router.post("/admin-send", authMiddleware, roleMiddleware("MAIN_ADMIN"), adminSendNotification);
 router.post("/organizer-send", authMiddleware, roleMiddleware("ORGANIZER"), organizerSendNotification);
 router.get("/organizer-sent", authMiddleware, roleMiddleware("ORGANIZER"), getOrganizerSentGroups);

@@ -19,7 +19,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get("/users", roleMiddleware("MAIN_ADMIN"), getAllUsersController);
+router.get("/users", getAllUsersController);
 router.put("/users/:id", roleMiddleware("MAIN_ADMIN"), updateUserController);
 router.delete("/users/:id", roleMiddleware("MAIN_ADMIN"), deleteUserController);
 

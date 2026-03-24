@@ -26,12 +26,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Profile from "./pages/Profile";
 import ProfileCustomization from "./pages/ProfileCustomization";
 import NotFound from "./pages/NotFound";
-
-const DeveloperTeam = lazy(() =>
-  import("./pages/DeveloperTeam").catch(() => ({
-    default: () => <div>Developer team loading...</div>,
-  }))
-);
+import DeveloperTeam from "./pages/DeveloperTeam";
 
 const AdminDashboard = lazy(() =>
   import("./pages/AdminDashboard").catch(() => ({
@@ -249,12 +244,6 @@ const StudentTeamRegistration = lazy(() =>
   }))
 );
 
-const StudentRegistrationPayment = lazy(() =>
-  import("./pages/StudentRegistrationPayment").catch(() => ({
-    default: () => <div>Payment loading...</div>,
-  }))
-);
-
 const StudentContactUs = lazy(() =>
   import("./pages/StudentContactUs").catch(() => ({
     default: () => <div>Contact loading...</div>,
@@ -292,11 +281,9 @@ const PublicEventDetails = lazy(() =>
 );
 
 const routeMotionVariants = {
-  // Keep route transitions viewport-safe so fixed UI like navbars and drawers
-  // stay anchored to the window instead of inheriting a transformed parent.
-  initial: { opacity: 0 },
-  animate: { opacity: 1 },
-  exit: { opacity: 0 },
+  initial: { opacity: 0, y: 18, scale: 0.996, filter: "blur(6px)" },
+  animate: { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" },
+  exit: { opacity: 0, y: -10, scale: 0.998, filter: "blur(4px)" },
 };
 
 const routeMotionTransition = {
@@ -335,81 +322,42 @@ function ProtectedRoute({ children, requiredRole }) {
       });
     };
 
-    const restoreSessionFromRefresh = async () => {
-      const refreshToken = getStoredRefreshToken();
-      if (!refreshToken) {
-        throw new Error("Missing refresh token.");
-      }
-
-      const response = await api({
-        ...SummaryApi.refresh_token,
-        data: { refreshToken },
-        skipAuth: true,
-      });
-
-      const nextAccessToken = response.data?.accessToken;
-      const nextRefreshToken = response.data?.refreshToken;
-      const nextUser = response.data?.user || null;
-      if (!nextAccessToken) {
-        throw new Error("Missing access token.");
-      }
-
-      storeAuth({
-        accessToken: nextAccessToken,
-        refreshToken: nextRefreshToken,
-        user: nextUser,
-      });
-
-      return readAuthSnapshot();
-    };
-
     const bootstrapAuth = async () => {
       let snapshot = readAuthSnapshot();
-      let shouldClearAuth = false;
 
       try {
         if (!snapshot.token && snapshot.refreshToken) {
-          snapshot = await restoreSessionFromRefresh();
+          const response = await api({
+            ...SummaryApi.refresh_token,
+            data: { refreshToken: snapshot.refreshToken },
+            skipAuth: true,
+          });
+
+          const nextAccessToken = response.data?.accessToken;
+          const nextRefreshToken = response.data?.refreshToken;
+          if (!nextAccessToken) {
+            throw new Error("Missing access token.");
+          }
+
+          storeAuth({ accessToken: nextAccessToken, refreshToken: nextRefreshToken });
+          snapshot = readAuthSnapshot();
         }
 
         if (snapshot.token && !snapshot.user) {
-          try {
-            const profileResponse = await api({
-              ...SummaryApi.get_profile,
-              cacheTTL: 0,
-              skipCache: true,
-              skipDedupe: true,
-            });
-            const profileUser = profileResponse.data?.user || null;
-            if (profileUser) {
-              storeAuth({ user: profileUser });
-              snapshot = readAuthSnapshot();
-            }
-          } catch (profileError) {
-            const profileStatus = Number(profileError?.response?.status || 0);
-            if (profileStatus === 401 || profileStatus === 403) {
-              throw profileError;
-            }
-
-            if (snapshot.refreshToken) {
-              try {
-                snapshot = await restoreSessionFromRefresh();
-              } catch (refreshError) {
-                const refreshStatus = Number(refreshError?.response?.status || 0);
-                if (refreshStatus === 401 || refreshStatus === 403) {
-                  throw refreshError;
-                }
-              }
-            }
+          const profileResponse = await api({
+            ...SummaryApi.get_profile,
+            cacheTTL: 0,
+            skipCache: true,
+            skipDedupe: true,
+          });
+          const profileUser = profileResponse.data?.user || null;
+          if (profileUser) {
+            storeAuth({ user: profileUser });
           }
         }
-      } catch (error) {
-        const status = Number(error?.response?.status || 0);
-        shouldClearAuth = status === 401 || status === 403;
+      } catch {
+        clearAuth();
       } finally {
-        if (shouldClearAuth) {
-          clearAuth();
-        }
         syncAuthState(true);
       }
     };
@@ -488,6 +436,11 @@ function AnimatedOutlet() {
   const location = useLocation();
   const routeShellRef = useRef(null);
   const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (prefersReducedMotion) return undefined;
@@ -595,84 +548,12 @@ function AnimatedOutlet() {
   );
 }
 
-function ScrollToTop() {
-  const location = useLocation();
-  const prefersReducedMotion = useReducedMotion();
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.history) return undefined;
-
-    const previousScrollRestoration = window.history.scrollRestoration;
-    window.history.scrollRestoration = "manual";
-
-    return () => {
-      window.history.scrollRestoration = previousScrollRestoration;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (location.hash) {
-      const targetId = decodeURIComponent(location.hash.slice(1));
-      let frameA = 0;
-      let frameB = 0;
-
-      const scrollToHashTarget = () => {
-        const targetElement = document.getElementById(targetId);
-        if (targetElement) {
-          targetElement.scrollIntoView({
-            block: "start",
-            behavior: prefersReducedMotion ? "auto" : "smooth",
-          });
-          return true;
-        }
-
-        return false;
-      };
-
-      if (scrollToHashTarget()) {
-        return;
-      }
-
-      frameA = window.requestAnimationFrame(() => {
-        frameB = window.requestAnimationFrame(() => {
-          if (!scrollToHashTarget()) {
-            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-          }
-        });
-      });
-
-      return () => {
-        window.cancelAnimationFrame(frameA);
-        window.cancelAnimationFrame(frameB);
-      };
-    }
-
-    const resetScroll = { top: 0, left: 0, behavior: "auto" };
-    window.scrollTo(resetScroll);
-    document.documentElement?.scrollTo?.(resetScroll);
-    document.body?.scrollTo?.(resetScroll);
-  }, [location.pathname, location.search, location.hash, prefersReducedMotion]);
-
-  return null;
-}
-
 function MainLayout() {
   const location = useLocation();
-  const isFooterlessPublicUtilityRoute =
-    location.pathname === "/login" ||
-    location.pathname === "/signup" ||
-    location.pathname === "/verify-email" ||
-    location.pathname === "/forgot-password" ||
-    location.pathname === "/verify-registration" ||
-    location.pathname === "/team-invite" ||
-    location.pathname.startsWith("/attendance/verify");
-  const showSharedFooter = location.pathname !== "/" && !isFooterlessPublicUtilityRoute;
+  const showSharedFooter = location.pathname !== "/";
 
   return (
     <div className="eventmate-app-shell eventmate-app-shell-public relative isolate flex min-h-screen flex-col overflow-x-hidden transition-colors duration-500">
-      <ScrollToTop />
       <ScrollProgressBeam />
       <AmbientBackdrop variant="public" />
       <Navbar variant="public" />
@@ -704,7 +585,6 @@ function DashboardLayout() {
 
   return (
     <div className="eventmate-app-shell eventmate-app-shell-dashboard relative isolate flex min-h-screen flex-col overflow-x-hidden">
-      <ScrollToTop />
       <AmbientBackdrop variant="dashboard" />
       {!hideTopNav && (
         <Navbar
@@ -738,14 +618,7 @@ export default function App() {
         />
         <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route
-            path="/developers"
-            element={
-              <Suspense fallback={<div className="p-8 text-center">Loading developer team...</div>}>
-                <DeveloperTeam />
-              </Suspense>
-            }
-          />
+          <Route path="/developers" element={<DeveloperTeam />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/verify-registration" element={<VerifyRegistration />} />
           <Route path="/team-invite" element={<TeamInvite />} />
@@ -1180,14 +1053,6 @@ export default function App() {
               }
             />
             <Route
-              path="my-events/payment/:registrationId"
-              element={
-                <Suspense fallback={<div className="p-8 text-center">Loading Payment...</div>}>
-                  <StudentRegistrationPayment />
-                </Suspense>
-              }
-            />
-            <Route
               path="team-registration/:registrationId"
               element={
                 <Suspense fallback={<div className="p-8 text-center">Loading Team Registration...</div>}>
@@ -1252,4 +1117,3 @@ export default function App() {
     </Router>
   );
 }
-

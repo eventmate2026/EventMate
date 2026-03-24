@@ -4,7 +4,6 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const ROLE_LABELS = {
   MAIN_ADMIN: "Main Admin",
@@ -70,8 +69,6 @@ export default function AdminUserManagement() {
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [profileUser, setProfileUser] = useState(null);
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -245,7 +242,6 @@ export default function AdminUserManagement() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
-                name="userSearch"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name, email, or role..."
@@ -255,7 +251,6 @@ export default function AdminUserManagement() {
 
             <div className="grid grid-cols-2 gap-2">
               <select
-                name="roleFilter"
                 value={roleFilter}
                 onChange={(event) => setRoleFilter(event.target.value)}
                 className="w-full py-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-slate-100 text-sm px-2"
@@ -268,7 +263,6 @@ export default function AdminUserManagement() {
               </select>
 
               <select
-                name="statusFilter"
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
                 className="w-full py-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-slate-100 text-sm px-2"
@@ -285,6 +279,18 @@ export default function AdminUserManagement() {
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Verification labels are system-managed and can be viewed here, but not edited from admin actions.
           </p>
+
+          {message && (
+            <p
+              className={`mt-4 text-sm text-center rounded-lg py-2 ${
+                message.type === "success"
+                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
+                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
 
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading users...</p>}
           {error && !loading && <p className="mt-6 text-sm text-red-600 dark:text-red-300">{error}</p>}
@@ -478,7 +484,3 @@ export default function AdminUserManagement() {
     </div>
   );
 }
-
-
-
-

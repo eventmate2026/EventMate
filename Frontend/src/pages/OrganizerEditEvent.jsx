@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ArrowLeft, Loader2, UploadCloud } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const initialForm = {
   title: "",
@@ -20,11 +19,6 @@ const initialForm = {
   maxParticipants: "",
   registrationOpen: true,
   registrationFee: "0",
-  paymentAccountName: "",
-  paymentUpiId: "",
-  paymentInstructions: "",
-  paymentQr: null,
-  paymentQrUrl: "",
   eventMode: "INDIVIDUAL",
   minTeamSize: "2",
   maxTeamSize: "4",
@@ -52,8 +46,6 @@ export default function OrganizerEditEvent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [message, setMessage] = useState(null);
-  const [paymentQrPreviewUrl, setPaymentQrPreviewUrl] = useState("");
-  useToastFeedback(message);
 
   const loadEvent = async () => {
     setLoading(true);
@@ -84,11 +76,6 @@ export default function OrganizerEditEvent() {
         maxParticipants: event.registration?.maxParticipants ? String(event.registration.maxParticipants) : "",
         registrationOpen: Boolean(event.registration?.isOpen),
         registrationFee: typeof event.registration?.fee === "number" ? String(event.registration.fee) : "0",
-        paymentAccountName: String(event.registration?.paymentConfig?.accountName || "").trim(),
-        paymentUpiId: String(event.registration?.paymentConfig?.upiId || "").trim(),
-        paymentInstructions: String(event.registration?.paymentConfig?.instructions || "").trim(),
-        paymentQr: null,
-        paymentQrUrl: String(event.registration?.paymentConfig?.qrImageUrl || "").trim(),
         eventMode: event.isTeamEvent ? "TEAM" : "INDIVIDUAL",
         minTeamSize: event.minTeamSize ? String(event.minTeamSize) : "2",
         maxTeamSize: event.maxTeamSize ? String(event.maxTeamSize) : "4",
@@ -113,25 +100,10 @@ export default function OrganizerEditEvent() {
     loadEvent();
   }, [eventId]);
 
-  useEffect(() => {
-    if (!form.paymentQr) {
-      setPaymentQrPreviewUrl(form.paymentQrUrl || "");
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(form.paymentQr);
-    setPaymentQrPreviewUrl(previewUrl);
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [form.paymentQr, form.paymentQrUrl]);
-
   const handleChange = (event) => {
-    const { name, value, type, checked, files } = event.target;
+    const { name, value, type, checked } = event.target;
     if (type === "checkbox") {
       setForm((prev) => ({ ...prev, [name]: checked }));
-      return;
-    }
-    if (type === "file") {
-      setForm((prev) => ({ ...prev, [name]: files?.[0] || null }));
       return;
     }
     if (name === "visibilityScope") {
@@ -178,83 +150,43 @@ export default function OrganizerEditEvent() {
       return "Department is required for department-level events.";
     }
 
-    if (Number(form.registrationFee || 0) > 0) {
-      if (!String(form.paymentAccountName || "").trim()) {
-        return "Account name is required for paid events.";
-      }
-      if (!String(form.paymentUpiId || "").trim() && !form.paymentQr && !form.paymentQrUrl) {
-        return "UPI ID or payment QR image is required for paid events.";
-      }
-    }
-
     return null;
   };
 
   const buildPayload = () => {
     const isTeamEvent = form.eventMode === "TEAM";
-    const payload = new FormData();
-    payload.append("title", form.title.trim());
-    payload.append("description", form.description.trim());
-    payload.append("category", form.category);
-    payload.append(
-      "venue",
-      JSON.stringify({
+    return {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      category: form.category,
+      venue: {
         mode: "OFFLINE",
         location: form.venueLocation.trim(),
-      })
-    );
-    payload.append(
-      "schedule",
-      JSON.stringify({
+      },
+      schedule: {
         startDate: form.startDate,
         endDate: form.endDate,
         startTime: form.startTime,
         endTime: form.endTime,
-      })
-    );
-    payload.append(
-      "registration",
-      JSON.stringify({
+      },
+      registration: {
         isOpen: Boolean(form.registrationOpen),
         lastDate: form.registrationLastDate,
         maxParticipants: Number(form.maxParticipants),
         fee: Number(form.registrationFee || 0),
-        paymentConfig:
-          Number(form.registrationFee || 0) > 0
-            ? {
-                method: "PHONEPE_QR",
-                accountName: String(form.paymentAccountName || "").trim(),
-                upiId: String(form.paymentUpiId || "").trim(),
-                qrImageUrl: String(form.paymentQrUrl || "").trim(),
-                instructions: String(form.paymentInstructions || "").trim(),
-              }
-            : {
-                method: "FREE",
-                accountName: "",
-                upiId: "",
-                qrImageUrl: "",
-                instructions: "",
-              },
-      })
-    );
-    payload.append("feedback", JSON.stringify({ enabled: true }));
-    payload.append("isTeamEvent", String(isTeamEvent));
-    payload.append("minTeamSize", String(isTeamEvent ? Number(form.minTeamSize || 2) : 1));
-    payload.append("maxTeamSize", String(isTeamEvent ? Number(form.maxTeamSize || 4) : 1));
-    payload.append(
-      "visibility",
-      JSON.stringify({
+      },
+      feedback: { enabled: true },
+      isTeamEvent,
+      minTeamSize: isTeamEvent ? Number(form.minTeamSize || 2) : 1,
+      maxTeamSize: isTeamEvent ? Number(form.maxTeamSize || 4) : 1,
+      visibility: {
         scope: form.visibilityScope === "DEPARTMENT" ? "DEPARTMENT" : "COLLEGE",
         department:
           form.visibilityScope === "DEPARTMENT"
             ? organizerDepartment.trim()
             : "",
-      })
-    );
-    if (form.paymentQr) {
-      payload.append("paymentQr", form.paymentQr);
-    }
-    return payload;
+      },
+    };
   };
 
   const handleSave = async () => {
@@ -344,7 +276,7 @@ export default function OrganizerEditEvent() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Edit Event</h1>
               <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-                Events can be edited only while their status is Draft.
+                Backend allows editing only while status is Draft.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -368,6 +300,18 @@ export default function OrganizerEditEvent() {
               </button>
             </div>
           </div>
+
+          {message && (
+            <p
+              className={`text-sm rounded-lg py-2 px-3 ${
+                message.type === "success"
+                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
+                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
 
           {form.status !== "Draft" && (
             <p className="text-xs text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15 rounded-lg px-3 py-2 inline-flex items-center gap-2">
@@ -396,10 +340,9 @@ export default function OrganizerEditEvent() {
               <option value="COLLEGE">College Level</option>
               <option value="DEPARTMENT">Department Level</option>
             </select>
-            <input name="status" value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
+            <input value={form.status} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm" />
             {form.visibilityScope === "DEPARTMENT" && (
               <input
-                name="organizerDepartment"
                 value={organizerDepartment || "Department not set in profile"}
                 placeholder="Department"
                 readOnly
@@ -432,53 +375,6 @@ export default function OrganizerEditEvent() {
               <input type="checkbox" name="registrationOpen" checked={form.registrationOpen} onChange={handleChange} className="h-4 w-4" />
               Open registration
             </label>
-
-            {Number(form.registrationFee || 0) > 0 && (
-              <>
-                <input
-                  name="paymentAccountName"
-                  value={form.paymentAccountName}
-                  onChange={handleChange}
-                  placeholder="Account name"
-                  className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
-                />
-                <input
-                  name="paymentUpiId"
-                  value={form.paymentUpiId}
-                  onChange={handleChange}
-                  placeholder="UPI ID"
-                  className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
-                />
-                <textarea
-                  name="paymentInstructions"
-                  value={form.paymentInstructions}
-                  onChange={handleChange}
-                  rows={3}
-                  placeholder="Payment instructions"
-                  className="lg:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm"
-                />
-                <label className="lg:col-span-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 p-4 text-center hover:bg-slate-50 dark:border-white/20 dark:hover:bg-white/5">
-                  <UploadCloud size={18} className="text-indigo-500" />
-                  <span className="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                    {form.paymentQr ? form.paymentQr.name : "Replace payment QR (optional)"}
-                  </span>
-                  <input
-                    type="file"
-                    name="paymentQr"
-                    onChange={handleChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </label>
-                {paymentQrPreviewUrl ? (
-                  <img
-                    src={paymentQrPreviewUrl}
-                    alt="Payment QR preview"
-                    className="lg:col-span-2 h-48 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
-                  />
-                ) : null}
-              </>
-            )}
           </div>
         </section>
       </div>

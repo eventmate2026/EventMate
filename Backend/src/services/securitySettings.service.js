@@ -36,7 +36,7 @@ export const invalidateAllSessions = async (userId = null, { rotate = false } = 
   if (userId) settings.updatedBy = userId;
   await settings.save();
 
-  await User.updateMany({}, { $set: { refreshToken: null, refreshSessions: [] } });
+  await User.updateMany({}, { $set: { refreshToken: null } });
   return settings;
 };
 

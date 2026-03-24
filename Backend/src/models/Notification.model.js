@@ -7,7 +7,7 @@ const NotificationSchema = new mongoose.Schema(
       userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        default: null
+        required: true
       },
       name: {
         type: String,
@@ -73,109 +73,6 @@ const NotificationSchema = new mongoose.Schema(
     groupId: {
       type: String,
       default: null
-    },
-
-    emailDelivery: {
-      requested: {
-        type: Boolean,
-        default: false
-      },
-      trackingMode: {
-        type: String,
-        enum: ["PROVIDER_ACCEPTANCE", "WEBHOOK_DELIVERY"],
-        default: "PROVIDER_ACCEPTANCE"
-      },
-      status: {
-        type: String,
-        enum: [
-          "NOT_REQUESTED",
-          "PENDING",
-          "PROCESSING",
-          "SENT",
-          "FAILED",
-          "SKIPPED"
-        ],
-        default: "NOT_REQUESTED"
-      },
-      attempts: {
-        type: Number,
-        default: 0
-      },
-      queuedAt: {
-        type: Date,
-        default: null
-      },
-      lastAttemptAt: {
-        type: Date,
-        default: null
-      },
-      nextAttemptAt: {
-        type: Date,
-        default: null
-      },
-      acceptedAt: {
-        type: Date,
-        default: null
-      },
-      deliveredAt: {
-        type: Date,
-        default: null
-      },
-      openedAt: {
-        type: Date,
-        default: null
-      },
-      openCount: {
-        type: Number,
-        default: 0
-      },
-      providerMessageId: {
-        type: String,
-        default: ""
-      },
-      lastError: {
-        type: String,
-        default: ""
-      }
-    },
-
-    emailPayload: {
-      subject: {
-        type: String,
-        default: ""
-      },
-      html: {
-        type: String,
-        default: ""
-      },
-      text: {
-        type: String,
-        default: ""
-      },
-      attachments: [
-        {
-          filename: {
-            type: String,
-            default: ""
-          },
-          content: {
-            type: String,
-            default: ""
-          },
-          type: {
-            type: String,
-            default: ""
-          },
-          disposition: {
-            type: String,
-            default: ""
-          },
-          contentId: {
-            type: String,
-            default: ""
-          }
-        }
-      ]
     },
 
     isRead: {

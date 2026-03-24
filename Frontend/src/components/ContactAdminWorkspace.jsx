@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { getStoredUser } from "../lib/auth";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { useToast } from "../context/ToastContext";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -28,13 +27,14 @@ const parseContactRows = (payload) => {
 
 export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }) {
   const navigate = useNavigate();
-  const toast = useToast();
   const user = getStoredUser();
 
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [apiWarning, setApiWarning] = useState(null);
   const [canReadHistory, setCanReadHistory] = useState(false);
 
@@ -45,7 +45,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
     setLoadingMessages(true);
     setApiWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_my_contacts, cacheTTL: 45000 });
+      const response = await api({ ...SummaryApi.get_contacts, cacheTTL: 45000 });
       const rows = parseContactRows(response.data).sort(
         (a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
       );
@@ -68,8 +68,9 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
   const fetchAdminContacts = async () => {
     setContactsWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_contact_admins, cacheTTL: 90000 });
-      const admins = Array.isArray(response.data?.data) ? response.data.data : [];
+      const response = await api({ ...SummaryApi.get_all_users, cacheTTL: 90000 });
+      const users = Array.isArray(response.data?.users) ? response.data.users : [];
+      const admins = users.filter((item) => item?.role === "MAIN_ADMIN");
       setAdminContacts(admins);
 
       if (!admins.length) {
@@ -88,21 +89,23 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setError(null);
+    setSuccess(null);
 
     if (subject.trim().length < 3) {
-      toast.error("Subject must be at least 3 characters.");
+      setError("Subject must be at least 3 characters.");
       return;
     }
 
     if (message.trim().length < 10) {
-      toast.error("Message must be at least 10 characters.");
+      setError("Message must be at least 10 characters.");
       return;
     }
 
     const fullName = String(user?.fullName || "").trim();
     const email = String(user?.email || "").trim();
     if (!fullName || !email) {
-      toast.error("Your profile is missing name or email. Update profile and retry.");
+      setError("Your profile is missing name or email. Update profile and retry.");
       return;
     }
 
@@ -117,7 +120,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         },
       });
 
-      toast.success(response.data?.message || "Message sent successfully.");
+      setSuccess(response.data?.message || "Message sent successfully.");
       setSubject("");
       setMessage("");
 
@@ -137,7 +140,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         ]);
       }
     } catch (submitError) {
-      toast.error(submitError.response?.data?.message || "Unable to send message.");
+      setError(submitError.response?.data?.message || "Unable to send message.");
     }
   };
 
@@ -167,10 +170,8 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="contact-admin-subject" className="text-xs font-medium text-slate-600 dark:text-slate-300">Subject</label>
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Subject</label>
                 <input
-                  id="contact-admin-subject"
-                  name="subject"
                   value={subject}
                   onChange={(event) => setSubject(event.target.value)}
                   placeholder="Approval required for upcoming event"
@@ -178,10 +179,8 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                 />
               </div>
               <div>
-                <label htmlFor="contact-admin-message" className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Message</label>
                 <textarea
-                  id="contact-admin-message"
-                  name="message"
                   rows={6}
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
@@ -189,6 +188,16 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                   className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                 />
               </div>
+
+              {error && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/15 dark:text-red-300">{error}</p>
+              )}
+              {success && (
+                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  {success}
+                </p>
+              )}
+
               <button
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"

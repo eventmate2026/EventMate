@@ -1,14 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   Bell, 
   Menu, 
   X, 
   LogOut, 
   Moon,
-  Sun,
-  Home,
-  Calendar,
-  Mail
+  Sun
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Link, useNavigate } from 'react-router-dom';
@@ -16,7 +13,8 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { getStoredToken } from "../lib/auth";
+import { io } from "socket.io-client";
+import { SOCKET_BASE_URL } from "../lib/backendUrl";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const navigate = useNavigate();
@@ -25,6 +23,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const [isMobileProfileOpen, setIsMobileProfileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [unreadCount, setUnreadCount] = useState(0);
+  const socketRef = useRef(null);
   const isStudent = user?.role === "STUDENT";
   const displayName = user?.fullName || user?.name || 'Student';
   const avatarUrl = user?.avatar || "";
@@ -32,8 +31,8 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const isDark = theme === "dark";
   const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
-    "p-2 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
-    "dark:border-indigo-400/40 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
+    "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
+    "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
   const mobileProfilePanelMotion = prefersReducedMotion
     ? {
         initial: false,
@@ -48,34 +47,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const mobileProfilePanelTransition = prefersReducedMotion
     ? { duration: 0 }
     : { duration: 0.18, ease: [0.22, 1, 0.36, 1] };
-  const mobileMenuPanelMotion = prefersReducedMotion
-    ? {
-        initial: false,
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: 0, scale: 1 },
-      }
-    : {
-        initial: { opacity: 0, y: -12, scale: 0.97 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -10, scale: 0.985 },
-      };
-  const mobileMenuPanelTransition = prefersReducedMotion
-    ? { duration: 0 }
-    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] };
-  const mobileMenuItemClass = (active = false) =>
-    `group flex w-full items-start gap-3 rounded-[22px] border px-3.5 py-3.5 text-left transition-all duration-200 ${
-      active
-        ? "border-indigo-200 bg-indigo-50/90 text-indigo-700 shadow-[0_16px_30px_-24px_rgba(79,70,229,0.65)] dark:border-indigo-400/35 dark:bg-indigo-500/15 dark:text-indigo-200"
-        : "border-transparent bg-slate-50/80 text-slate-700 hover:border-slate-200 hover:bg-white dark:bg-white/[0.04] dark:text-slate-200 dark:hover:border-white/10 dark:hover:bg-white/[0.07]"
-    }`;
-  const mobileMenuIconShellClass = (active = false) =>
-    `mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${
-      active
-        ? "border-indigo-200 bg-white text-indigo-600 dark:border-indigo-400/30 dark:bg-slate-950/60 dark:text-indigo-200"
-        : "border-slate-200 bg-white text-slate-500 dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-300"
-    }`;
-  const mobileQuickActionClass =
-    "inline-flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-indigo-400/30 dark:hover:text-indigo-200";
 
   if (!isStudent) {
     return null;
@@ -88,53 +59,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     notifications: "/student-dashboard/notifications",
     "contact-us": "/student-dashboard/contact-us",
   };
-  const closeMenus = () => {
-    setIsMobileMenuOpen(false);
-    setIsUserMenuOpen(false);
-    setIsMobileProfileOpen(false);
-  };
 
   useEffect(() => {
     let mounted = true;
-    let requestInFlight = false;
-    let activeController = null;
     const userId = String(user?._id || user?.id || "").trim();
 
     const syncUnread = async () => {
-      if (!getStoredToken() || !userId) {
-        if (mounted) setUnreadCount(0);
-        return;
-      }
-
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-
-      if (requestInFlight) {
-        return;
-      }
-
-      activeController?.abort?.();
-      activeController = new AbortController();
-      requestInFlight = true;
-
       try {
-        const response = await api({
-          ...SummaryApi.get_my_notifications,
-          cacheTTL: 20000,
-          skipRetry: true,
-          timeout: 8000,
-          signal: activeController.signal,
-        });
+        const response = await api({ ...SummaryApi.get_my_notifications, cacheTTL: 20000 });
         const nextUnread = Number(response?.data?.unreadCount || 0);
         if (mounted) setUnreadCount(nextUnread);
-      } catch (error) {
-        if (activeController?.signal?.aborted || error?.code === "ERR_CANCELED") {
-          return;
-        }
+      } catch {
         if (mounted) setUnreadCount(0);
-      } finally {
-        requestInFlight = false;
       }
     };
 
@@ -143,56 +79,46 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       setUnreadCount(Number.isFinite(nextUnread) ? Math.max(0, nextUnread) : 0);
     };
 
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void syncUnread();
-      }
-    };
-
     window.addEventListener("eventmate:student-unread-count", onUnreadCount);
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onVisibilityChange);
-    }
     syncUnread();
 
     let intervalId = null;
     if (userId) {
+      if (SOCKET_BASE_URL !== null) {
+        const socket = io(SOCKET_BASE_URL, {
+          transports: ["websocket", "polling"],
+          withCredentials: true,
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 800,
+          timeout: 8000,
+        });
+
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+          socket.emit("join", userId);
+        });
+
+        socket.on("notification", () => {
+          if (!mounted) return;
+          setUnreadCount((prev) => prev + 1);
+        });
+      }
+
       intervalId = setInterval(syncUnread, 30000);
     }
 
     return () => {
       mounted = false;
-      activeController?.abort?.();
       if (intervalId) clearInterval(intervalId);
-      window.removeEventListener("eventmate:student-unread-count", onUnreadCount);
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
+      window.removeEventListener("eventmate:student-unread-count", onUnreadCount);
     };
   }, [user?._id, user?.id]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return undefined;
-    }
-
-    const shouldLockScroll = isMobileMenuOpen || isMobileProfileOpen;
-    if (!shouldLockScroll) {
-      return undefined;
-    }
-
-    const { body, documentElement } = document;
-    const previousBodyOverflow = body.style.overflow;
-    const previousHtmlOverflow = documentElement.style.overflow;
-
-    body.style.overflow = "hidden";
-    documentElement.style.overflow = "hidden";
-
-    return () => {
-      body.style.overflow = previousBodyOverflow;
-      documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, [isMobileMenuOpen, isMobileProfileOpen]);
 
   // Handle route navigation for student dashboard pages
   const handleNavClick = (pageName) => {
@@ -201,11 +127,10 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     }
 
     navigate(pageToPath[pageName] || "/student-dashboard");
-    closeMenus();
-    const resetScroll = { top: 0, left: 0, behavior: "auto" };
-    window.scrollTo(resetScroll);
-    document.documentElement?.scrollTo?.(resetScroll);
-    document.body?.scrollTo?.(resetScroll);
+    setIsMobileMenuOpen(false);
+    setIsUserMenuOpen(false);
+    setIsMobileProfileOpen(false);
+    window.scrollTo(0, 0);
   };
   const toggleMobileProfileMenu = () => {
     setIsUserMenuOpen(false);
@@ -217,99 +142,19 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   };
 
   const isActivePage = (pageName) => activePage === pageName;
-  const mobileMenuSections = [
-    {
-      title: "Explore",
-      items: [
-        {
-          key: "home",
-          label: "Home",
-          description: "Return to your student dashboard overview.",
-          icon: Home,
-          active: isActivePage("home"),
-          onSelect: () => handleNavClick("home"),
-        },
-        {
-          key: "events",
-          label: "Events",
-          description: "Browse upcoming events and open registrations.",
-          icon: Calendar,
-          active: isActivePage("events"),
-          onSelect: () => handleNavClick("events"),
-        },
-        {
-          key: "my-events",
-          label: "My Events",
-          description: "Open your registered and completed events.",
-          icon: Calendar,
-          active: isActivePage("my-events"),
-          onSelect: () => handleNavClick("my-events"),
-        },
-      ],
-    },
-    {
-      title: "Support",
-      items: [
-        {
-          key: "contact-us",
-          label: "Contact us",
-          description: "Reach the EventMate team whenever you need help.",
-          icon: Mail,
-          active: isActivePage("contact-us"),
-          onSelect: () => handleNavClick("contact-us"),
-        },
-      ],
-    },
-  ];
-  const mobileQuickActions = [
-    {
-      key: "profile",
-      label: "Profile",
-      onSelect: () => {
-        navigate("/profile");
-        closeMenus();
-      },
-    },
-    {
-      key: "theme",
-      label: isDark ? "Light" : "Dark",
-      onSelect: () => {
-        toggleTheme();
-        closeMenus();
-      },
-    },
-  ];
-  const renderMobileMenuEntry = (item) => {
-    const Icon = item.icon || Home;
-    return (
-      <button
-        key={item.key}
-        type="button"
-        onClick={item.onSelect}
-        className={mobileMenuItemClass(item.active)}
-      >
-        <span className={mobileMenuIconShellClass(item.active)}>
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="text-sm font-semibold leading-5">{item.label}</span>
-          <span
-            className={`mt-1 block text-[11px] leading-5 ${
-              item.active ? "text-indigo-500/90 dark:text-indigo-200/80" : "text-slate-500 dark:text-slate-400"
-            }`}
-          >
-            {item.description}
-          </span>
-        </span>
-      </button>
-    );
-  };
   const desktopLinkClass = (pageName) =>
     `inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
       isActivePage(pageName)
         ? "text-purple-600 dark:text-indigo-300 border-b-2 border-purple-600 dark:border-indigo-300"
         : "text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-indigo-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-white/20"
     }`;
+  const mobileLinkClass = (pageName) =>
+    `w-full text-left block pl-3 pr-4 py-3 border-l-4 text-base font-medium ${
+      isActivePage(pageName)
+        ? "bg-purple-50 dark:bg-indigo-500/10 border-purple-600 dark:border-indigo-300 text-purple-700 dark:text-indigo-300"
+        : "border-transparent text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:border-gray-300 dark:hover:border-white/20 hover:text-gray-700 dark:hover:text-indigo-300"
+    }`;
+
   const renderAvatar = (className, textClassName) => (
     <AvatarWithFrame
       src={avatarUrl}
@@ -322,7 +167,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
   return (
     <>
-    <nav className="sticky inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 shadow-sm">
+    <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           
@@ -330,11 +175,11 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           <div className="flex">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => handleNavClick('home')}>
-              <span className="relative font-extrabold text-[clamp(1.05rem,6.2vw,1.5rem)] leading-none tracking-[-0.045em] max-[320px]:text-[0.95rem] sm:text-2xl">
+              <span className="font-extrabold text-2xl tracking-tight relative">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
-                <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-indigo-400/25 blur-lg max-[320px]:-left-1.5 max-[320px]:-top-1.5 max-[320px]:h-3.5 max-[320px]:w-3.5 min-[380px]:-left-3 min-[380px]:-top-3 min-[380px]:h-6 min-[380px]:w-6" />
+                <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-indigo-400/25 blur-lg" />
               </span>
             </div>
 
@@ -394,30 +239,36 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
               {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </button>
 
+            {/* User Profile Dropdown */}
             <div className="relative ml-3">
               <div>
                 <button
                   type="button"
-                  className="flex rounded-full border-2 border-transparent text-sm transition duration-150 ease-in-out focus:outline-none focus:border-purple-300"
+                  className="flex text-sm border-2 border-transparent rounded-full focus:outline-none focus:border-purple-300 transition duration-150 ease-in-out"
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 >
                   <span className="sr-only">Open user menu</span>
                   {renderAvatar("h-8 w-8", "text-sm")}
-                </button>
+                  </button>
               </div>
 
+              {/* Dropdown Menu */}
               {isUserMenuOpen && (
-                <div className="animate-fade-in-down absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 dark:bg-gray-900 dark:ring-white/10">
-                  <div className="border-b border-gray-100 px-4 py-2 dark:border-white/10">
-                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{displayName}</p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</p>
+                <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white dark:bg-gray-900 ring-1 ring-black ring-opacity-5 dark:ring-white/10 focus:outline-none z-50 animate-fade-in-down">
+                  <div className="px-4 py-2 border-b border-gray-100 dark:border-white/10">
+                    <p className="text-sm text-gray-900 dark:text-gray-100 font-bold">{displayName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || 'student@college.com'}</p>
                   </div>
+                  
+                  <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/5">
+                    Your Profile
+                  </Link>
                   <button
                     onClick={() => {
                       onLogout();
                       setIsUserMenuOpen(false);
                     }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                    className="w-full text-left block px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                   >
                     <LogOut size={16} /> Sign out
                   </button>
@@ -427,7 +278,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           </div>
 
           {/* --- MOBILE MENU BUTTON --- */}
-          <div className="-mr-2 flex items-center gap-1.5 max-[360px]:gap-1 sm:hidden">
+          <div className="-mr-2 flex items-center gap-2 sm:hidden">
             <button
               type="button"
               onClick={() => handleNavClick("notifications")}
@@ -442,11 +293,73 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
               )}
             </button>
             <button
+              type="button"
+              aria-label="Toggle theme"
+              onClick={() => {
+                setIsMobileProfileOpen(false);
+                toggleTheme();
+              }}
+              className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleMobileProfileClick}
+                aria-label="Open profile menu"
+                aria-expanded={isMobileProfileOpen}
+                aria-haspopup="menu"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                {renderAvatar("h-8 w-8", "text-sm")}
+              </button>
+              <AnimatePresence>
+                {isMobileProfileOpen && (
+                  <motion.div
+                    initial={mobileProfilePanelMotion.initial}
+                    animate={mobileProfilePanelMotion.animate}
+                    exit={mobileProfilePanelMotion.exit}
+                    transition={mobileProfilePanelTransition}
+                    role="menu"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                  >
+                    <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300 truncate">
+                        {user?.email || "student@college.com"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMobileProfileOpen(false);
+                        navigate("/profile");
+                      }}
+                      className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      Your Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onLogout();
+                        setIsMobileProfileOpen(false);
+                      }}
+                      className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/15 flex items-center gap-2"
+                    >
+                      <LogOut size={16} /> Sign out
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <button
               onClick={() => {
                 setIsMobileProfileOpen(false);
                 setIsMobileMenuOpen(!isMobileMenuOpen);
               }}
-              className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-white/90 p-1.5 text-slate-500 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-white/10 dark:bg-slate-900/90 dark:text-slate-300 dark:hover:border-indigo-400/40 dark:hover:text-indigo-200 max-[320px]:p-1"
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-indigo-300 hover:bg-gray-100 dark:hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-purple-500"
             >
               <span className="sr-only">Open main menu</span>
               {isMobileMenuOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
@@ -456,95 +369,41 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       </div>
 
       {/* --- MOBILE MENU PANEL --- */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.button
-              type="button"
-              aria-label="Close mobile menu"
-              onClick={closeMenus}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
-              className="fixed inset-0 top-16 z-[105] bg-slate-950/40 backdrop-blur-[2px] sm:hidden"
-            />
-            <motion.div
-              initial={mobileMenuPanelMotion.initial}
-              animate={mobileMenuPanelMotion.animate}
-              exit={mobileMenuPanelMotion.exit}
-              transition={mobileMenuPanelTransition}
-              className="fixed right-3 top-[4.35rem] z-[109] w-[min(22rem,calc(100vw-1.5rem))] max-h-[min(30rem,calc(100svh-5.5rem))] overflow-y-auto overscroll-contain rounded-[30px] border border-slate-200/80 bg-white/96 shadow-[0_32px_80px_-38px_rgba(15,23,42,0.6)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/96 sm:hidden"
+      {isMobileMenuOpen && (
+        <div className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
+          <div className="pt-2 pb-3 space-y-1">
+            <button
+              onClick={() => handleNavClick('home')}
+              className={mobileLinkClass("home")}
             >
-              <div className="p-3">
-                <div className="rounded-[26px] border border-slate-200/80 bg-gradient-to-br from-slate-50 via-white to-white p-4 dark:border-white/10 dark:from-white/[0.08] dark:via-white/[0.04] dark:to-transparent">
-                  <div className="flex items-start gap-3">
-                    <AvatarWithFrame
-                      src={avatarUrl}
-                      alt={`${displayName} avatar`}
-                      className="h-11 w-11 shrink-0"
-                      coreClassName="h-full w-full border border-indigo-200 bg-white text-indigo-700 dark:border-indigo-400/40 dark:bg-slate-950/70 dark:text-indigo-200 flex items-center justify-center text-sm font-semibold"
-                      fallback={<span>{avatarText || "S"}</span>}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                        Student Menu
-                      </p>
-                      <h2 className="mt-1 truncate text-base font-semibold text-slate-900 dark:text-white">
-                        {displayName}
-                      </h2>
-                      <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-300">
-                        {user?.email || "student@college.com"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {mobileQuickActions.map((action) => (
-                      <button
-                        key={action.key}
-                        type="button"
-                        onClick={action.onSelect}
-                        className={mobileQuickActionClass}
-                      >
-                        <span className="block max-w-full truncate whitespace-nowrap">
-                          {action.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {mobileMenuSections.map((section) => (
-                    <div key={section.title} className="space-y-2.5">
-                      <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                        {section.title}
-                      </p>
-                      <div className="space-y-2">
-                        {section.items.map((item) => renderMobileMenuEntry(item))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    onLogout();
-                    closeMenus();
-                  }}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-[22px] border border-red-200/80 bg-red-50/80 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/12 dark:text-red-300 dark:hover:bg-red-500/18"
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              Home
+            </button>
+            <button
+              onClick={() => handleNavClick('events')}
+              className={mobileLinkClass("events")}
+            >
+              Events
+            </button>
+            <button
+              onClick={() => handleNavClick('my-events')}
+              className={mobileLinkClass("my-events")}
+            >
+              My Events
+            </button>
+            
+            <button
+              onClick={() => handleNavClick("contact-us")}
+              className={mobileLinkClass("contact-us")}
+            >
+              Contact us
+            </button>
+          </div>
+          
+          <div className="pt-4 pb-4 border-t border-gray-200" />
+        </div>
+      )}
     </nav>
+    <div aria-hidden="true" className="h-16 shrink-0" />
     </>
   );
 };

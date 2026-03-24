@@ -1,27 +1,22 @@
 import Event from "../models/Event.model.js";
 import User from "../models/User.model.js";
-import EventRegistration from "../models/EventRegistration.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
-import { generateCertificatesForEvent } from "../services/certificate.service.js";
-import { buildEventEndDateTime, buildEventStartDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
+import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
-const normalizeId = (value = "") => String(value || "").trim();
-const normalizeEmail = (value = "") => String(value || "").trim().toLowerCase();
 const resolveUserDepartment = (user) =>
   normalizeDepartment(user?.academicProfile?.branch || user?.professionalProfile?.department || user?.department);
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
-  const endDateTime = buildEventEndDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate,
-    event?.schedule?.endTime
-  );
-  if (!endDateTime) return false;
-  return Date.now() > endDateTime.getTime();
+  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
+  if (!endValue) return false;
+  const endTime = new Date(endValue).getTime();
+  if (Number.isNaN(endTime)) return false;
+  return Date.now() > endTime;
 };
 
 const parseVisibilityPayload = (raw) => {
@@ -37,125 +32,10 @@ const parseVisibilityPayload = (raw) => {
   return null;
 };
 
-const parseJsonPayload = (raw, fallback = null) => {
-  if (!raw) return fallback;
-  if (typeof raw === "object") return raw;
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return fallback;
-    }
-  }
-  return fallback;
-};
-
-const normalizePaymentConfig = (registrationPayload = {}, paymentQrUrl = "") => {
-  const fee = Number(registrationPayload?.fee || 0);
-  if (fee <= 0) {
-    return {
-      method: "FREE",
-      accountName: "",
-      upiId: "",
-      qrImageUrl: "",
-      instructions: ""
-    };
-  }
-
-  const rawConfig = registrationPayload?.paymentConfig || {};
-  const method =
-    String(rawConfig?.method || "").trim().toUpperCase() === "PHONEPE_QR"
-      ? "PHONEPE_QR"
-      : "PHONEPE_QR";
-
-  return {
-    method,
-    accountName: String(rawConfig?.accountName || "").trim(),
-    upiId: String(rawConfig?.upiId || "").trim(),
-    qrImageUrl: String(paymentQrUrl || rawConfig?.qrImageUrl || "").trim(),
-    instructions: String(rawConfig?.instructions || "").trim()
-  };
-};
-
-const validatePaymentConfig = (registrationPayload = {}) => {
-  const fee = Number(registrationPayload?.fee || 0);
-  if (fee <= 0) return null;
-
-  const paymentConfig = registrationPayload?.paymentConfig || {};
-  const accountName = String(paymentConfig?.accountName || "").trim();
-  const upiId = String(paymentConfig?.upiId || "").trim();
-  const qrImageUrl = String(paymentConfig?.qrImageUrl || "").trim();
-
-  if (!accountName) {
-    return "Account name is required for paid events";
-  }
-  if (!upiId && !qrImageUrl) {
-    return "UPI ID or payment QR image is required for paid events";
-  }
-  return null;
-};
-
-const EVENT_CONTACT_AUDIENCE_USER_FIELDS = [
-  "_id",
-  "fullName",
-  "email",
-  "role",
-  "avatar",
-  "collegeName",
-  "academicProfile.branch",
-  "professionalProfile.department",
-].join(" ");
-
-const buildEventContactAudienceSignals = (event, registrations = []) => {
-  const allowedIds = new Set();
-  const allowedEmails = new Set();
-  const isTeamEvent = Boolean(event?.isTeamEvent);
-
-  (Array.isArray(event?.studentCoordinators) ? event.studentCoordinators : []).forEach((entry) => {
-    const coordinatorId = normalizeId(entry?.coordinatorId);
-    const coordinatorEmail = normalizeEmail(entry?.email);
-    if (coordinatorId) allowedIds.add(coordinatorId);
-    if (coordinatorEmail) allowedEmails.add(coordinatorEmail);
-  });
-
-  registrations.forEach((registration) => {
-    const registeredById = normalizeId(registration?.registeredBy);
-    const leaderEmail = normalizeEmail(registration?.teamLeader?.email);
-
-    if (registeredById) allowedIds.add(registeredById);
-    if (leaderEmail) allowedEmails.add(leaderEmail);
-
-    if (!isTeamEvent) return;
-
-    (Array.isArray(registration?.teamMembers) ? registration.teamMembers : []).forEach((member) => {
-      const memberEmail = normalizeEmail(member?.email);
-      if (memberEmail) allowedEmails.add(memberEmail);
-    });
-  });
-
-  return { allowedIds, allowedEmails };
-};
-
-const mapEventContactAudienceUser = (user = {}) => ({
-  _id: user?._id || null,
-  fullName: String(user?.fullName || "").trim(),
-  email: String(user?.email || "").trim().toLowerCase(),
-  role: String(user?.role || "").trim(),
-  avatar: user?.avatar || null,
-  collegeName: String(user?.collegeName || "").trim(),
-  academicProfile: {
-    branch: String(user?.academicProfile?.branch || "").trim(),
-  },
-  professionalProfile: {
-    department: String(user?.professionalProfile?.department || "").trim(),
-  },
-});
-
 export const createEventController = asyncHandler(async (req, res) => {
 
   const posterFile = req.files?.poster?.[0] || req.file;
   const resourceFile = req.files?.resourceFile?.[0];
-  const paymentQrFile = req.files?.paymentQr?.[0];
 
   if (!posterFile) {
     return res.status(400).json({
@@ -215,15 +95,6 @@ export const createEventController = asyncHandler(async (req, res) => {
     };
   }
 
-  let uploadedPaymentQrUrl = "";
-  if (paymentQrFile) {
-    const uploadedPaymentQr = await uploadImageCloudinary(paymentQrFile, {
-      folder: "eventmate/events/payments",
-      resourceType: "image"
-    });
-    uploadedPaymentQrUrl = uploadedPaymentQr.url;
-  }
-
   const visibilityPayload = parseVisibilityPayload(visibility);
   const visibilityScope = String(visibilityPayload?.scope || "").toUpperCase() === "DEPARTMENT"
     ? "DEPARTMENT"
@@ -246,23 +117,6 @@ export const createEventController = asyncHandler(async (req, res) => {
     }
   }
 
-  const registrationPayload = parseJsonPayload(registration, {
-    isOpen: false,
-    fee: 0
-  });
-  registrationPayload.paymentConfig = normalizePaymentConfig(
-    registrationPayload,
-    uploadedPaymentQrUrl
-  );
-
-  const paymentValidationError = validatePaymentConfig(registrationPayload);
-  if (paymentValidationError) {
-    return res.status(400).json({
-      success: false,
-      message: paymentValidationError
-    });
-  }
-
   const event = await Event.create({
     title,
     description,
@@ -280,7 +134,10 @@ export const createEventController = asyncHandler(async (req, res) => {
 
     venue: venue ? JSON.parse(venue) : undefined,
     schedule: schedule ? JSON.parse(schedule) : undefined,
-    registration: registrationPayload,
+    registration: registration ? JSON.parse(registration) : {
+      isOpen: false,
+      fee: 0
+    },
     certificate: certificate ? JSON.parse(certificate) : { isEnabled: false },
     feedback: feedback ? JSON.parse(feedback) : { enabled: false },
 
@@ -446,12 +303,6 @@ export const cancelEvent = async (req, res, next) => {
 
     await event.save();
 
-    if (event?.certificate?.isEnabled) {
-      generateCertificatesForEvent(event._id).catch((certificateError) => {
-        console.error("Post-completion certificate sync error:", certificateError.message);
-      });
-    }
-
     return res.status(200).json({
       success: true,
       message: "Event cancelled successfully",
@@ -502,23 +353,6 @@ export const updateEvent = async (req, res, next) => {
     delete req.body._id;
     delete req.body.__v;
 
-    if (req.body.venue && typeof req.body.venue === "string") {
-      const parsedVenue = parseJsonPayload(req.body.venue);
-      if (parsedVenue) req.body.venue = parsedVenue;
-    }
-    if (req.body.schedule && typeof req.body.schedule === "string") {
-      const parsedSchedule = parseJsonPayload(req.body.schedule);
-      if (parsedSchedule) req.body.schedule = parsedSchedule;
-    }
-    if (req.body.registration && typeof req.body.registration === "string") {
-      const parsedRegistration = parseJsonPayload(req.body.registration);
-      if (parsedRegistration) req.body.registration = parsedRegistration;
-    }
-    if (req.body.feedback && typeof req.body.feedback === "string") {
-      const parsedFeedback = parseJsonPayload(req.body.feedback);
-      if (parsedFeedback) req.body.feedback = parsedFeedback;
-    }
-
     if (req.body.visibility && typeof req.body.visibility === "string") {
       const parsedVisibility = parseVisibilityPayload(req.body.visibility);
       if (parsedVisibility) req.body.visibility = parsedVisibility;
@@ -546,39 +380,6 @@ export const updateEvent = async (req, res, next) => {
           message: "Department is required for department-level events"
         });
       }
-    }
-
-    const paymentQrFile = req.files?.paymentQr?.[0];
-    let uploadedPaymentQrUrl = "";
-    if (paymentQrFile) {
-      const uploadedPaymentQr = await uploadImageCloudinary(paymentQrFile, {
-        folder: "eventmate/events/payments",
-        resourceType: "image"
-      });
-      uploadedPaymentQrUrl = uploadedPaymentQr.url;
-    }
-
-    if (req.body.registration) {
-      const mergedRegistration = {
-        ...(event.registration?.toObject ? event.registration.toObject() : event.registration || {}),
-        ...req.body.registration
-      };
-      mergedRegistration.paymentConfig = normalizePaymentConfig(
-        mergedRegistration,
-        uploadedPaymentQrUrl ||
-          mergedRegistration?.paymentConfig?.qrImageUrl ||
-          event?.registration?.paymentConfig?.qrImageUrl
-      );
-
-      const paymentValidationError = validatePaymentConfig(mergedRegistration);
-      if (paymentValidationError) {
-        return res.status(400).json({
-          success: false,
-          message: paymentValidationError
-        });
-      }
-
-      req.body.registration = mergedRegistration;
     }
 
     Object.assign(event, req.body);
@@ -662,85 +463,6 @@ export const getEvent = async (req, res, next) => {
       data: event
     });
     
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getEventContactAudience = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const event = await Event.findById(id).select(
-      "createdBy organizer studentCoordinators isTeamEvent"
-    );
-
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: "Event not found"
-      });
-    }
-
-    const requesterId = normalizeId(req.user?._id);
-    const isAdmin = String(req.user?.role || "").trim().toUpperCase() === "MAIN_ADMIN";
-    const isOrganizer =
-      normalizeId(event?.organizer?.organizerId) === requesterId ||
-      normalizeId(event?.createdBy) === requesterId;
-
-    if (!isAdmin && !isOrganizer) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view this event audience"
-      });
-    }
-
-    const registrations = await EventRegistration.find({ event: event._id }).select(
-      "registeredBy teamLeader.email teamMembers.email"
-    );
-    const audienceSignals = buildEventContactAudienceSignals(event, registrations);
-    const userQuery = [];
-
-    if (audienceSignals.allowedIds.size > 0) {
-      userQuery.push({ _id: { $in: Array.from(audienceSignals.allowedIds) } });
-    }
-
-    if (audienceSignals.allowedEmails.size > 0) {
-      userQuery.push({ email: { $in: Array.from(audienceSignals.allowedEmails) } });
-    }
-
-    if (!userQuery.length) {
-      return res.status(200).json({
-        success: true,
-        count: 0,
-        data: []
-      });
-    }
-
-    const rows = await User.find({
-      $or: userQuery,
-      role: { $in: ["STUDENT_COORDINATOR", "STUDENT"] }
-    })
-      .select(EVENT_CONTACT_AUDIENCE_USER_FIELDS)
-      .sort({ fullName: 1, email: 1 })
-      .lean();
-
-    const seen = new Set();
-    const users = rows
-      .filter((user) => normalizeId(user?._id) !== requesterId)
-      .map(mapEventContactAudienceUser)
-      .filter((user) => {
-        const userId = normalizeId(user?._id);
-        if (!userId || seen.has(userId)) return false;
-        seen.add(userId);
-        return true;
-      });
-
-    return res.status(200).json({
-      success: true,
-      count: users.length,
-      data: users
-    });
   } catch (error) {
     next(error);
   }
@@ -905,7 +627,7 @@ export const completeEvent = async (req, res, next) => {
     }
 
     const now = new Date();
-    const eventStartDateTime = buildEventStartDateTime(
+    const eventStartDateTime = buildEventEndDateTime(
       event.schedule?.startDate,
       event.schedule?.startTime
     );

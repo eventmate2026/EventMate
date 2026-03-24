@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import api, { primeBackendConnection } from "../lib/api";
+import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
-import { useToast } from "../context/ToastContext";
 
-export default function ContactUs({ compactTopSpacing = false }) {
-  const toast = useToast();
+export default function ContactUs() {
   const [user, setUser] = useState(() => getStoredUser());
   const [formData, setFormData] = useState({
     name: "",
@@ -13,6 +11,7 @@ export default function ContactUs({ compactTopSpacing = false }) {
     message: "",
   });
 
+  const [status, setStatus] = useState({ type: "", message: "" });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -23,32 +22,32 @@ export default function ContactUs({ compactTopSpacing = false }) {
       name: prev.name || profile?.fullName || "",
       email: prev.email || profile?.email || "",
     }));
-    void primeBackendConnection();
   }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    if (status.message) setStatus({ type: "", message: "" });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      toast.error("Please fill in all fields.");
+      setStatus({ type: "error", message: "Please fill in all fields." });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      toast.error("Please enter a valid email address.");
+      setStatus({ type: "error", message: "Please enter a valid email address." });
       return;
     }
 
     setIsLoading(true);
+    setStatus({ type: "", message: "" });
 
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.submit_contact,
         data: {
@@ -58,15 +57,10 @@ export default function ContactUs({ compactTopSpacing = false }) {
         },
       });
 
-      const deliveryPending =
-        Boolean(response.data?.emailDeliveryPending) || Number(response.status) === 202;
-      const responseMessage = response.data?.message || "Message sent successfully.";
-
-      if (deliveryPending) {
-        toast.info(responseMessage, { duration: 5200 });
-      } else {
-        toast.success(responseMessage);
-      }
+      setStatus({
+        type: "success",
+        message: response.data?.message || "Message sent successfully.",
+      });
 
       setFormData({
         name: user?.fullName || "",
@@ -74,18 +68,17 @@ export default function ContactUs({ compactTopSpacing = false }) {
         message: "",
       });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Unable to send message right now.");
+      setStatus({
+        type: "error",
+        message: error.response?.data?.message || "Unable to send message right now.",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <section
-      className={`eventmate-page relative px-4 sm:px-6 overflow-hidden bg-gray-50 dark:bg-gray-900 ${
-        compactTopSpacing ? "pt-6 pb-16 sm:pt-8 sm:pb-20" : "py-20"
-      }`}
-    >
+    <section className="eventmate-page relative py-20 px-4 sm:px-6 overflow-hidden bg-gray-50 dark:bg-gray-900">
       
       {/* Background Decorative Gradients */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
@@ -117,19 +110,17 @@ export default function ContactUs({ compactTopSpacing = false }) {
 
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Send us a message</h3>
               
-              <form onSubmit={handleSubmit} className="space-y-6" autoComplete="on">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Name */}
                   <div className="space-y-2">
-                    <label htmlFor="contact-name" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Full Name</label>
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Full Name</label>
                     <input
-                      id="contact-name"
                       type="text"
                       name="name"
                       value={formData.name}
                       onChange={handleChange}
                       placeholder="John Doe"
-                      autoComplete="name"
                       required
                       disabled={isLoading}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all dark:text-white disabled:opacity-50"
@@ -137,15 +128,13 @@ export default function ContactUs({ compactTopSpacing = false }) {
                   </div>
                   {/* Email */}
                   <div className="space-y-2">
-                    <label htmlFor="contact-email" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
+                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Email Address</label>
                     <input
-                      id="contact-email"
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
                       placeholder="john@example.com"
-                      autoComplete="email"
                       required
                       disabled={isLoading}
                       className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all dark:text-white disabled:opacity-50"
@@ -155,20 +144,30 @@ export default function ContactUs({ compactTopSpacing = false }) {
 
                 {/* Message */}
                 <div className="space-y-2">
-                  <label htmlFor="contact-message" className="text-sm font-semibold text-gray-700 dark:text-gray-300">Message</label>
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Message</label>
                   <textarea
-                    id="contact-message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
                     placeholder="Write your message here..."
                     rows="4"
-                    autoComplete="off"
                     required
                     disabled={isLoading}
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-none dark:text-white disabled:opacity-50"
                   />
                 </div>
+
+                {/* Status Alert */}
+                {status.message && (
+                  <div className={`p-4 rounded-xl text-sm font-semibold animate-fade-in ${
+                    status.type === "success" 
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800" 
+                      : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800"
+                  }`}>
+                    {status.message}
+                  </div>
+                )}
+
                 {/* Submit Button */}
                 <button
                   type="submit"

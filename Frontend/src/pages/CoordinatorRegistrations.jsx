@@ -380,7 +380,6 @@ export default function CoordinatorRegistrations() {
             <label className="eventmate-panel w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 px-3 py-2 text-xs text-slate-600 dark:text-slate-300 sm:w-auto">
               <span className="mr-2 font-semibold text-slate-700 dark:text-slate-200">Event</span>
               <select
-                name="selectedEvent"
                 value={normalizeId(selectedEvent?._id)}
                 onChange={(event) => {
                   const nextId = normalizeId(event.target.value);
@@ -453,7 +452,6 @@ export default function CoordinatorRegistrations() {
               <label className="relative mt-4 block">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  name="registrationSearch"
                   value={registrationQuery}
                   onChange={(event) => setRegistrationQuery(event.target.value)}
                   placeholder="Search by name, email, or team..."

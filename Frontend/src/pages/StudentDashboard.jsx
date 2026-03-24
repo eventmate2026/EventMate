@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BadgeCheck, CalendarDays, Loader2, MapPin, MessageSquareMore, Search, Users2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
-import { fetchMyRegistrations } from "../lib/registrationApi";
+import { fetchRegisteredEventIds } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
-import { countEligibleFeedbackRegistrations } from "../lib/feedbackEligibility";
 
 const StatCard = ({ label, value, color = "bg-purple-100 text-purple-700 dark:bg-indigo-500/20 dark:text-indigo-200" }) => (
   <div className={`eventmate-kpi flex flex-col items-center p-6 rounded-2xl ${color} shadow-sm`}>
@@ -39,24 +38,33 @@ const dateValue = (value) => {
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
 
-const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
+const formatTime = (date) =>
+  date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
-const loadSubmittedFeedbackEventIds = () => {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(FEEDBACK_SUBMITTED_KEY) || "[]");
-    return new Set(Array.isArray(parsed) ? parsed.map((item) => String(item || "").trim()).filter(Boolean) : []);
-  } catch {
-    return new Set();
-  }
+const formatDate = (date) =>
+  date.toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+const resolveGreeting = (date) => {
+  const hour = date.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "Good night";
 };
 
-const countCertificateRows = (payload) => {
-  if (Array.isArray(payload?.data)) return payload.data.length;
-  if (Array.isArray(payload?.certificates)) return payload.certificates.length;
-  if (Array.isArray(payload?.data?.certificates)) return payload.data.certificates.length;
-  return Number(payload?.count || payload?.data?.count || 0) || 0;
-};
+const LIVE_TIPS = [
+  "Tap an event card to view full details and coordinator info.",
+  "Complete your profile to unlock smarter event recommendations.",
+  "Check feedback tasks after you attend an event.",
+  "Use My Events to track registrations in one place.",
+];
 
 const resolveDashboardStatus = (event) => {
   const mappedStatus = normalizeStatus(event?.status);
@@ -152,35 +160,27 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(() => getStoredUser());
+  const [showAllRecommended, setShowAllRecommended] = useState(false);
   const [events, setEvents] = useState([]);
   const [myEvents, setMyEvents] = useState([]);
-  const [registrationCount, setRegistrationCount] = useState(0);
   const [assignedEventsCount, setAssignedEventsCount] = useState(0);
-  const [certificateCount, setCertificateCount] = useState(0);
-  const [pendingFeedbackCount, setPendingFeedbackCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
+  const [clock, setClock] = useState(() => new Date());
 
-  const fetchDashboardEvents = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
-    }
+  const fetchDashboardEvents = async () => {
+    setLoading(true);
     setError(null);
     setRegistrationWarning(null);
     try {
       const [publicResponse, registrationInfo] = await Promise.all([
         api({ ...SummaryApi.get_public_events, cacheTTL: 90000 }),
-        fetchMyRegistrations({ bypassCache: silent }),
+        fetchRegisteredEventIds(),
       ]);
-      const registrationRows = Array.isArray(registrationInfo?.rows) ? registrationInfo.rows : [];
-      const registeredIds = new Set(registrationRows.map((row) => String(row?.eventId || "").trim()).filter(Boolean));
-      const submittedEventIds = loadSubmittedFeedbackEventIds();
+      const registeredIds = registrationInfo.ids;
       setRegistrationWarning(registrationInfo.warning);
-      setRegistrationCount(registrationRows.length);
-      setPendingFeedbackCount(
-        countEligibleFeedbackRegistrations(registrationRows, { submittedEventIds })
-      );
       const publicEvents = extractEventList(publicResponse.data);
 
       const allMapped = publicEvents
@@ -203,38 +203,21 @@ export default function StudentDashboard() {
       setError(err.response?.data?.message || "Unable to load dashboard events.");
       setEvents([]);
       setMyEvents([]);
-      setRegistrationCount(0);
-      setPendingFeedbackCount(0);
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchDashboardEvents();
+  }, []);
 
-    const refreshOnFocus = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-      void fetchDashboardEvents({ silent: true });
-    };
-    const intervalId = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      void fetchDashboardEvents({ silent: true });
-    }, 15000);
-
-    window.addEventListener("focus", refreshOnFocus);
-    document.addEventListener("visibilitychange", refreshOnFocus);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", refreshOnFocus);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-    };
-  }, [fetchDashboardEvents]);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setClock(new Date());
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const fetchAssignedEvents = async () => {
@@ -249,34 +232,6 @@ export default function StudentDashboard() {
 
     fetchAssignedEvents();
   }, [user?._id]);
-
-  const fetchCertificateCount = useCallback(async () => {
-    try {
-      const response = await api({
-        ...SummaryApi.get_my_certificates,
-        cacheTTL: 0,
-        skipCache: true,
-      });
-      setCertificateCount(countCertificateRows(response?.data));
-    } catch {
-      setCertificateCount(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchCertificateCount();
-
-    const intervalId = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
-        return;
-      }
-      void fetchCertificateCount();
-    }, 15000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [fetchCertificateCount, user?._id]);
 
   useEffect(() => {
     return subscribeAuthUpdates(() => {
@@ -302,10 +257,18 @@ export default function StudentDashboard() {
     return notJoined.length > 0 ? notJoined : events;
   }, [events, myEvents]);
 
-  const displayedEvents = useMemo(() => recommendedEvents.slice(0, 3), [recommendedEvents]);
+  const displayedEvents = useMemo(
+    () => (showAllRecommended ? recommendedEvents : recommendedEvents.slice(0, 3)),
+    [recommendedEvents, showAllRecommended]
+  );
 
   const profileProgress = useMemo(() => computeProfileProgress(user), [user]);
   const showProfileCard = profileProgress.left > 0;
+  const liveGreeting = useMemo(() => resolveGreeting(clock), [clock]);
+  const liveTimeLabel = useMemo(() => formatTime(clock), [clock]);
+  const liveDateLabel = useMemo(() => formatDate(clock), [clock]);
+  const liveTip = useMemo(() => LIVE_TIPS[clock.getMinutes() % LIVE_TIPS.length], [clock]);
+  const userFirstName = String(user?.fullName || "Student").split(" ")[0];
 
   const coordinatorAction =
     assignedEventsCount > 0
@@ -331,7 +294,7 @@ export default function StudentDashboard() {
     {
       id: "my-events",
       title: "My Events",
-      subtitle: `${registrationCount} registered`,
+      subtitle: `${myEvents.length} registered`,
       icon: CalendarDays,
       iconClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300",
       path: "/student-dashboard/my-events",
@@ -340,7 +303,7 @@ export default function StudentDashboard() {
     {
       id: "my-certificates",
       title: "My Certificates",
-      subtitle: `${certificateCount} earned`,
+      subtitle: "See earned",
       icon: BadgeCheck,
       iconClass: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
       path: "/student-dashboard/my-certificates",
@@ -348,7 +311,7 @@ export default function StudentDashboard() {
     {
       id: "feedback",
       title: "Feedback",
-      subtitle: `${pendingFeedbackCount} pending`,
+      subtitle: "Pending",
       icon: MessageSquareMore,
       iconClass: "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
       path: "/student-dashboard/feedback-pending",
@@ -356,7 +319,19 @@ export default function StudentDashboard() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+      {message && (
+        <p
+          className={`mb-6 rounded-lg px-3 py-2 text-sm ${
+            message.type === "success"
+              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+              : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
+
       {registrationWarning && (
         <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
           {registrationWarning}
@@ -402,15 +377,22 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <div className={`grid gap-8 ${showProfileCard ? "md:grid-cols-3" : "grid-cols-1"}`}>
-        <div className={showProfileCard ? "md:col-span-2" : ""}>
+      <div className="grid md:grid-cols-3 gap-8">
+        <div className="md:col-span-2">
           <section className="eventmate-panel rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-gray-900/60 p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Event Highlights</h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">Recommended events selected for you</p>
+                <p className="text-gray-600 dark:text-gray-300 mt-1">Recommended events from database</p>
               </div>
               <div className="mt-3 sm:mt-0 flex gap-2">
+                <button
+                  onClick={() => setShowAllRecommended((prev) => !prev)}
+                  disabled={recommendedEvents.length <= 3}
+                  className="px-5 py-2 bg-purple-100 dark:bg-indigo-500/20 text-purple-700 dark:text-indigo-200 rounded-lg hover:bg-purple-200 dark:hover:bg-indigo-500/30 transition font-medium disabled:opacity-60"
+                >
+                  {showAllRecommended ? "Show Less" : "Show More"}
+                </button>
                 <button
                   onClick={() => navigate("/student-dashboard/events")}
                   className="px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
@@ -440,8 +422,8 @@ export default function StudentDashboard() {
           </section>
         </div>
 
-        {showProfileCard && (
-          <div className="space-y-6">
+        <div className="space-y-6">
+          {showProfileCard && (
             <div className="bg-gradient-to-br from-purple-600 to-indigo-600 dark:from-indigo-700 dark:to-slate-800 text-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold mb-3">Complete your profile</h2>
               <p className="mb-4 text-purple-100 dark:text-indigo-100 text-sm">
@@ -466,8 +448,38 @@ export default function StudentDashboard() {
                 Continue Setup
               </button>
             </div>
+          )}
+
+          <div className="relative overflow-hidden rounded-2xl border border-indigo-200/30 dark:border-white/10 bg-gradient-to-br from-indigo-600 via-purple-600 to-slate-900 text-white shadow-lg p-6">
+            <div className="absolute -top-16 -right-10 h-32 w-32 rounded-full bg-fuchsia-300/40 blur-3xl animate-pulse" />
+            <div className="absolute -bottom-16 -left-10 h-32 w-32 rounded-full bg-indigo-300/35 blur-3xl animate-pulse" />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-indigo-100/80">Live Campus Pulse</p>
+                  <h3 className="mt-2 text-2xl font-semibold">{liveGreeting}, {userFirstName}</h3>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs whitespace-nowrap shrink-0">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                  Live
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-white/12 p-3">
+                  <p className="text-xs text-indigo-100/90">Time now</p>
+                  <p className="mt-1 text-lg font-semibold">{liveTimeLabel}</p>
+                  <p className="text-xs text-indigo-100/90">{liveDateLabel}</p>
+                </div>
+                <div className="rounded-xl bg-white/12 p-3">
+                  <p className="text-xs text-indigo-100/90">Your snapshot</p>
+                  <p className="mt-1 text-lg font-semibold">{displayedEvents.length} picks</p>
+                  <p className="text-xs text-indigo-100/90">{myEvents.length} registered</p>
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-indigo-100/90">{liveTip}</p>
+            </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

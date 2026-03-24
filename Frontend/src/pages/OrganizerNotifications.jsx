@@ -4,10 +4,8 @@ export default function OrganizerNotifications() {
   return (
     <NotificationInbox
       title="Organizer Notifications"
-      subtitle="Track event updates, participant activity, and important organizer alerts."
+      subtitle="Your backend notifications are listed here."
       unreadEventName="eventmate:organizer-unread-count"
-      backPath="/organizer-dashboard"
-      backLabel="Back to Dashboard"
     />
   );
 }

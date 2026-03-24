@@ -11,23 +11,16 @@
   --ev-accent-a: #0ea5e9;
   --ev-accent-b: #14b8a6;
   --ev-accent-c: #f59e0b;
-  --eventmate-nav-offset: 4rem;
 }
 
 html {
-  height: 100%;
-  scroll-behavior: auto;
-  scroll-padding-top: var(--eventmate-nav-offset);
-  scrollbar-gutter: stable both-edges;
+  scroll-behavior: smooth;
   transition: background-color 0.45s ease, color 0.45s ease;
-  scrollbar-width: auto;
-  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  height: 100%;
   font-family: "Manrope", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background:
     radial-gradient(circle at 8% -6%, rgba(14, 165, 233, 0.14), transparent 30%),
@@ -36,8 +29,6 @@ body {
     var(--ev-bg-light);
   color: var(--ev-text-light);
   overflow-x: hidden;
-  overscroll-behavior-y: auto;
-  -webkit-overflow-scrolling: touch;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -50,14 +41,6 @@ body {
 
 #root {
   min-height: 100vh;
-  height: 100%;
-  overflow-x: hidden;
-}
-
-@media (min-width: 640px) {
-  :root {
-    --eventmate-nav-offset: 4.5rem;
-  }
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -197,160 +180,22 @@ table {
   box-shadow: 0 0 0 1000px #1e293b inset;
 }
 
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-) {
-  scrollbar-width: auto;
-  scrollbar-color: rgba(148, 163, 184, 0.92) rgba(15, 23, 42, 0.84);
-  -webkit-overflow-scrolling: touch;
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
-  background: rgba(15, 23, 42, 0.84);
+::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.18);
 }
 
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.84);
-  border-left: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(203, 213, 225, 0.9), rgba(100, 116, 139, 0.95));
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.65), rgba(20, 184, 166, 0.65));
   border-radius: 999px;
-  border: 3px solid rgba(15, 23, 42, 0.84);
-  background-clip: padding-box;
-  min-height: 36px;
 }
 
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(226, 232, 240, 0.96), rgba(148, 163, 184, 0.98));
-}
-
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-button {
-  display: block;
-  width: 14px;
-  height: 14px;
-  background-color: rgba(15, 23, 42, 0.84);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 8px 8px;
-}
-
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-button:single-button:vertical:decrement {
-  background-image:
-    linear-gradient(135deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%),
-    linear-gradient(225deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%);
-  background-position: calc(50% - 2px) 58%, calc(50% + 2px) 58%;
-}
-
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-button:single-button:vertical:increment {
-  background-image:
-    linear-gradient(-45deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%),
-    linear-gradient(45deg, transparent 50%, rgba(226, 232, 240, 0.88) 50%);
-  background-position: calc(50% - 2px) 42%, calc(50% + 2px) 42%;
-}
-
-:where(
-  html,
-  body,
-  textarea,
-  select,
-  .eventmate-route-shell,
-  .eventmate-page,
-  [class*="overflow-y-auto"],
-  [class*="overflow-x-auto"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"]
-)::-webkit-scrollbar-corner {
-  background: transparent;
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.9), rgba(20, 184, 166, 0.9));
 }
 
 .dark {
@@ -593,7 +438,7 @@ table {
   isolation: isolate;
   z-index: 1;
   min-height: 100%;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .eventmate-route-shell > * {
@@ -666,18 +511,8 @@ table {
 
 .eventmate-page {
   position: relative;
-  overflow-x: clip;
-  overflow-y: visible;
+  overflow: hidden;
   background-color: transparent !important;
-}
-
-.eventmate-app-shell main,
-.eventmate-app-shell .eventmate-route-shell {
-  min-height: 100%;
-}
-
-.eventmate-app-shell main > .eventmate-route-shell > :where(.eventmate-page, .min-h-screen) {
-  min-height: 100%;
 }
 
 .eventmate-page::before {
@@ -954,23 +789,5 @@ table {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-@media (max-width: 768px) {
-  :where(
-    html,
-    body,
-    textarea,
-    select,
-    .eventmate-route-shell,
-    .eventmate-page,
-    [class*="overflow-y-auto"],
-    [class*="overflow-x-auto"],
-    [class*="overflow-auto"],
-    [class*="overflow-scroll"]
-  )::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
   }
 }

@@ -1,4 +1,4 @@
-﻿import PDFDocument from "pdfkit";
+import PDFDocument from "pdfkit";
 import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
 import path from "path";
@@ -9,79 +9,27 @@ import ParticipantQR from "../models/ParticipantQR.model.js";
 import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import Feedback from "../models/Feedback.model.js";
-import User from "../models/User.model.js";
+import sendEmail from "../config/sendEmail.js";
 import { sendNotification } from "./notification.service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-
 export const buildCertificateEmailSlug = (email) =>
-  normalizeEmail(email).replace(/[@.]/g, "_");
+  String(email || "").trim().toLowerCase().replace(/[@.]/g, "_");
 
 const normalizeBaseUrl = (value) => String(value || "").trim().replace(/\/+$/, "");
 
-const getCertificateDownloadSecret = () =>
-  String(
-    process.env.CERTIFICATE_DOWNLOAD_SECRET ||
-      process.env.JWT_SECRET ||
-      process.env.JWT_REFRESH_SECRET ||
-      ""
-  ).trim();
-
-const buildCertificateDownloadTokenSeed = (eventId, participantEmail) =>
-  `${String(eventId || "").trim()}::${normalizeEmail(participantEmail)}`;
-
-export const createCertificateDownloadToken = (eventId, participantEmail) => {
-  const secret = getCertificateDownloadSecret();
-  const seed = buildCertificateDownloadTokenSeed(eventId, participantEmail);
-  if (!secret || !seed || !normalizeEmail(participantEmail)) return "";
-
-  return crypto.createHmac("sha256", secret).update(seed).digest("hex");
-};
-
-export const isCertificateDownloadTokenValid = (token, eventId, participantEmail) => {
-  const submitted = String(token || "").trim().toLowerCase();
-  const expected = createCertificateDownloadToken(eventId, participantEmail);
-  if (!submitted || !expected || !/^[a-f0-9]{64}$/i.test(submitted)) return false;
-
-  const submittedBuffer = Buffer.from(submitted, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  if (!submittedBuffer.length || submittedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(submittedBuffer, expectedBuffer);
-};
-
-const getBackendBaseUrl = ({ required = true } = {}) => {
+const getBackendBaseUrl = () => {
   const backendBaseUrl = normalizeBaseUrl(
     process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL
   );
 
-  if (!backendBaseUrl && required) {
+  if (!backendBaseUrl) {
     throw new Error("BACKEND_URL is required to generate certificate links.");
   }
 
   return backendBaseUrl;
-};
-
-export const buildCertificateDownloadUrl = (
-  eventId,
-  participantEmail,
-  backendBaseUrl = getBackendBaseUrl({ required: false })
-) => {
-  const normalizedBaseUrl = normalizeBaseUrl(backendBaseUrl);
-  const normalizedEventId = String(eventId || "").trim();
-  const emailSlug = buildCertificateEmailSlug(participantEmail);
-  const token = createCertificateDownloadToken(normalizedEventId, participantEmail);
-
-  if (!normalizedBaseUrl || !normalizedEventId || !emailSlug || !token) {
-    return "";
-  }
-
-  return `${normalizedBaseUrl}/api/certificates/download/${normalizedEventId}/${emailSlug}?token=${encodeURIComponent(token)}`;
 };
 
 const formatCertificateDate = (value) => {
@@ -1467,33 +1415,25 @@ const certificateEmailTemplate = ({
           Verification Code: <strong>${verificationCode || "N/A"}</strong>
         </p>
 
-        ${
-          certificateUrl
-            ? `<div style="text-align: center; margin: 32px 0;">
-                <a href="${certificateUrl}" 
-                   download
-                   style="
-                     display: inline-block;
-                     padding: 14px 32px;
-                     background: linear-gradient(135deg, #7C3AED, #EC4899);
-                     color: white;
-                     text-decoration: none;
-                     border-radius: 8px;
-                     font-weight: bold;
-                     font-size: 15px;
-                   ">
-                  Download Certificate
-                </a>
-              </div>`
-            : ""
-        }
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${certificateUrl}" 
+             download
+             style="
+               display: inline-block;
+               padding: 14px 32px;
+               background: linear-gradient(135deg, #7C3AED, #EC4899);
+               color: white;
+               text-decoration: none;
+               border-radius: 8px;
+               font-weight: bold;
+               font-size: 15px;
+             ">
+            Download Certificate
+          </a>
+        </div>
 
         <p style="font-size: 13px; color: #9ca3af; text-align: center;">
-          ${
-            certificateUrl
-              ? "You can also view and download your certificate anytime from your EventMate dashboard."
-              : "Your certificate is ready in EventMate. Open the dashboard to view and download it while your public domain is still being set up."
-          }
+          You can also view and download your certificate anytime from your EventMate dashboard.
         </p>
 
       </div>
@@ -1506,53 +1446,6 @@ const certificateEmailTemplate = ({
   `;
 
   return { subject, html };
-};
-
-const sendCertificateIssuedNotification = async ({
-  certificateRecord,
-  registration,
-  event,
-  participantName,
-  participantEmail,
-  certificateType,
-  position,
-  messageText
-}) => {
-  const { subject, html } = certificateEmailTemplate({
-    participantName,
-    eventName: event.title,
-    certificateType,
-    position,
-    certificateUrl: certificateRecord?.certificateUrl,
-    verificationCode: certificateRecord?.verificationCode
-  });
-
-  const participantUser = await User.findOne({ email: participantEmail }).select(
-    "_id fullName role email"
-  );
-  const notificationRecipientId = participantUser?._id || registration.registeredBy;
-  const notificationRecipientName =
-    participantUser?.fullName || participantName || registration?.teamLeader?.name || "Student";
-  const notificationRecipientRole = participantUser?.role || "STUDENT";
-  const notificationRecipientEmail = participantUser?.email || participantEmail;
-
-  await sendNotification({
-    recipientId: notificationRecipientId,
-    recipientName: notificationRecipientName,
-    recipientRole: notificationRecipientRole,
-    recipientEmail: notificationRecipientEmail,
-    title: "Certificate Issued!",
-    message:
-      messageText ||
-      `Your certificate for ${event.title} is ready on the website and has been queued for email delivery.`,
-    type: "CERTIFICATE",
-    refId: event._id,
-    sendEmailCopy: true,
-    emailPayload: {
-      subject,
-      html
-    }
-  });
 };
 
 const issueCertificateForParticipant = async ({
@@ -1574,38 +1467,24 @@ const issueCertificateForParticipant = async ({
     eventId: event._id,
     participantEmail
   });
-
-  if (existing?.verificationStatus === "REVOKED") {
-    return {
-      status: "skipped",
-      reason: "Certificate is revoked and cannot be re-issued automatically."
-    };
+  if (existing) {
+    return { status: "exists", reason: "Certificate already issued." };
   }
 
   const resolvedType = normalizeCertificateType(certificateType) || "participation";
   const resolvedPosition = resolvedType === "winner" ? position || null : null;
-  const existingMatchesRequestedCertificate =
-    existing &&
-    existing.certificateType === resolvedType &&
-    String(existing.position || "") === String(resolvedPosition || "") &&
-    Boolean(existing.certificateData);
-
-  if (existingMatchesRequestedCertificate) {
-    return { status: "exists", reason: "Certificate already issued." };
-  }
-
   const eventDate = event.schedule?.startDate
     ? formatCertificateDate(event.schedule.startDate)
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
-  const certificateUrl = buildCertificateDownloadUrl(event._id, participantEmail);
+  const backendBaseUrl = getBackendBaseUrl();
+  const certificateUrl = `${backendBaseUrl}/api/certificates/download/${event._id}/${buildCertificateEmailSlug(participantEmail)}`;
   let certificateRecord = null;
+  let verificationCode = null;
   let duplicateParticipantCertificate = false;
-  let operationLabel = "issued";
 
-  if (existing) {
-    operationLabel = "updated";
-    const verificationCode = existing.verificationCode || (await generateUniqueVerificationCode());
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    verificationCode = await generateUniqueVerificationCode();
     const pdfBuffer = await generateCertificatePDF({
       participantName,
       eventName: event.title,
@@ -1617,59 +1496,32 @@ const issueCertificateForParticipant = async ({
       verificationCode
     });
 
-    existing.eventName = event.title;
-    existing.eventDate = eventDate;
-    existing.registrationId = registration._id;
-    existing.participantName = participantName;
-    existing.participantEmail = participantEmail;
-    existing.certificateType = resolvedType;
-    existing.position = resolvedPosition;
-    existing.certificateUrl = certificateUrl;
-    existing.certificateData = pdfBuffer.toString("base64");
-    existing.verificationCode = verificationCode;
-    existing.issuedAt = new Date();
-    certificateRecord = await existing.save();
-  } else {
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      const verificationCode = await generateUniqueVerificationCode();
-      const pdfBuffer = await generateCertificatePDF({
-        participantName,
+    const base64PDF = pdfBuffer.toString("base64");
+
+    try {
+      certificateRecord = await Certificate.create({
+        eventId: event._id,
         eventName: event.title,
         eventDate,
-        venue,
+        registrationId: registration._id,
+        participantName,
+        participantEmail,
         certificateType: resolvedType,
         position: resolvedPosition,
-        customization,
+        certificateUrl,
+        certificateData: base64PDF,
         verificationCode
       });
-
-      const base64PDF = pdfBuffer.toString("base64");
-
-      try {
-        certificateRecord = await Certificate.create({
-          eventId: event._id,
-          eventName: event.title,
-          eventDate,
-          registrationId: registration._id,
-          participantName,
-          participantEmail,
-          certificateType: resolvedType,
-          position: resolvedPosition,
-          certificateUrl,
-          certificateData: base64PDF,
-          verificationCode
-        });
+      break;
+    } catch (creationError) {
+      if (isDuplicateParticipantCertificateError(creationError)) {
+        duplicateParticipantCertificate = true;
         break;
-      } catch (creationError) {
-        if (isDuplicateParticipantCertificateError(creationError)) {
-          duplicateParticipantCertificate = true;
-          break;
-        }
-        if (isDuplicateVerificationCodeError(creationError)) {
-          continue;
-        }
-        throw creationError;
       }
+      if (isDuplicateVerificationCodeError(creationError)) {
+        continue;
+      }
+      throw creationError;
     }
   }
 
@@ -1680,18 +1532,35 @@ const issueCertificateForParticipant = async ({
     throw new Error("Unable to generate a unique verification code for certificate.");
   }
 
-  await sendCertificateIssuedNotification({
-    certificateRecord,
-    registration,
-    event,
+  const { subject, html } = certificateEmailTemplate({
     participantName,
-    participantEmail,
+    eventName: event.title,
     certificateType: resolvedType,
     position: resolvedPosition,
-    messageText:
-      operationLabel === "updated"
-        ? `Your certificate for ${event.title} has been updated and re-queued for email delivery.`
-        : undefined
+    certificateUrl,
+    verificationCode: certificateRecord.verificationCode
+  });
+
+  let emailDeliveryFailed = false;
+  try {
+    await sendEmail(participantEmail, subject, html);
+  } catch (emailError) {
+    emailDeliveryFailed = true;
+    console.error(
+      `Certificate email failed for ${participantEmail}: ${emailError?.message || "Unknown error"}`
+    );
+  }
+
+  await sendNotification({
+    recipientId: registration.registeredBy,
+    recipientName: participantName,
+    recipientRole: "STUDENT",
+    title: "Certificate Issued!",
+    message: emailDeliveryFailed
+      ? `Your certificate for ${event.title} is ready. Download it from your dashboard.`
+      : `Your certificate for ${event.title} is ready. Check your email!`,
+    type: "CERTIFICATE",
+    refId: event._id
   });
 
   await createCertificateAuditLog({
@@ -1708,20 +1577,18 @@ const issueCertificateForParticipant = async ({
     actorName: "System",
     actorRole: "SYSTEM",
     source: "SYSTEM",
-    message:
-      operationLabel === "updated"
-        ? "Certificate updated and queued for email delivery."
-        : "Certificate issued and queued for email delivery.",
+    message: emailDeliveryFailed
+      ? "Certificate issued, but email delivery failed."
+      : "Certificate issued and delivered to participant.",
     metadata: {
       registrationId: registration._id,
       certificateType: resolvedType,
       position: resolvedPosition || null,
-      emailQueued: true,
-      operation: operationLabel
+      emailDeliveryFailed
     }
   });
 
-  return { status: operationLabel, certificateId: certificateRecord._id };
+  return { status: "issued", certificateId: certificateRecord._id };
 };
 
 /* ================================================
@@ -1732,6 +1599,10 @@ const issueCertificateForParticipant = async ({
 export const generateCertificatesForRegistration = async (registration, event) => {
   try {
     if (!event?.certificate?.isEnabled) {
+      return 0;
+    }
+    const rankingComplete = await isEventWinnerRankingComplete(event?._id);
+    if (!rankingComplete) {
       return 0;
     }
 
@@ -1748,10 +1619,6 @@ export const generateCertificatesForRegistration = async (registration, event) =
 
     const customization = normalizeCertificateCustomization(event?.certificate?.customization);
     let participants = [];
-
-    if (isWinner && !normalizeWinnerPosition(position)) {
-      return 0;
-    }
 
     if (!event.isTeamEvent) {
       const leaderQR = await ParticipantQR.findOne({
@@ -1798,7 +1665,7 @@ export const generateCertificatesForRegistration = async (registration, event) =
         customization
       });
 
-      if (result?.status === "issued" || result?.status === "updated") {
+      if (result?.status === "issued") {
         issuedCount += 1;
       }
     }
@@ -1816,6 +1683,11 @@ export const generateCertificatesForEvent = async (eventId) => {
 
   if (!event?.certificate?.isEnabled) {
     throw new Error("Certificate template is not saved for this event");
+  }
+
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  if (!rankingComplete) {
+    throw new Error("Winner ranks must be assigned before issuing certificates");
   }
 
   if (event.status !== "Completed") {
@@ -1871,6 +1743,11 @@ export const generateCertificatesForSelection = async (event, selections = []) =
 
   if (!event?.certificate?.isEnabled) {
     throw new Error("Certificate template is not saved for this event");
+  }
+
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  if (!rankingComplete) {
+    throw new Error("Winner ranks must be assigned before issuing certificates");
   }
 
   if (event.status !== "Completed") {
@@ -1977,7 +1854,7 @@ export const generateCertificatesForSelection = async (event, selections = []) =
         customization
       });
 
-      if (result?.status === "issued" || result?.status === "updated") {
+      if (result?.status === "issued") {
         results.issued += 1;
       } else if (result?.status === "exists" || result?.status === "skipped") {
         recordSkipped(selection, result.reason || "Certificate already issued.");
@@ -1991,6 +1868,3 @@ export const generateCertificatesForSelection = async (event, selections = []) =
 
   return results;
 };
-
-
-

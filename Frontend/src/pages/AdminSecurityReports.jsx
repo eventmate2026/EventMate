@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   maxFailedLoginAttempts: 5,
@@ -69,9 +68,7 @@ export default function AdminSecurityReports() {
   const [saving, setSaving] = useState(false);
   const [rotatingSecret, setRotatingSecret] = useState(false);
   const [forcingLogout, setForcingLogout] = useState(false);
-  const [notice, setNotice] = useState(null);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(notice);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -107,7 +104,7 @@ export default function AdminSecurityReports() {
 
   const handleRotateSecret = async () => {
     setRotatingSecret(true);
-    setNotice(null);
+    setNotice("");
     try {
       const response = await api({ ...SummaryApi.rotate_security_secret });
       const data = response.data?.data;
@@ -115,15 +112,9 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice({
-        type: "success",
-        text: response.data?.message || "Security settings updated. Everyone will need to sign in again.",
-      });
+      setNotice(response.data?.message || "JWT secret rotated. Current sessions now require fresh login.");
     } catch (err) {
-      setNotice({
-        type: "error",
-        text: err.response?.data?.message || "Unable to rotate secret right now.",
-      });
+      setNotice(err.response?.data?.message || "Unable to rotate secret right now.");
     } finally {
       setRotatingSecret(false);
     }
@@ -131,7 +122,7 @@ export default function AdminSecurityReports() {
 
   const handleForceLogoutAll = async () => {
     setForcingLogout(true);
-    setNotice(null);
+    setNotice("");
     try {
       const response = await api({ ...SummaryApi.force_logout_all });
       const data = response.data?.data;
@@ -139,15 +130,9 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice({
-        type: "success",
-        text: response.data?.message || "Forced logout applied to all active sessions.",
-      });
+      setNotice(response.data?.message || "Forced logout applied to all active sessions.");
     } catch (err) {
-      setNotice({
-        type: "error",
-        text: err.response?.data?.message || "Unable to force logout right now.",
-      });
+      setNotice(err.response?.data?.message || "Unable to force logout right now.");
     } finally {
       setForcingLogout(false);
     }
@@ -155,12 +140,12 @@ export default function AdminSecurityReports() {
 
   const handleDiscardChanges = () => {
     setSettings(initialSettings);
-    setNotice({ type: "info", text: "Unsaved changes discarded." });
+    setNotice("Unsaved changes discarded.");
   };
 
   const handleSaveConfiguration = async () => {
     setSaving(true);
-    setNotice(null);
+    setNotice("");
     try {
       const response = await api({
         ...SummaryApi.update_security_settings,
@@ -171,15 +156,9 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice({
-        type: "success",
-        text: response.data?.message || "System security configuration saved.",
-      });
+      setNotice(response.data?.message || "System security configuration saved.");
     } catch (err) {
-      setNotice({
-        type: "error",
-        text: err.response?.data?.message || "Unable to save configuration.",
-      });
+      setNotice(err.response?.data?.message || "Unable to save configuration.");
     } finally {
       setSaving(false);
     }
@@ -207,6 +186,12 @@ export default function AdminSecurityReports() {
         {error && !loading ? (
           <article className="eventmate-panel rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
             {error}
+          </article>
+        ) : null}
+
+        {notice ? (
+          <article className="eventmate-panel rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+            {notice}
           </article>
         ) : null}
 
@@ -257,7 +242,6 @@ export default function AdminSecurityReports() {
                   </div>
                   <input
                     type="range"
-                    name="accessTokenLifetimeMinutes"
                     min={5}
                     max={120}
                     step={1}
@@ -288,7 +272,6 @@ export default function AdminSecurityReports() {
                   </div>
                   <input
                     type="range"
-                    name="refreshTokenLifetimeDays"
                     min={1}
                     max={30}
                     step={1}
@@ -312,12 +295,7 @@ export default function AdminSecurityReports() {
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={() =>
-                    setNotice({
-                      type: "info",
-                      text: "Token settings staged. Save system configuration to persist.",
-                    })
-                  }
+                  onClick={() => setNotice("Token settings staged. Save system configuration to persist.")}
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
                 >
                   Apply Token Settings
@@ -337,7 +315,6 @@ export default function AdminSecurityReports() {
                   </span>
                   <input
                     type="number"
-                    name="maxFailedLoginAttempts"
                     min={3}
                     max={20}
                     value={settings.maxFailedLoginAttempts}
@@ -357,7 +334,6 @@ export default function AdminSecurityReports() {
                   </span>
                   <input
                     type="number"
-                    name="lockoutDurationMinutes"
                     min={5}
                     max={240}
                     value={settings.lockoutDurationMinutes}

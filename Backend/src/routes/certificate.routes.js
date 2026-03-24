@@ -1,7 +1,5 @@
 import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
-import optionalAuthMiddleware from "../middleware/optionalAuth.middleware.js";
-import { certificatePublicLimiter } from "../middleware/rateLimit.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 import upload from "../middleware/multer.middleware.js";
 import {
@@ -25,7 +23,7 @@ const router = express.Router();
 router.get("/my", authMiddleware, getMyCertificates);
 
 // Public verify by unique certificate code
-router.post("/verify", certificatePublicLimiter, verifyCertificate);
+router.post("/verify", verifyCertificate);
 
 // Organizer/Admin views certificates for a specific event
 router.get(
@@ -103,11 +101,6 @@ router.post(
 );
 
 // Public download
-router.get(
-  "/download/:eventId/:emailSlug",
-  certificatePublicLimiter,
-  optionalAuthMiddleware,
-  downloadCertificate
-);
+router.get("/download/:eventId/:emailSlug", downloadCertificate);
 
 export default router;

@@ -2,214 +2,17 @@ import axios from "axios";
 import SummaryApi from "../api/SummaryApi";
 import { clearAuth, getStoredRefreshToken, getStoredToken, storeAuth } from "./auth";
 import { API_BASE_URL } from "./backendUrl";
-import { sanitizeApiPayload } from "./safeMessage";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 20000,
 });
 
 const GET_CACHE_TTL_MS = 60000;
-const NETWORK_RETRY_DELAY_MS = 1200;
-const MAX_AUTO_RETRY_ATTEMPTS = 2;
-const BACKEND_WARM_TTL_MS = 45000;
-const TOKEN_EXPIRY_SKEW_SECONDS = 15;
-const RETRYABLE_STATUS_CODES = new Set([408, 429, 502, 503, 504]);
-const RETRYABLE_NETWORK_ERROR_CODES = new Set(["ECONNABORTED", "ERR_NETWORK"]);
 const responseCache = new Map();
 const pendingGetRequests = new Map();
-let backendWarmupPromise = null;
-let backendWarmedAt = 0;
-let refreshPromise = null;
-
-const decodeJwtPayload = (token) => {
-  const parts = String(token || "").trim().split(".");
-  if (parts.length < 2) return null;
-
-  let base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-  const paddingLength = base64.length % 4;
-  if (paddingLength) {
-    base64 += "=".repeat(4 - paddingLength);
-  }
-
-  try {
-    if (typeof globalThis?.atob === "function") {
-      const binary = globalThis.atob(base64);
-      const utf8 = Array.from(binary, (char) =>
-        `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`
-      ).join("");
-      return JSON.parse(decodeURIComponent(utf8));
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-};
-
-const isJwtExpired = (token, skewSeconds = TOKEN_EXPIRY_SKEW_SECONDS) => {
-  const exp = Number(decodeJwtPayload(token)?.exp || 0);
-  if (!Number.isFinite(exp) || exp <= 0) return false;
-  return Date.now() + Math.max(0, Number(skewSeconds) || 0) * 1000 >= exp * 1000;
-};
-
-const pause = (durationMs) =>
-  new Promise((resolve) => {
-    setTimeout(resolve, Math.max(0, Number(durationMs) || 0));
-  });
-
-const getRequestMethod = (config) => String(config?.method || "get").toLowerCase();
-const isRefreshRequest = (config) => {
-  const refreshUrl = SummaryApi.refresh_token?.url;
-  if (!refreshUrl || !config?.url) return false;
-  return config.url.includes(refreshUrl);
-};
-
-const isRetryableMethod = (config) => {
-  const method = getRequestMethod(config);
-  return method === "get" || config?.retryable === true;
-};
-
-const getRetryAttemptCount = (config) => Math.max(0, Number(config?.__retryAttempt || 0));
-
-const getMaxAutoRetryAttempts = (config) => {
-  if (config?.skipRetry) return 0;
-
-  const configured = Number(config?.maxRetries);
-  if (Number.isFinite(configured)) {
-    return Math.max(0, configured);
-  }
-
-  return isRetryableMethod(config) ? MAX_AUTO_RETRY_ATTEMPTS : 0;
-};
-
-const isRetryableStatus = (status) => RETRYABLE_STATUS_CODES.has(Number(status));
-const isServiceWarmupResponse = (error) =>
-  Number(error?.response?.status || 0) === 503 &&
-  String(error?.response?.data?.code || "")
-    .trim()
-    .toUpperCase() === "SERVICE_WARMING_UP";
-
-const isRetryableNetworkError = (error) => {
-  const code = String(error?.code || "").trim().toUpperCase();
-  const message = String(error?.message || "").trim();
-
-  return (
-    !error?.response &&
-    (RETRYABLE_NETWORK_ERROR_CODES.has(code) ||
-      /network error|failed to fetch|load failed|connection.*closed|socket hang up|timeout/i.test(message))
-  );
-};
-
-const resetDerivedRequestState = (config) => {
-  const nextConfig = {
-    ...config,
-    headers: { ...(config?.headers || {}) },
-  };
-
-  delete nextConfig.adapter;
-  delete nextConfig.__cacheHit;
-  delete nextConfig.__cacheKey;
-  delete nextConfig.__cacheTTL;
-  delete nextConfig.__dedupeHit;
-  delete nextConfig.__dedupeKey;
-
-  return nextConfig;
-};
-
-const resolveWarmupUrl = () => {
-  const base = String(API_BASE_URL || "").trim();
-  if (!base) return "";
-
-  try {
-    return new URL("/healthz", `${base.replace(/\/+$/, "")}/`).toString();
-  } catch {
-    return `${base.replace(/\/+$/, "")}/healthz`;
-  }
-};
-
-export const primeBackendConnection = async ({ force = false, maxWaitMs = 0 } = {}) => {
-  if (typeof window === "undefined" || !API_BASE_URL) {
-    return false;
-  }
-
-  if (!force && backendWarmupPromise) {
-    return backendWarmupPromise;
-  }
-
-  if (!force && backendWarmedAt && Date.now() - backendWarmedAt < BACKEND_WARM_TTL_MS) {
-    return true;
-  }
-
-  const warmupUrl = resolveWarmupUrl();
-  if (!warmupUrl) {
-    return false;
-  }
-
-  backendWarmupPromise = axios
-    .get(warmupUrl, {
-      timeout: 25000,
-      validateStatus: (status) => Number(status) >= 200 && Number(status) < 500,
-    })
-    .then(() => {
-      backendWarmedAt = Date.now();
-      return true;
-    })
-    .catch(() => false)
-    .finally(() => {
-      backendWarmupPromise = null;
-    });
-
-  if (Number(maxWaitMs) > 0) {
-    return Promise.race([
-      backendWarmupPromise,
-      pause(maxWaitMs).then(() => false),
-    ]);
-  }
-
-  return backendWarmupPromise;
-};
-
-const retryRequestIfRecoverable = async (error) => {
-  const original = error?.config;
-  if (!original) return null;
-
-  const attemptCount = getRetryAttemptCount(original);
-  const maxAttempts = getMaxAutoRetryAttempts(original);
-  if (attemptCount >= maxAttempts) {
-    return null;
-  }
-
-  const status = Number(error?.response?.status || 0);
-  const warmupRetry = isServiceWarmupResponse(error);
-  const shouldRetry =
-    warmupRetry || isRetryableStatus(status) || isRetryableNetworkError(error);
-  if (!shouldRetry) {
-    return null;
-  }
-
-  if (warmupRetry && attemptCount >= 1) {
-    return null;
-  }
-
-  if (warmupRetry) {
-    await primeBackendConnection({ force: true, maxWaitMs: 4000 });
-  }
-
-  // Wake sleeping backends like Render before retrying the original GET.
-  if (isRetryableNetworkError(error) || status >= 502) {
-    await primeBackendConnection({ force: true });
-  }
-
-  await pause(NETWORK_RETRY_DELAY_MS * (attemptCount + 1));
-
-  const retryConfig = resetDerivedRequestState(original);
-  retryConfig.__retryAttempt = attemptCount + 1;
-  return api(retryConfig);
-};
 
 const shouldCacheRequest = (config) => {
-  const method = getRequestMethod(config);
+  const method = String(config?.method || "get").toLowerCase();
   if (method !== "get") return false;
   if (config?.skipCache) return false;
   if (config?.responseType === "blob" || config?.responseType === "arraybuffer") return false;
@@ -224,7 +27,7 @@ const shouldDedupeRequest = (config) => {
 
 const buildCacheKey = (config) => {
   const token = getStoredToken() || "";
-  const method = getRequestMethod(config);
+  const method = String(config?.method || "get").toLowerCase();
   const url = String(config?.url || "");
   const params = config?.params ? JSON.stringify(config.params) : "";
   return `${token}::${method}::${url}::${params}`;
@@ -240,79 +43,13 @@ const resolveAdapter = (config) => {
   return null;
 };
 
-const refreshAccessTokenIfPossible = async () => {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) {
-    return null;
-  }
-
-  if (isJwtExpired(refreshToken, 0)) {
-    clearAuth();
-    return null;
-  }
-
-  if (!refreshPromise) {
-    refreshPromise = api({
-      ...SummaryApi.refresh_token,
-      data: { refreshToken },
-      skipAuth: true,
-      skipRetry: true,
-    })
-      .then((response) => {
-        const nextAccess = response.data?.accessToken;
-        const nextRefresh = response.data?.refreshToken;
-        if (!nextAccess) {
-          throw new Error("Missing access token.");
-        }
-        storeAuth({ accessToken: nextAccess, refreshToken: nextRefresh });
-        return nextAccess;
-      })
-      .catch((error) => {
-        const refreshStatus = Number(error?.response?.status || 0);
-        if (refreshStatus === 401 || refreshStatus === 403 || isJwtExpired(refreshToken, 0)) {
-          clearAuth();
-        }
-        throw error;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-  }
-
-  return refreshPromise;
-};
-
-api.interceptors.request.use(async (config) => {
-  const refreshRequest = isRefreshRequest(config);
-  let token = getStoredToken();
-  config.headers = config.headers || {};
-
-  if (!config.skipAuth && !refreshRequest) {
-    if ((!token || isJwtExpired(token)) && getStoredRefreshToken()) {
-      try {
-        token = await refreshAccessTokenIfPossible();
-      } catch {
-        token = null;
-      }
-    }
-
-    if (token && !isJwtExpired(token)) {
-      config.headers.Authorization = `Bearer ${token}`;
-    } else if (config.headers?.Authorization) {
-      delete config.headers.Authorization;
-    }
-  } else if (token && !config.skipAuth) {
+api.interceptors.request.use((config) => {
+  const token = getStoredToken();
+  if (token && !config.skipAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
-
   if (config.skipAuth && config.headers?.Authorization) {
     delete config.headers.Authorization;
-  }
-
-  const timezone =
-    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
-  if (timezone) {
-    config.headers["X-Client-Timezone"] = timezone;
   }
 
   if (shouldCacheRequest(config)) {
@@ -372,14 +109,17 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+let refreshPromise = null;
+
+const isRefreshRequest = (config) => {
+  const refreshUrl = SummaryApi.refresh_token?.url;
+  if (!refreshUrl || !config?.url) return false;
+  return config.url.includes(refreshUrl);
+};
+
 api.interceptors.response.use(
   (response) => {
-    sanitizeApiPayload(response?.data, {
-      status: Number(response?.status || 0),
-      kind: "success",
-    });
-
-    const method = getRequestMethod(response?.config);
+    const method = String(response?.config?.method || "get").toLowerCase();
 
     if (method !== "get") {
       responseCache.clear();
@@ -409,15 +149,6 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const contentType = String(error.response?.headers?.["content-type"] || "").toLowerCase();
 
-    if (original?.__dedupeKey) {
-      pendingGetRequests.delete(original.__dedupeKey);
-    }
-
-    const retryResponse = await retryRequestIfRecoverable(error);
-    if (retryResponse) {
-      return retryResponse;
-    }
-
     if (
       status >= 500 &&
       typeof error.response?.data === "string" &&
@@ -425,14 +156,13 @@ api.interceptors.response.use(
     ) {
       error.response.data = {
         success: false,
-        message: "",
+        message: "Backend is unreachable. Start the backend server and try again.",
       };
     }
 
-    sanitizeApiPayload(error?.response?.data, {
-      status: Number(status || 0),
-      kind: "error",
-    });
+    if (original?.__dedupeKey) {
+      pendingGetRequests.delete(original.__dedupeKey);
+    }
 
     if (!original || original.skipAuth || original._retry || isRefreshRequest(original) || status !== 401) {
       throw error;
@@ -445,20 +175,31 @@ api.interceptors.response.use(
     }
 
     try {
-      const newAccessToken = await refreshAccessTokenIfPossible();
-      if (!newAccessToken) {
-        clearAuth();
-        throw error;
+      if (!refreshPromise) {
+        refreshPromise = api({
+          ...SummaryApi.refresh_token,
+          data: { refreshToken },
+          skipAuth: true,
+        })
+          .then((response) => {
+            const nextAccess = response.data?.accessToken;
+            const nextRefresh = response.data?.refreshToken;
+            if (!nextAccess) throw new Error("Missing access token.");
+            storeAuth({ accessToken: nextAccess, refreshToken: nextRefresh });
+            return nextAccess;
+          })
+          .finally(() => {
+            refreshPromise = null;
+          });
       }
+
+      const newAccessToken = await refreshPromise;
       original._retry = true;
       original.headers = original.headers || {};
       original.headers.Authorization = `Bearer ${newAccessToken}`;
       return api(original);
     } catch (refreshError) {
-      const refreshStatus = Number(refreshError?.response?.status || 0);
-      if (refreshStatus === 401 || refreshStatus === 403) {
-        clearAuth();
-      }
+      clearAuth();
       throw refreshError;
     }
   }

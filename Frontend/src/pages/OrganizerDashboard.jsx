@@ -23,7 +23,6 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 import { computeProfileProgress } from "../lib/profileProgress";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   Draft: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -105,35 +104,27 @@ const formatTimeRange = (schedule) => {
   return startTime || endTime || "Time TBD";
 };
 
-const buildScheduleDateTime = (dateValue, timeValue, { fallbackToEndOfDay = false } = {}) => {
-  if (!dateValue) return null;
-  const rawDate = new Date(dateValue);
+const buildEventEndDateTime = (event) => {
+  const endDate = event?.schedule?.endDate;
+  const endTime = event?.schedule?.endTime;
+  if (!endDate || !endTime) return null;
+
+  const [hours, minutes] = String(endTime).split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  const rawDate = new Date(endDate);
   if (Number.isNaN(rawDate.getTime())) return null;
-
-  const [hours, minutes] = String(timeValue || "")
-    .split(":")
-    .map((value) => Number.parseInt(value, 10));
-
-  const resolvedHours = Number.isInteger(hours) ? hours : fallbackToEndOfDay ? 23 : 0;
-  const resolvedMinutes = Number.isInteger(minutes) ? minutes : fallbackToEndOfDay ? 59 : 0;
-  const resolvedSeconds = fallbackToEndOfDay ? 59 : 0;
-  const resolvedMilliseconds = fallbackToEndOfDay ? 999 : 0;
 
   return new Date(
     rawDate.getUTCFullYear(),
     rawDate.getUTCMonth(),
     rawDate.getUTCDate(),
-    resolvedHours,
-    resolvedMinutes,
-    resolvedSeconds,
-    resolvedMilliseconds
+    hours,
+    minutes,
+    0,
+    0
   );
 };
-
-const buildEventEndDateTime = (event) =>
-  buildScheduleDateTime(event?.schedule?.endDate, event?.schedule?.endTime, {
-    fallbackToEndOfDay: true,
-  });
 
 const canManuallyComplete = (event) => {
   if (!event || event.status !== "Published") return false;
@@ -192,12 +183,8 @@ const deriveEventStage = (event) => {
     };
   }
 
-  const start = buildScheduleDateTime(event?.schedule?.startDate, event?.schedule?.startTime)?.getTime();
-  const end = buildScheduleDateTime(
-    event?.schedule?.endDate || event?.schedule?.startDate,
-    event?.schedule?.endTime,
-    { fallbackToEndOfDay: true }
-  )?.getTime();
+  const start = new Date(event?.schedule?.startDate || 0).getTime();
+  const end = new Date(event?.schedule?.endDate || event?.schedule?.startDate || 0).getTime();
   const now = Date.now();
 
   if (Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end) {
@@ -229,9 +216,7 @@ export default function OrganizerDashboard() {
 
   const [events, setEvents] = useState([]);
   const [registrationStats, setRegistrationStats] = useState({});
-  const [feedbackStats, setFeedbackStats] = useState({});
   const [loadingRegistrationStats, setLoadingRegistrationStats] = useState(false);
-  const [loadingFeedbackStats, setLoadingFeedbackStats] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -240,8 +225,6 @@ export default function OrganizerDashboard() {
   const [completingEventId, setCompletingEventId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
 
   const fetchRegistrationStats = async (eventRows) => {
     const rows = Array.isArray(eventRows) ? eventRows : [];
@@ -279,47 +262,6 @@ export default function OrganizerDashboard() {
     }
   };
 
-  const fetchFeedbackStats = async (eventRows) => {
-    const rows = Array.isArray(eventRows) ? eventRows : [];
-    if (!rows.length) {
-      setFeedbackStats({});
-      return;
-    }
-
-    setLoadingFeedbackStats(true);
-    try {
-      const requests = rows.map(async (event) => {
-        const eventId = normalizeId(event?._id);
-        if (!eventId) return null;
-
-        try {
-          const response = await api({
-            ...SummaryApi.get_event_feedback,
-            url: SummaryApi.get_event_feedback.url.replace(":eventId", eventId),
-          });
-
-          const payload = response.data?.data || {};
-          const totalFeedbacks = Math.max(0, Math.floor(firstNumber(payload?.totalFeedbacks) || 0));
-          const averageRating =
-            totalFeedbacks > 0 ? firstNumber(payload?.averageRating, payload?.avgRating) : null;
-
-          return [eventId, { totalFeedbacks, averageRating, error: null }];
-        } catch (fetchError) {
-          return [eventId, { totalFeedbacks: null, averageRating: null, error: fetchError.response?.data?.message || "Unavailable" }];
-        }
-      });
-
-      const resolved = await Promise.all(requests);
-      const next = {};
-      resolved.filter(Boolean).forEach(([eventId, payload]) => {
-        next[eventId] = payload;
-      });
-      setFeedbackStats(next);
-    } finally {
-      setLoadingFeedbackStats(false);
-    }
-  };
-
   const fetchMyEvents = async ({ silent = false } = {}) => {
     if (silent) {
       setRefreshing(true);
@@ -335,7 +277,6 @@ export default function OrganizerDashboard() {
       const sortedEvents = sortByRecent(myEvents);
       setEvents(sortedEvents);
       void fetchRegistrationStats(sortedEvents);
-      void fetchFeedbackStats(sortedEvents);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load organizer events.");
     } finally {
@@ -403,14 +344,7 @@ export default function OrganizerDashboard() {
       events.map((event, index) => {
         const eventId = normalizeId(event?._id);
         const registrationInfo = registrationStats[eventId] || null;
-        const feedbackInfo = feedbackStats[eventId] || null;
         const registrationCount = Number(registrationInfo?.count);
-        const fallbackFeedbackCount = getFeedbackCount(event);
-        const feedbackCount = Number.isFinite(Number(feedbackInfo?.totalFeedbacks))
-          ? Math.max(0, Math.floor(Number(feedbackInfo.totalFeedbacks)))
-          : fallbackFeedbackCount;
-        const fallbackRating = getEventRating(event);
-        const rating = feedbackCount > 0 ? firstNumber(feedbackInfo?.averageRating, fallbackRating) : null;
 
         return {
           ...event,
@@ -423,15 +357,14 @@ export default function OrganizerDashboard() {
           startDate: event?.schedule?.startDate || event?.createdAt || null,
           updatedAt: event?.updatedAt || event?.createdAt || null,
           description: event?.description || "Event details will be announced soon.",
-          feedbackCount,
-          rating,
+          feedbackCount: getFeedbackCount(event),
+          rating: getEventRating(event),
           registrations: Number.isFinite(registrationCount) ? registrationCount : null,
           registrationError: registrationInfo?.error || null,
-          feedbackError: feedbackInfo?.error || null,
           posterUrl: String(event?.posterUrl || "").trim() || FALLBACK_POSTERS[index % FALLBACK_POSTERS.length],
         };
       }),
-    [events, registrationStats, feedbackStats]
+    [events, registrationStats]
   );
 
   const metrics = useMemo(() => {
@@ -446,7 +379,7 @@ export default function OrganizerDashboard() {
 
     let totalRegistrations = 0;
     let totalFeedback = 0;
-    let weightedRatingTotal = 0;
+    const ratings = [];
 
     eventRows.forEach((event) => {
       const status = String(event.status || "Draft");
@@ -459,12 +392,10 @@ export default function OrganizerDashboard() {
 
       if (Number.isFinite(event.registrations)) totalRegistrations += event.registrations;
       totalFeedback += event.feedbackCount;
-      if (Number.isFinite(event.rating) && event.feedbackCount > 0) {
-        weightedRatingTotal += event.rating * event.feedbackCount;
-      }
+      if (Number.isFinite(event.rating)) ratings.push(event.rating);
     });
 
-    const averageRating = totalFeedback > 0 ? weightedRatingTotal / totalFeedback : null;
+    const averageRating = ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null;
 
     return {
       totalEvents: eventRows.length,
@@ -591,7 +522,7 @@ export default function OrganizerDashboard() {
       value: metrics.averageRating === null ? "--" : metrics.averageRating.toFixed(1),
       icon: Star,
       iconClass: "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300",
-      hint: loadingFeedbackStats ? "Updating feedback..." : `${metrics.totalFeedback} total feedback`,
+      hint: `${metrics.totalFeedback} total feedback`,
     },
   ];
 
@@ -679,6 +610,18 @@ export default function OrganizerDashboard() {
           })}
         </section>
 
+        {message && (
+          <p
+            className={`rounded-lg px-3 py-2 text-sm ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+            }`}
+          >
+            {message.text}
+          </p>
+        )}
+
         {loading && (
           <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
             <Loader2 size={14} className="animate-spin" />
@@ -711,7 +654,6 @@ export default function OrganizerDashboard() {
                 <label className="relative flex-1">
                   <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    name="dashboardEventSearch"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search by title, category, venue..."
@@ -753,20 +695,6 @@ export default function OrganizerDashboard() {
                       : loadingRegistrationStats
                       ? "Loading registrations..."
                       : "0 registrations";
-                    const feedbackLabel = event.feedbackError
-                      ? "Feedback unavailable"
-                      : Number.isFinite(Number(event.feedbackCount))
-                      ? `${event.feedbackCount} feedback`
-                      : loadingFeedbackStats
-                      ? "Loading feedback..."
-                      : "0 feedback";
-                    const ratingLabel = event.feedbackError
-                      ? "Rating unavailable"
-                      : Number.isFinite(event.rating)
-                      ? `${event.rating.toFixed(1)} rating`
-                      : loadingFeedbackStats
-                      ? "Loading rating..."
-                      : "Not rated yet";
                     const showScanButton = event.status === "Published" || event.stage.key === "live";
                     const manualCompleteAllowed = canManuallyComplete(event);
                     const isCompleting = completingEventId === event.eventId;
@@ -814,11 +742,11 @@ export default function OrganizerDashboard() {
                           </p>
                           <p className="inline-flex items-center gap-1.5">
                             <Star size={13} />
-                            {ratingLabel}
+                            {Number.isFinite(event.rating) ? `${event.rating.toFixed(1)} rating` : "Not rated yet"}
                           </p>
                           <p className="inline-flex items-center gap-1.5">
                             <MessageSquareMore size={13} />
-                            {feedbackLabel}
+                            {event.feedbackCount} feedback
                           </p>
                         </div>
 

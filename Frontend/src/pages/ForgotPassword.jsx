@@ -1,14 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaRegEye, FaRegEyeSlash } from "react-icons/fa6";
-import api, { primeBackendConnection } from "../lib/api";
+import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { useToast } from "../context/ToastContext";
-import { getSafeApiErrorText } from "../lib/safeMessage";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
-  const toast = useToast();
   const [step, setStep] = useState("email");
   const [formData, setFormData] = useState({
     email: "",
@@ -16,17 +12,15 @@ export default function ForgotPassword() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [message, setMessage] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  useEffect(() => {
-    void primeBackendConnection();
-  }, []);
 
   const getErrorMessage = (error, fallback) => {
-    return getSafeApiErrorText(error, fallback);
+    const apiMessage = error.response?.data?.message;
+    if (apiMessage) return apiMessage;
+    if (error.request) return "Backend not reachable. Start the backend server and try again.";
+    return fallback;
   };
 
   const handleChange = (e) => {
@@ -45,16 +39,19 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.forgot_password,
         data: { email: formData.email },
       });
       const apiMessage = response.data?.message || "OTP sent to your email.";
-      toast.success(apiMessage, { duration: 4200 });
+      const otp = response.data?.otp;
+      setMessage({ type: "success", text: otp ? `${apiMessage} OTP: ${otp}` : apiMessage });
       setStep("reset");
     } catch (error) {
-      toast.error(getErrorMessage(error, "Unable to send OTP. Try again."));
+      setMessage({
+        type: "error",
+        text: getErrorMessage(error, "Unable to send OTP. Try again."),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -74,7 +71,6 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.reset_password,
         data: {
@@ -83,10 +79,13 @@ export default function ForgotPassword() {
           newPassword: formData.newPassword,
         },
       });
-      toast.success(response.data?.message || "Password reset successful.");
+      setMessage({ type: "success", text: response.data?.message || "Password reset successful." });
       setTimeout(() => navigate("/login"), 900);
     } catch (error) {
-      toast.error(getErrorMessage(error, "Unable to reset password. Try again."));
+      setMessage({
+        type: "error",
+        text: getErrorMessage(error, "Unable to reset password. Try again."),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -94,7 +93,7 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
+    setMessage(null);
     if (step === "email") {
       await submitEmail();
     } else {
@@ -117,17 +116,15 @@ export default function ForgotPassword() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="forgot-email" className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <input
-              id="forgot-email"
               name="email"
               type="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="you@college.edu"
-              autoComplete="email"
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
               disabled={step === "reset"}
             />
@@ -137,67 +134,53 @@ export default function ForgotPassword() {
           {step === "reset" && (
             <>
               <div>
-                <label htmlFor="forgot-otp" className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
                 <input
-                  id="forgot-otp"
                   name="otp"
                   value={formData.otp}
                   onChange={handleChange}
                   placeholder="Enter 6 digit code"
-                  autoComplete="one-time-code"
                   className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                 />
                 {errors.otp && <p className="text-xs text-red-600 mt-1">{errors.otp}</p>}
               </div>
               <div>
-                <label htmlFor="forgot-new-password" className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
-                <div className="relative mt-1">
-                  <input
-                    id="forgot-new-password"
-                    name="newPassword"
-                    type={showNewPassword ? "text" : "password"}
-                    value={formData.newPassword}
-                    onChange={handleChange}
-                    placeholder="Minimum 8 characters"
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                    onClick={() => setShowNewPassword((prev) => !prev)}
-                  >
-                    {showNewPassword ? <FaRegEye className="eventmate-icon" /> : <FaRegEyeSlash className="eventmate-icon" />}
-                  </button>
-                </div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
+                <input
+                  name="newPassword"
+                  type="password"
+                  value={formData.newPassword}
+                  onChange={handleChange}
+                  placeholder="Minimum 8 characters"
+                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+                />
                 {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
               </div>
               <div>
-                <label htmlFor="forgot-confirm-password" className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
-                <div className="relative mt-1">
-                  <input
-                    id="forgot-confirm-password"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="Re-enter new password"
-                    autoComplete="new-password"
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 pr-12 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  >
-                    {showConfirmPassword ? <FaRegEye className="eventmate-icon" /> : <FaRegEyeSlash className="eventmate-icon" />}
-                  </button>
-                </div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
+                <input
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Re-enter new password"
+                  className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+                />
                 {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
               </div>
             </>
+          )}
+
+          {message && (
+            <p
+              className={`text-sm text-center rounded-lg py-2 ${
+                message.type === "success"
+                  ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
+              }`}
+            >
+              {message.text}
+            </p>
           )}
 
           <button
@@ -225,4 +208,3 @@ export default function ForgotPassword() {
     </section>
   );
 }
-

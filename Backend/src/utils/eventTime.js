@@ -26,18 +26,14 @@ const extractYMD = (value) => {
   };
 };
 
-export const buildScheduleDateTime = (dateValue, timeValue, { fallbackToEndOfDay = false } = {}) => {
-  const parts = extractYMD(dateValue);
+export const buildEventEndDateTime = (endDate, endTime) => {
+  if (!endDate || !endTime) return null;
+
+  const [hours, minutes] = String(endTime).split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+
+  const parts = extractYMD(endDate);
   if (!parts) return null;
-
-  const [hoursValue, minutesValue] = String(timeValue || "").split(":");
-  const hours = Number.parseInt(hoursValue, 10);
-  const minutes = Number.parseInt(minutesValue, 10);
-
-  const resolvedHours = Number.isInteger(hours) ? hours : fallbackToEndOfDay ? 23 : 0;
-  const resolvedMinutes = Number.isInteger(minutes) ? minutes : fallbackToEndOfDay ? 59 : 0;
-  const resolvedSeconds = fallbackToEndOfDay ? 59 : 0;
-  const resolvedMilliseconds = fallbackToEndOfDay ? 999 : 0;
 
   // Create a UTC timestamp that represents the IST calendar date + time.
   const utcMillis =
@@ -45,18 +41,12 @@ export const buildScheduleDateTime = (dateValue, timeValue, { fallbackToEndOfDay
       parts.year,
       parts.monthIndex,
       parts.day,
-      resolvedHours,
-      resolvedMinutes,
-      resolvedSeconds,
-      resolvedMilliseconds
+      hours,
+      minutes,
+      0,
+      0
     ) -
     IST_OFFSET_MINUTES * 60 * 1000;
 
   return new Date(utcMillis);
 };
-
-export const buildEventStartDateTime = (startDate, startTime) =>
-  buildScheduleDateTime(startDate, startTime);
-
-export const buildEventEndDateTime = (endDate, endTime) =>
-  buildScheduleDateTime(endDate, endTime, { fallbackToEndOfDay: true });

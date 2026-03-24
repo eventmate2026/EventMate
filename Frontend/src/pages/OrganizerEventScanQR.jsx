@@ -16,7 +16,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -67,12 +66,6 @@ const resolveTokenFromQrImageUrl = (value) => {
   if (fromCloudinarySegment) return fromCloudinarySegment;
 
   return "";
-};
-
-const resolveParticipantToken = (participant) => {
-  const explicitToken = String(participant?.token || "").trim();
-  if (explicitToken) return explicitToken;
-  return resolveTokenFromQrImageUrl(participant?.qrImageUrl);
 };
 
 const toParticipantRows = (registration) => {
@@ -129,7 +122,7 @@ const toParticipantRows = (registration) => {
       role: String(participant?.role || "participant").trim(),
       attendanceMarked: Boolean(participant?.attendanceMarked),
       attendanceMarkedAt: participant?.attendanceMarkedAt || null,
-      token: resolveParticipantToken(participant),
+      token: resolveTokenFromQrImageUrl(participant?.qrImageUrl),
     };
   });
 };
@@ -258,9 +251,6 @@ export default function OrganizerEventScanQR() {
   const [cameraError, setCameraError] = useState(null);
   const [cameraSupported, setCameraSupported] = useState(true);
   const [scannerEngineLabel, setScannerEngineLabel] = useState("Auto");
-  useToastFeedback(message);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(cameraError, { defaultType: "error" });
 
   const [pendingScan, setPendingScan] = useState(null);
   const [lastResult, setLastResult] = useState(null);
@@ -352,7 +342,7 @@ export default function OrganizerEventScanQR() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  const queuePendingToken = useCallback(async (rawValue, sourceLabel) => {
+  const queuePendingToken = useCallback((rawValue, sourceLabel) => {
     const token = parseAttendanceToken(rawValue);
     if (!token) {
       setMessage({ type: "error", text: "QR detected, but attendance token could not be parsed." });
@@ -369,7 +359,7 @@ export default function OrganizerEventScanQR() {
     duplicateScanGuardRef.current = { token, at: now };
 
     const participant = lookupRef.current.get(token);
-    const initialPendingScan = {
+    setPendingScan({
       token,
       sourceLabel,
       participantName: participant?.participantName || "Unknown participant",
@@ -377,44 +367,8 @@ export default function OrganizerEventScanQR() {
       participantDepartment: participant?.participantDepartment || "",
       registrationStatus: participant?.registrationStatus || "Unknown",
       alreadyMarked: Boolean(participant?.attendanceMarked),
-    };
-    pendingScanRef.current = initialPendingScan;
-    setPendingScan(initialPendingScan);
+    });
     setMessage(null);
-
-    try {
-      const response = await api({
-        ...SummaryApi.preview_attendance_by_token,
-        url: SummaryApi.preview_attendance_by_token.url.replace(":token", encodeURIComponent(token)),
-      });
-      const preview = response?.data?.data || {};
-
-      setPendingScan((current) => {
-        if (String(current?.token || "").trim() !== token) return current;
-        return {
-          ...current,
-          participantName: preview?.participantName || current.participantName,
-          participantEmail: preview?.email || current.participantEmail,
-          participantDepartment: preview?.participantDepartment || current.participantDepartment,
-          registrationStatus: preview?.registrationStatus || current.registrationStatus,
-          alreadyMarked: Boolean(preview?.attendanceMarked),
-        };
-      });
-    } catch (previewError) {
-      const previewMessage =
-        previewError?.response?.data?.message || "Unable to verify this QR code right now.";
-      const hasFallbackDetails =
-        Boolean(initialPendingScan.participantEmail) ||
-        initialPendingScan.participantName !== "Unknown participant";
-
-      if (!hasFallbackDetails) {
-        pendingScanRef.current = null;
-        setPendingScan(null);
-        setMessage({ type: "error", text: previewMessage });
-        return false;
-      }
-    }
-
     return true;
   }, []);
 
@@ -526,7 +480,7 @@ export default function OrganizerEventScanQR() {
             rawValue = await decodeSourceWithJsQr(videoNode, resolvedDecoder, decodeCanvasRef);
           }
 
-          if (rawValue) void queuePendingToken(rawValue, "Live camera");
+          if (rawValue) queuePendingToken(rawValue, "Live camera");
         } catch {
           // Swallow scanner frame errors to keep loop alive.
         } finally {
@@ -556,48 +510,6 @@ export default function OrganizerEventScanQR() {
     }
   }, []);
 
-  const syncParticipantAttendance = useCallback((token, payload, fallbackParticipant) => {
-    const tokenText = String(token || "").trim();
-    const participantName = String(payload?.participantName || fallbackParticipant?.participantName || "Participant");
-    const participantEmail = String(payload?.email || fallbackParticipant?.participantEmail || "");
-    const participantDepartment = fallbackParticipant?.participantDepartment || "";
-    const markedAt = payload?.markedAt || new Date().toISOString();
-    const role = String(payload?.role || fallbackParticipant?.role || "participant").trim();
-
-    setParticipantRows((prev) => {
-      const index = prev.findIndex((row) => String(row?.token || "").trim() === tokenText);
-      if (index >= 0) {
-        const next = [...prev];
-        next[index] = {
-          ...next[index],
-          participantName: participantName || next[index].participantName,
-          participantEmail: participantEmail || next[index].participantEmail,
-          participantDepartment: participantDepartment || next[index].participantDepartment,
-          attendanceMarked: true,
-          attendanceMarkedAt: markedAt,
-          token: tokenText || next[index].token,
-        };
-        return next;
-      }
-
-      return [
-        {
-          id: `session-${tokenText || Date.now()}`,
-          registrationId: "",
-          registrationStatus: "Confirmed",
-          participantName,
-          participantEmail,
-          participantDepartment,
-          role,
-          attendanceMarked: true,
-          attendanceMarkedAt: markedAt,
-          token: tokenText,
-        },
-        ...prev,
-      ];
-    });
-  }, []);
-
   const markAttendanceWithToken = useCallback(
     async (rawToken, sourceLabel) => {
       const token = parseAttendanceToken(rawToken);
@@ -619,32 +531,30 @@ export default function OrganizerEventScanQR() {
 
         const payload = response?.data?.data || {};
         const participantName = String(payload?.participantName || participant?.participantName || "Participant");
-        const participantEmail = String(payload?.email || participant?.participantEmail || "");
-        const participantDepartment = participant?.participantDepartment || "";
-        const successText = response.data?.message || `Attendance marked for ${participantName}.`;
+      const participantEmail = String(payload?.email || participant?.participantEmail || "");
+      const participantDepartment = participant?.participantDepartment || "";
+      const successText = response.data?.message || `Attendance marked for ${participantName}.`;
 
-        setLastResult({
+      setLastResult({
+        type: "success",
+        participantName,
+        participantEmail,
+        participantDepartment,
+        text: successText,
+        sourceLabel,
+        at: Date.now(),
+      });
+
+      addRecentScan(
+        {
           type: "success",
           participantName,
           participantEmail,
           participantDepartment,
-          text: successText,
           sourceLabel,
-          at: Date.now(),
-        });
-
-        addRecentScan(
-          {
-            type: "success",
-            participantName,
-            participantEmail,
-            participantDepartment,
-            sourceLabel,
-          },
-          { countForRate: true }
-        );
-
-        syncParticipantAttendance(token, payload, participant);
+        },
+        { countForRate: true }
+      );
 
         setMessage({ type: "success", text: successText });
         await load({ silent: true });
@@ -679,7 +589,7 @@ export default function OrganizerEventScanQR() {
         setMarking(false);
       }
     },
-    [addRecentScan, load, syncParticipantAttendance]
+    [addRecentScan, load]
   );
 
   const handleConfirmPending = async () => {
@@ -748,7 +658,7 @@ export default function OrganizerEventScanQR() {
         return;
       }
 
-      await queuePendingToken(rawValue, "Image upload");
+      queuePendingToken(rawValue, "Image upload");
     } catch {
       setMessage({ type: "error", text: "Unable to scan QR from image. Try another image." });
     }
@@ -886,7 +796,6 @@ export default function OrganizerEventScanQR() {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      name="scanImageFile"
                       accept="image/*"
                       onChange={handleScanImageFile}
                       className="hidden"

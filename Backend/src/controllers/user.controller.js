@@ -6,40 +6,15 @@ import sendEmail from "../config/sendEmail.js";
 import forgotPasswordTemplate from "../utils/forgotPasswordTemplate.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
-import { countRecentLogins } from "../utils/loginHistory.js";
-import {
-  removeRefreshSession,
-  serializeActiveSessions,
-} from "../utils/sessionTracker.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
-const INTERACTIVE_EMAIL_OPTIONS = Object.freeze({ deliveryProfile: "interactive" });
 
 const resolveDepartment = (user) =>
   String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
 
-const sanitizeProfileUser = (user, currentSessionId = null, req = null) => {
-  if (!user) return null;
-  const plainUser = user.toObject ? user.toObject() : { ...user };
-  delete plainUser.password;
-  delete plainUser.refreshToken;
-  delete plainUser.refreshSessions;
-  delete plainUser.loginHistory;
-  delete plainUser.otp;
-  delete plainUser.otpExpiry;
-  return {
-    ...plainUser,
-    loginCount30d: countRecentLogins(user, 30),
-    activeSessions: serializeActiveSessions(user, currentSessionId, req),
-  };
-};
-
 // ---------------- PROFILE ----------------
 export const getProfileController = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).select(
-    "+refreshToken +refreshSessions +loginHistory"
-  );
-  res.json({ success: true, user: sanitizeProfileUser(user, req.authSessionId, req) });
+  res.json({ success: true, user: req.user });
 });
 
 // ---------------- UPDATE PROFILE ----------------
@@ -73,43 +48,10 @@ export const updateProfileController = asyncHandler(async (req, res) => {
 
 // ---------------- UPLOAD AVATAR ----------------
 export const uploadAvatarController = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ success: false, message: "Avatar image is required" });
-  }
-
   const result = await uploadImageCloudinary(req.file);
   req.user.avatar = result.url;
   await req.user.save();
   res.json({ success: true, message: "Avatar uploaded", avatar: result.url });
-});
-
-export const revokeProfileSessionController = asyncHandler(async (req, res) => {
-  const sessionId = String(req.params?.sessionId || "").trim();
-  if (!sessionId) {
-    return res.status(400).json({ success: false, message: "Session id is required" });
-  }
-
-  const user = await User.findById(req.user._id).select("+refreshSessions");
-  if (!user) {
-    return res.status(404).json({ success: false, message: "User not found" });
-  }
-
-  const removed = removeRefreshSession(user, sessionId);
-  if (!removed) {
-    return res.status(404).json({ success: false, message: "Session not found" });
-  }
-
-  await user.save({ validateBeforeSave: false });
-
-  res.json({
-    success: true,
-    message:
-      sessionId === req.authSessionId
-        ? "Current session terminated. Please log in again."
-        : "Session terminated successfully.",
-    activeSessions: serializeActiveSessions(user, req.authSessionId, req),
-    currentSessionRevoked: sessionId === req.authSessionId,
-  });
 });
 
 // ---------------- FORGOT PASSWORD ----------------
@@ -120,12 +62,7 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  if (!user) {
-    return res.json({
-      success: true,
-      message: "If an account exists for this email, an OTP has been sent."
-    });
-  }
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
   const otp = generateOtp();
   user.otp = otp;
@@ -133,12 +70,7 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   await user.save();
 
   try {
-    await sendEmail(
-      email,
-      "Reset Password OTP",
-      forgotPasswordTemplate({ name: user.fullName, otp }),
-      INTERACTIVE_EMAIL_OPTIONS
-    );
+    await sendEmail(email, "Reset Password OTP", forgotPasswordTemplate({ name: user.fullName, otp }));
   } catch (error) {
     user.otp = null;
     user.otpExpiry = null;
@@ -148,10 +80,7 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  res.json({
-    success: true,
-    message: "If an account exists for this email, an OTP has been sent."
-  });
+  res.json({ success: true, message: "OTP sent to email" });
 });
 
 // ---------------- RESET PASSWORD ----------------
@@ -165,9 +94,7 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email }).select("+otp +otpExpiry");
-  if (!user) {
-    return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
-  }
+  if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
   if (!user.otp || !user.otpExpiry || String(user.otp) !== otp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -186,9 +113,7 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
 // Admin creates Organizer
 export const createOrganizer = async (req, res, next) => {
   try {
-    const fullName = String(req.body?.fullName || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = req.body?.password;
+    const { fullName, email, password } = req.body;
     const organizerDepartment = String(
       req.body?.professionalProfile?.department || req.body?.department || ""
     ).trim();
@@ -241,9 +166,7 @@ export const createOrganizer = async (req, res, next) => {
 // MAIN_ADMIN or ORGANIZER creates Student Coordinator
 export const createCoordinator = async (req, res, next) => {
   try {
-    const fullName = String(req.body?.fullName || "").trim();
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = req.body?.password;
+    const { fullName, email, password } = req.body;
     const requestedDepartment = String(
       req.body?.professionalProfile?.department || req.body?.department || ""
     ).trim();
@@ -293,12 +216,7 @@ export const createCoordinator = async (req, res, next) => {
 
     if (requiresVerification) {
       try {
-        await sendEmail(
-          email,
-          "Verify Email - EventMate",
-          verifyEmailTemplate({ name: fullName, otp }),
-          INTERACTIVE_EMAIL_OPTIONS
-        );
+        await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
       } catch (error) {
         await User.deleteOne({ _id: coordinator._id });
         error.statusCode = Number(error.statusCode) || 503;

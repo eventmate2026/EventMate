@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import api, { primeBackendConnection } from "../lib/api";
+import api from "../lib/api";
 import {
   clearPendingVerificationEmail,
   getPendingVerificationEmail,
   storePendingVerificationEmail,
 } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
-import { useToast } from "../context/ToastContext";
 
 export default function VerifyEmail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const toast = useToast();
   const resolvePresetEmail = () => {
     const searchEmail = new URLSearchParams(location.search).get("email");
     return String(location.state?.email || searchEmail || getPendingVerificationEmail() || "")
@@ -25,9 +23,11 @@ export default function VerifyEmail() {
     email: presetEmail,
     otp: "",
   });
+  const [message, setMessage] = useState(
+    location.state?.message ? { type: "info", text: location.state.message } : null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const hasVerificationEmail = Boolean(formData.email);
 
   useEffect(() => {
     const nextEmail = resolvePresetEmail();
@@ -36,78 +36,65 @@ export default function VerifyEmail() {
     storePendingVerificationEmail(nextEmail);
   }, [location.search, location.state]);
 
-  useEffect(() => {
-    const initialMessage = String(location.state?.message || "").trim();
-    if (!initialMessage) return;
-    toast.info(initialMessage);
-  }, [location.state, toast]);
-
-  useEffect(() => {
-    void primeBackendConnection();
-  }, []);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value.trim(),
+      [name]: name === "email" ? value.trim().toLowerCase() : value.trim(),
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage(null);
 
-    if (!hasVerificationEmail) {
-      toast.error("Verification email not found. Please sign up or log in again.");
-      return;
-    }
-
-    if (!formData.otp) {
-      toast.error("Please enter the OTP sent to your email.");
+    if (!formData.email || !formData.otp) {
+      setMessage({ type: "error", text: "Email and OTP are required." });
       return;
     }
 
     setIsLoading(true);
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({ ...SummaryApi.verify_email, data: formData });
       clearPendingVerificationEmail();
-      toast.success(response.data?.message || "Email verified successfully.");
+      setMessage({ type: "success", text: response.data?.message || "Email verified successfully." });
       setTimeout(
         () => navigate(`/login?email=${encodeURIComponent(formData.email)}`, { replace: true }),
         900
       );
     } catch (error) {
-      toast.error(error.response?.data?.message || "Verification failed. Please try again.");
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Verification failed. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (!hasVerificationEmail) {
-      toast.error("Verification email not found. Please sign up or log in again.");
+    if (!formData.email) {
+      setMessage({ type: "error", text: "Enter your email to resend the OTP." });
       return;
     }
 
+    setMessage(null);
     setIsResending(true);
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
       const response = await api({
         ...SummaryApi.resend_verification_otp,
         data: { email: formData.email },
       });
       storePendingVerificationEmail(formData.email);
-      const apiMessage = response.data?.message || "A new OTP has been sent to your email.";
-      const deliveryPending =
-        Boolean(response.data?.deliveryPending) || Number(response.status) === 202;
-      if (deliveryPending) {
-        toast.info(apiMessage);
-      } else {
-        toast.success(apiMessage);
-      }
+      setMessage({
+        type: "success",
+        text: response.data?.message || "A new OTP has been sent to your email.",
+      });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Unable to resend OTP right now.");
+      setMessage({
+        type: "error",
+        text: error.response?.data?.message || "Unable to resend OTP right now.",
+      });
     } finally {
       setIsResending(false);
     }
@@ -124,39 +111,46 @@ export default function VerifyEmail() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit} autoComplete="on">
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label htmlFor="verify-email-address" className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <input
-              id="verify-email-address"
               name="email"
               type="email"
-              readOnly
-              value={formData.email || "No verification email found"}
-              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="you@college.edu"
+              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
             />
-            {!hasVerificationEmail && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-300">
-                Go back to signup or login and request a fresh OTP first.
-              </p>
-            )}
           </div>
           <div>
-            <label htmlFor="verify-email-otp" className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">OTP</label>
             <input
-              id="verify-email-otp"
               name="otp"
               value={formData.otp}
               onChange={handleChange}
               placeholder="Enter 6 digit code"
-              autoComplete="one-time-code"
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
             />
           </div>
 
+          {message && (
+            <p
+              className={`text-sm text-center rounded-lg py-2 ${
+                message.type === "success"
+                  ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
+                  : message.type === "info"
+                    ? "text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-300"
+                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
+              }`}
+            >
+              {message.text}
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={isLoading || !hasVerificationEmail}
+            disabled={isLoading}
             className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition disabled:opacity-70"
           >
             {isLoading ? "Verifying..." : "Verify Email"}
@@ -165,7 +159,7 @@ export default function VerifyEmail() {
           <button
             type="button"
             onClick={handleResendOtp}
-            disabled={isResending || isLoading || !hasVerificationEmail}
+            disabled={isResending || isLoading}
             className="w-full py-3 rounded-xl border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 transition disabled:opacity-70 dark:border-indigo-400/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
           >
             {isResending ? "Sending OTP..." : "Resend OTP"}
@@ -180,4 +174,3 @@ export default function VerifyEmail() {
     </section>
   );
 }
-

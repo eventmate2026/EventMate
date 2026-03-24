@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BadgeCheck, Compass, Leaf, ShieldCheck, Zap } from "lucide-react";
 import ContactUs from "../components/ContactUs";
 import Footer from "../components/Footer";
 import { motion, useReducedMotion, useScroll } from "framer-motion";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
-import { buildScheduleDateTime } from "../lib/eventSchedule";
 
 // --- Icons ---
 const SearchIcon = () => (
@@ -35,22 +33,41 @@ const fallbackImages = {
 const EVENTS_CACHE_KEY = "eventmate:public-events-cache";
 const EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
+const parseDateValue = (value) => {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const toLocalDate = (value) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
 const isUpcomingEvent = (event) => {
   const workflowStatus = String(event?.status || "").trim().toLowerCase();
   if (workflowStatus === "completed" || workflowStatus === "cancelled" || workflowStatus === "canceled") {
     return false;
   }
 
-  const eventEndDateTime = buildScheduleDateTime(
-    event?.schedule?.endDate || event?.endDate || event?.schedule?.startDate || event?.startDate || event?.createdAt,
-    event?.schedule?.endTime || event?.endTime,
-    { fallbackToEndOfDay: true }
-  );
+  const startDate = toLocalDate(event?.schedule?.startDate || event?.startDate || event?.createdAt);
+  const endDate = toLocalDate(event?.schedule?.endDate || event?.endDate || event?.schedule?.startDate || event?.startDate || event?.createdAt);
+  const now = toLocalDate(new Date());
 
-  if (eventEndDateTime && Date.now() > eventEndDateTime.getTime()) {
-    return false;
-  }
-
+  if (endDate && now && now > endDate) return false;
   return true;
 };
 
@@ -143,38 +160,6 @@ const fadeUp = {
 const stagger = {
   hidden: {},
   show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
-};
-
-const HOW_IT_WORKS_DESCRIPTION = {
-  "Discover Events": "Browse all upcoming campus events with full details.",
-  "Register Securely": "Login -> Select Event -> Confirm Registration",
-  "Attend & Get Certified": "QR Scan -> Attendance Marked -> Certificate Generated",
-};
-
-const renderHowItWorksIcon = (title, className) => {
-  switch (title) {
-    case "Discover Events":
-      return <Compass className={className} />;
-    case "Register Securely":
-      return <ShieldCheck className={className} />;
-    case "Attend & Get Certified":
-      return <BadgeCheck className={className} />;
-    default:
-      return <Compass className={className} />;
-  }
-};
-
-const renderLandingBenefitIcon = (title, className) => {
-  switch (title) {
-    case "QR Check-in":
-      return <BadgeCheck className={className} />;
-    case "Instant Certificates":
-      return <Compass className={className} />;
-    case "Real-time Analytics":
-      return <Zap className={className} />;
-    default:
-      return <BadgeCheck className={className} />;
-  }
 };
 
 export default function Landing() {
@@ -294,7 +279,7 @@ export default function Landing() {
   const viewportOnce = { once: true, amount: 0.25 };
 
   return (
-    <div className="min-h-[100svh] relative bg-white dark:bg-[#030712] text-gray-900 dark:text-white overflow-x-hidden selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-300">
+    <div className="min-h-screen relative bg-white dark:bg-[#030712] text-gray-900 dark:text-white overflow-x-hidden selection:bg-indigo-500 selection:text-white font-sans transition-colors duration-300">
       
       {/* --- SCROLL PROGRESS BAR --- */}
       <motion.div
@@ -315,7 +300,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION (Synced Animation) --- */}
-      <section className="relative z-10 flex min-h-[calc(100svh-4rem)] items-center px-4 pt-16 pb-12 sm:min-h-0 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
+      <section className="relative z-10 pt-24 pb-12 px-4 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="hero-spotlight hero-spotlight--one" />
           <div className="hero-spotlight hero-spotlight--two" />
@@ -324,7 +309,7 @@ export default function Landing() {
           <div className="hero-beam" />
         </div>
 
-        <div className="mx-auto max-w-5xl text-center">
+        <div className="max-w-5xl mx-auto text-center">
           
           <motion.div
             initial="hidden"
@@ -335,7 +320,7 @@ export default function Landing() {
               {/* Badge */}
               <motion.span
                 variants={textReveal}
-                className="mb-6 inline-block max-w-full rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-indigo-600 backdrop-blur-md dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 max-[380px]:px-2.5 max-[380px]:text-[10px] sm:mb-8 sm:px-4 sm:text-xs sm:tracking-[0.2em]"
+                className="inline-block py-1 px-4 rounded-full bg-indigo-50 dark:bg-white/5 border border-indigo-100 dark:border-white/10 text-indigo-600 dark:text-indigo-300 text-xs font-bold uppercase tracking-[0.2em] mb-8 backdrop-blur-md"
               >
                 Campus Event Management
               </motion.span>
@@ -343,7 +328,7 @@ export default function Landing() {
               {/* Main Title (Word by word effect) */}
               <motion.h1
                 variants={textReveal}
-                className="hero-title mb-6 text-[clamp(2.7rem,16vw,4.8rem)] font-black leading-[0.98] tracking-[-0.045em] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40 max-[380px]:text-[2.45rem] sm:mb-8 sm:text-5xl sm:leading-[1.02] md:text-7xl lg:text-8xl"
+                className="hero-title text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
               >
                 Manage Campus Events <br />
                 <motion.span
@@ -357,18 +342,18 @@ export default function Landing() {
               </motion.h1>
 
               {/* Description */}
-               <motion.p variants={textReveal} className="mx-auto mt-4 max-w-[34rem] text-[0.98rem] leading-8 text-gray-600 dark:text-gray-300 max-[380px]:text-[0.94rem] max-[380px]:leading-7 sm:mt-6 sm:text-lg md:text-xl">
-                 The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
-               </motion.p>
+              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+                The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
+              </motion.p>
 
               {/* Buttons */}
-              <motion.div variants={textReveal} className="mt-8 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
+              <motion.div variants={textReveal} className="mt-10 flex flex-col items-center justify-center gap-4 sm:mt-12 sm:flex-row sm:gap-5">
                 <Link
                   to="/signup"
-                  className="group relative w-full max-w-[18rem] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 p-[2px] cta-glow sm:w-auto sm:max-w-none"
+                  className="group relative p-[2px] rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 cta-glow"
                 >
-                  <div className="relative rounded-full bg-white px-6 py-3.5 transition-all duration-300 group-hover:bg-opacity-0 dark:bg-[#030712] sm:px-8 sm:py-4">
-                    <span className="relative z-10 text-base font-bold text-gray-900 dark:text-white sm:text-lg">
+                  <div className="relative bg-white dark:bg-[#030712] rounded-full px-8 py-4 group-hover:bg-opacity-0 transition-all duration-300">
+                    <span className="relative z-10 text-gray-900 dark:text-white font-bold text-lg">
                       Get Started
                     </span>
                   </div>
@@ -412,13 +397,11 @@ export default function Landing() {
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${card.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
               <div className="relative z-10">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-gray-100 bg-gray-50 text-indigo-600 shadow-inner transition-transform duration-500 group-hover:scale-110 dark:border-white/10 dark:bg-white/5 dark:text-indigo-300 sm:mb-7 sm:h-20 sm:w-20 lg:mb-8 lg:h-24 lg:w-24">
-                  {renderHowItWorksIcon(card.title, "h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12")}
+                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-gray-100 bg-gray-50 text-4xl shadow-inner transition-transform duration-500 group-hover:scale-110 dark:border-white/10 dark:bg-white/5 sm:mb-7 sm:h-20 sm:w-20 sm:text-5xl lg:mb-8 lg:h-24 lg:w-24">
+                  {card.icon}
                 </div>
                 <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{card.title}</h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  {HOW_IT_WORKS_DESCRIPTION[card.title] || card.desc}
-                </p>
+                <p className="text-gray-600 dark:text-gray-400">{card.desc}</p>
               </div>
             </motion.div>
           ))}
@@ -450,15 +433,13 @@ export default function Landing() {
              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100/50 to-transparent dark:from-indigo-600/20 opacity-0 group-hover:opacity-100 transition duration-500"></div>
              <div className="relative z-10 h-full flex flex-col justify-between">
                 <div>
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm dark:bg-indigo-500/20 dark:text-indigo-200 dark:shadow-none sm:mb-6 sm:h-14 sm:w-14">
-                    <Zap className="h-6 w-6 sm:h-7 sm:w-7" />
-                  </div>
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-sm dark:bg-indigo-500/20 dark:shadow-none sm:mb-6 sm:h-14 sm:w-14 sm:text-3xl">⚡</div>
                   <h3 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-4">Lightning Fast</h3>
                   <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">Automated workflows that save hours of manual admin work. No more Excel sheets.</p>
                 </div>
                 <div className="mt-8">
                   <div className="w-full h-24 sm:h-32 bg-indigo-100 dark:bg-indigo-500/20 rounded-xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20">
-                    <Zap className="h-10 w-10 text-indigo-600 dark:text-indigo-200 sm:h-12 sm:w-12" />
+                    <span className="text-4xl">⚡</span>
                   </div>
                 </div>
              </div>
@@ -466,18 +447,14 @@ export default function Landing() {
 
           {/* Standard Card 1 */}
           <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
-             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm dark:text-indigo-200 dark:shadow-none">
-               <ShieldCheck className="h-6 w-6" />
-             </div>
+             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🔐</div>
              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Secure Access</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Role-based protection ensures data stays safe.</p>
           </motion.div>
 
           {/* Standard Card 2 */}
           <motion.div variants={fadeUp} whileHover={{ y: -5 }} className="bg-gray-50 dark:bg-white/5 backdrop-blur-xl rounded-[2rem] border border-gray-200 dark:border-white/10 p-6 sm:p-8 hover:border-gray-300 dark:hover:border-white/20 transition-all">
-             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm dark:text-indigo-200 dark:shadow-none">
-               <Leaf className="h-6 w-6" />
-             </div>
+             <div className="w-12 h-12 bg-white dark:bg-indigo-500/20 rounded-xl flex items-center justify-center text-xl mb-4 shadow-sm dark:shadow-none">🌱</div>
              <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">Paperless</h3>
              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">Digital tickets and certificates.</p>
           </motion.div>
@@ -510,7 +487,6 @@ export default function Landing() {
               </div>
               <input
                 type="text"
-                name="eventSearch"
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -641,9 +617,7 @@ export default function Landing() {
               whileHover={reduceMotion ? {} : { y: -6 }}
               className="bg-gray-50 dark:bg-white/5 backdrop-blur-md rounded-3xl border border-gray-200 dark:border-white/10 p-6 sm:p-8 lg:p-10 hover:border-gray-300 dark:hover:border-white/20 transition-all shadow-lg dark:shadow-none"
             >
-              <div className="mb-6 text-indigo-600 dark:text-indigo-300">
-                {renderLandingBenefitIcon(f.title, "h-10 w-10 sm:h-12 sm:w-12")}
-              </div>
+              <div className="text-4xl sm:text-5xl mb-6">{f.icon}</div>
               <h3 className="text-xl sm:text-2xl font-bold mb-4 text-gray-900 dark:text-white">{f.title}</h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{f.desc}</p>
             </motion.div>
@@ -742,4 +716,3 @@ export default function Landing() {
     </div>
   );
 }
-

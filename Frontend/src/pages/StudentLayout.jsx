@@ -18,12 +18,14 @@ const resolveActivePage = (pathname) => {
 export default function StudentLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState(() => getStoredUser());
+  const [user, setUser] = useState(
+    () => getStoredUser() || { fullName: "Student", email: "student@college.com", role: "STUDENT" }
+  );
   const activePage = resolveActivePage(location.pathname);
 
   useEffect(() => {
     const unsubscribe = subscribeAuthUpdates(() => {
-      setUser(getStoredUser());
+      setUser(getStoredUser() || { fullName: "Student", email: "student@college.com", role: "STUDENT" });
     });
 
     return unsubscribe;
@@ -35,12 +37,11 @@ export default function StudentLayout() {
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 flex flex-col transition-colors">
+    <div className="eventmate-page min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col transition-colors">
       <StudentNavbar activePage={activePage} user={user} onLogout={handleLogout} />
-      <main className="flex-1">
+      <main className="flex-grow">
         <Outlet />
       </main>
     </div>
   );
 }
-

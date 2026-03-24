@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa6";
 import { ArrowLeft, Lock, Mail, ShieldCheck, Sparkles, Users } from "lucide-react";
-import api, { primeBackendConnection } from "../lib/api";
+import api from "../lib/api";
 import { storeAuth } from "../lib/auth";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
-import { useToast } from "../context/ToastContext";
-import { getSafeApiErrorText } from "../lib/safeMessage";
 
 const dashboardRoutes = {
   MAIN_ADMIN: "/admin-dashboard",
@@ -19,7 +17,6 @@ const dashboardRoutes = {
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
-  const toast = useToast();
   const [data, setData] = useState({
     email: "",
     password: "",
@@ -35,10 +32,6 @@ export default function Login() {
     if (!nextEmail) return;
     setData((prev) => ({ ...prev, email: prev.email || nextEmail }));
   }, [location.search]);
-
-  useEffect(() => {
-    void primeBackendConnection();
-  }, []);
 
   const finalizeLogin = ({ accessToken, refreshToken, role, user }) => {
     const finalAccessToken = accessToken;
@@ -77,54 +70,50 @@ export default function Login() {
     e.preventDefault();
     if (isLoading) return;
 
-    const normalizedEmail = String(data.email || "").trim().toLowerCase();
-    const password = String(data.password || "");
-
-    if (!normalizedEmail || !password) {
+    if (!data.email || !data.password) {
       setErrors({
-        email: !normalizedEmail ? "Email is required" : "",
-        password: !password ? "Password is required" : "",
+        email: !data.email ? "Email is required" : "",
+        password: !data.password ? "Password is required" : "",
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      await primeBackendConnection({ maxWaitMs: 2500 });
-      const response = await api({
-        ...SummaryApi.login,
-        data: { email: normalizedEmail, password },
-      });
+      const response = await api({ ...SummaryApi.login, data });
       const { accessToken, refreshToken, role, token, user } = response.data || {};
-      toast.success("Login successful. Redirecting to your dashboard...");
       finalizeLogin({ accessToken: accessToken || token, refreshToken, role, user });
     } catch (error) {
       const status = error.response?.status;
       const retryAfter = Number(error.response?.data?.retryAfterSeconds);
-      const backendMessage = getSafeApiErrorText(error, "");
+      const responseData = error.response?.data;
+      const backendMessage =
+        typeof responseData?.message === "string" && responseData.message.trim()
+          ? responseData.message
+          : null;
+      const isLikelyProxyHtmlError =
+        status === 500 &&
+        typeof responseData === "string" &&
+        responseData.toLowerCase().includes("<!doctype html");
       const rateLimitMessage =
         status === 429 && Number.isFinite(retryAfter)
           ? `Too many attempts. Try again in ${retryAfter} seconds.`
           : backendMessage;
-      const fallbackMessage = "Login failed. Please try again.";
-      const networkMessage = fallbackMessage;
-      if (
-        status === 403 &&
-        /verify(?: your)? email|email (?:is )?not verified|verify email first/i.test(
-          backendMessage
-        )
-      ) {
-        const pendingEmail = normalizedEmail;
+      const fallbackMessage = isLikelyProxyHtmlError
+        ? "Backend is unreachable. Start the backend server and try again."
+        : "Login failed. Please try again.";
+      const networkMessage = status ? fallbackMessage : (error.message || fallbackMessage);
+      if (status === 403 && backendMessage === "Verify email first") {
+        const pendingEmail = String(data.email || "").trim().toLowerCase();
         if (pendingEmail) {
           storePendingVerificationEmail(pendingEmail);
-          toast.info("Please verify your email before logging in.");
           navigate(`/verify-email?email=${encodeURIComponent(pendingEmail)}`, {
             state: { email: pendingEmail, message: backendMessage },
           });
           return;
         }
       }
-      toast.error(rateLimitMessage || networkMessage);
+      setErrors({ submit: rateLimitMessage || networkMessage });
     } finally {
       setIsLoading(false);
     }
@@ -264,8 +253,6 @@ export default function Login() {
                     />
                     <button
                       type="button"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      aria-pressed={showPassword}
                       className="text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                       onClick={() => setShowPassword((prev) => !prev)}
                     >
@@ -283,6 +270,13 @@ export default function Login() {
                   Admins, Organizers, Coordinators, and Students login here. Access is provided by role after
                   authentication.
                 </p>
+
+                {errors.submit && (
+                  <p className="rounded-lg bg-red-50 py-2 text-center text-sm text-red-600">
+                    {errors.submit}
+                  </p>
+                )}
+
                 <button
                   disabled={!isValid || isLoading}
                   className={`w-full rounded-xl py-3 text-sm font-semibold uppercase tracking-[0.14em] text-white transition ${
@@ -311,4 +305,3 @@ export default function Login() {
     </section>
   );
 }
-

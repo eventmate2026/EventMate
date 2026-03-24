@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, RefreshCcw, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   ACCEPTED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -21,12 +20,6 @@ const formatStatus = (status) =>
 const formatRole = (role) =>
   String(role || "").trim().toLowerCase() === "leader" ? "Leader" : "Member";
 
-const formatCurrency = (value) => {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount) || amount <= 0) return "Free";
-  return `Rs ${amount}`;
-};
-
 export default function StudentTeamRegistration() {
   const { registrationId } = useParams();
   const navigate = useNavigate();
@@ -38,8 +31,6 @@ export default function StudentTeamRegistration() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState(null);
   const [registration, setRegistration] = useState(null);
-  useToastFeedback(error, { defaultType: "error" });
-  useToastFeedback(notice);
 
   const loadStatus = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -149,15 +140,9 @@ export default function StudentTeamRegistration() {
     registration?.status === "PendingMemberVerification" &&
     ((statusSummary?.pending || 0) + (statusSummary?.awaitingSignup || 0) > 0);
   const canEditMembers = registration?.status === "PendingMemberVerification";
-  const paymentStatus = String(registration?.payment?.paymentStatus || "NotRequired").trim();
-  const paymentRequired = Boolean(registration?.payment?.required);
-  const paymentAmount = Number(registration?.payment?.amount || 0) || 0;
-  const paymentRejectionReason = String(registration?.payment?.rejectionReason || "").trim();
-  const needsPayment = paymentRequired && (paymentStatus === "Pending" || paymentStatus === "Rejected");
-  const paymentUnderReview = paymentRequired && paymentStatus === "UnderReview";
 
   return (
-    <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 pt-4 pb-8">
+    <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-5">
         <button
           type="button"
@@ -219,6 +204,18 @@ export default function StudentTeamRegistration() {
               </div>
             </section>
 
+            {notice && (
+              <section
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  notice.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
+                    : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
+                }`}
+              >
+                {notice.text}
+              </section>
+            )}
+
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -263,7 +260,6 @@ export default function StudentTeamRegistration() {
                               {isEditing ? (
                                 <div className="flex flex-col gap-2">
                                   <input
-                                    name={`memberEmail-${index}`}
                                     value={draftEmail}
                                     onChange={(event) =>
                                       setEmailDrafts((prev) => ({
@@ -337,58 +333,14 @@ export default function StudentTeamRegistration() {
                 <div className="text-sm text-slate-600 dark:text-slate-300">
                   {registration.status === "Confirmed"
                     ? "Registration confirmed. QR codes are available in My Events."
-                    : needsPayment
-                      ? "All team members accepted. Complete payment to unlock the QR pass."
-                      : paymentUnderReview
-                        ? "Payment proof is under review. QR codes will appear after approval."
+                    : registration.status === "PendingPayment"
+                      ? "Team accepted. Registration is being finalized. Check back for your QR codes soon."
                       : registration.anyRejected
                         ? "A team member rejected the invitation. You cannot continue."
                         : registration.allAccepted
-                          ? "All members accepted. Registration is being finalized."
+                          ? "All members accepted. Registration will be confirmed automatically."
                           : "Waiting for team members to accept the invitation."}
                 </div>
-                {paymentRequired ? (
-                  <div className="flex flex-col items-start gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          paymentStatus === "Verified"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                            : paymentStatus === "UnderReview"
-                              ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300"
-                              : paymentStatus === "Rejected"
-                                ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-                                : "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
-                        }`}
-                      >
-                        Payment: {formatStatus(paymentStatus)}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-300">
-                        Amount: {formatCurrency(paymentAmount)}
-                      </span>
-                      {(needsPayment || paymentUnderReview) && registration?.registrationId ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigate(
-                              `/student-dashboard/my-events/payment/${encodeURIComponent(
-                                registration.registrationId
-                              )}`
-                            )
-                          }
-                          className="rounded-md bg-indigo-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-indigo-700"
-                        >
-                          {needsPayment ? "Complete Payment" : "View Payment"}
-                        </button>
-                      ) : null}
-                    </div>
-                    {paymentStatus === "Rejected" && paymentRejectionReason ? (
-                      <p className="text-xs text-rose-600 dark:text-rose-300">
-                        {paymentRejectionReason}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
             </section>
           </>

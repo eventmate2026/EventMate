@@ -19,11 +19,9 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
-import { useToast } from "../context/ToastContext";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
-import { useToastFeedback } from "../hooks/useToastFeedback";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -72,30 +70,6 @@ const profileToParticipant = (profile) => ({
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
-const normalizeEventPeople = (entries) => {
-  if (!Array.isArray(entries)) return [];
-
-  return entries.reduce((rows, entry) => {
-    if (typeof entry === "string") {
-      const name = entry.trim();
-      if (name) rows.push({ name, organization: "", department: "", occupation: "" });
-      return rows;
-    }
-
-    if (!entry || typeof entry !== "object") return rows;
-
-    const name = String(entry?.name || entry?.fullName || "").trim();
-    const organization = String(entry?.organization || entry?.college || "").trim();
-    const department = String(entry?.department || entry?.branch || "").trim();
-    const occupation = String(entry?.occupation || entry?.role || "").trim();
-
-    if (name || organization || department || occupation) {
-      rows.push({ name: name || "TBA", organization, department, occupation });
-    }
-
-    return rows;
-  }, []);
-};
 
 const getEventId = (event) =>
   normalizeId(event?._id || event?.id || event?.eventId);
@@ -144,7 +118,6 @@ const findEventInMyRegistrations = async (eventId) => {
 export default function StudentEventDetails({ mode = "details" }) {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const toast = useToast();
   const user = getStoredUser();
   const lockedDepartment = String(user?.academicProfile?.branch || "").trim();
   const isRegistrationMode = mode === "register";
@@ -155,12 +128,15 @@ export default function StudentEventDetails({ mode = "details" }) {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [pendingRegistrationId, setPendingRegistrationId] = useState("");
+  const [pendingTeamRegistrationId, setPendingTeamRegistrationId] = useState("");
   const [registrationWarning, setRegistrationWarning] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [teamRegistrationInfo, setTeamRegistrationInfo] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState("about");
-  useToastFeedback(error, { defaultType: "error" });
 
   const [registrationType, setRegistrationType] = useState("INDIVIDUAL");
   const [teamName, setTeamName] = useState("");
@@ -179,6 +155,9 @@ export default function StudentEventDetails({ mode = "details" }) {
     const fetchEventDetails = async () => {
       setLoading(true);
       setError(null);
+      setMessage(null);
+      setPendingRegistrationId("");
+      setPendingTeamRegistrationId("");
       setRegistrationWarning(null);
       setTeamRegistrationInfo(null);
       try {
@@ -264,6 +243,10 @@ export default function StudentEventDetails({ mode = "details" }) {
     fetchEventDetails();
   }, [eventId]);
 
+  const handleModalClose = () => {
+    setModal(null);
+  };
+
   const allowedRegistrationTypes = useMemo(() => {
     const participationMode = event?.participationMode || "INDIVIDUAL";
     if (participationMode === "TEAM") return ["TEAM"];
@@ -284,15 +267,6 @@ export default function StudentEventDetails({ mode = "details" }) {
     }
     return base;
   }, [isDepartmentEvent, eventVisibilityDepartment]);
-  const mentorEntries = useMemo(() => normalizeEventPeople(event?.mentors), [event?.mentors]);
-  const judgeEntries = useMemo(() => normalizeEventPeople(event?.judges), [event?.judges]);
-  const hasMentorJudgeSection = mentorEntries.length > 0 || judgeEntries.length > 0;
-
-  useEffect(() => {
-    if (activeDetailTab === "mentor" && !hasMentorJudgeSection) {
-      setActiveDetailTab("about");
-    }
-  }, [activeDetailTab, hasMentorJudgeSection]);
 
   useEffect(() => {
     if (!lockedDepartment) return;
@@ -529,21 +503,25 @@ export default function StudentEventDetails({ mode = "details" }) {
   const handleRegister = async () => {
     if (!event || isRegistered || isRegistering) return;
     if (isCoordinatorBlocked) {
-      toast.error(
-        isAssignedCoordinator
+      const payload = {
+        type: "error",
+        text: isAssignedCoordinator
           ? "You are assigned as a coordinator for this event. Coordinators cannot register."
-          : "Coordinator accounts cannot register for team events."
-      );
+          : "Coordinator accounts cannot register for team events.",
+      };
+      setMessage(payload);
       return;
     }
     if (!event.registrationOpen) return;
     const validationError = validateRegistration();
     if (validationError) {
-      toast.error(validationError);
+      const payload = { type: "error", text: validationError };
+      setMessage(payload);
       return;
     }
 
     setIsRegistering(true);
+    setMessage(null);
     try {
       const response = await api({
         ...SummaryApi.register_for_event,
@@ -563,20 +541,18 @@ export default function StudentEventDetails({ mode = "details" }) {
         Number(response.data?.data?.totalParticipants) ||
         (isTeamRegistration ? teamMembers.length + 1 : 1);
 
-      const createdRegistrationId = String(
-        response.data?.data?._id || response.data?.data?.id || ""
-      ).trim();
       const registrationStatus = String(response.data?.data?.status || "").trim();
       const qrReadyNow = registrationStatus === "Confirmed";
-      toast.success(
-        registrationStatus === "PendingPayment"
-          ? "Registration created. Complete the payment to receive your QR pass."
-          : qrReadyNow
-            ? "Registered successfully. Your QR pass is now available in My Events."
-            : isTeamRegistration
-              ? "Team registration created. Track member acceptance and complete payment when the team is ready."
-              : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed."
-      );
+      const popupPayload = {
+        type: "success",
+        text: qrReadyNow
+          ? "Registered successfully. Your QR pass is now available in My Events."
+          : isTeamRegistration
+            ? "Team registration created. Invitations go to members with accounts; others will get an invite after signup and login. Track accept/reject status and registration will auto-confirm once everyone accepts."
+            : "Registered successfully. Your QR pass will appear in My Events once registration is confirmed.",
+      };
+      setMessage(popupPayload);
+      setModal(popupPayload);
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
       setEvent((prev) =>
@@ -584,21 +560,21 @@ export default function StudentEventDetails({ mode = "details" }) {
           ? { ...prev, participantCount: Number(prev.participantCount || 0) + headCount }
           : prev
       );
-      if (registrationStatus === "PendingPayment" && createdRegistrationId) {
-        navigate(
-          `/student-dashboard/my-events/payment/${encodeURIComponent(createdRegistrationId)}`
-        );
-        return;
+
+      const registrationId = response.data?.data?._id || response.data?.data?.id;
+      if (registrationId) {
+        if (isTeamRegistration) {
+          setPendingTeamRegistrationId(String(registrationId));
+        } else {
+          setPendingRegistrationId(String(registrationId));
+        }
       }
-      if (isTeamRegistration && createdRegistrationId) {
-        navigate(
-          `/student-dashboard/team-registration/${encodeURIComponent(createdRegistrationId)}`
-        );
-        return;
-      }
-      navigate("/student-dashboard/my-events");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to register for this event.");
+      const payload = {
+        type: "error",
+        text: err.response?.data?.message || "Unable to register for this event.",
+      };
+      setMessage(payload);
     } finally {
       setIsRegistering(false);
     }
@@ -606,7 +582,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
         <Loader2 size={14} className="animate-spin" />
         Loading event details...
       </div>
@@ -615,7 +591,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (error || !event) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Event not found</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">{error || "This event is not available."}</p>
@@ -625,7 +601,37 @@ export default function StudentEventDetails({ mode = "details" }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f8] pt-4 pb-6 sm:pt-5 sm:pb-8 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#f3f4f8] py-6 sm:py-8 dark:bg-gray-900">
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900/95 p-6 text-center text-white shadow-2xl">
+            <div
+              className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-1 ${
+                modal.type === "success"
+                  ? "bg-emerald-500/15 text-emerald-400 ring-emerald-400/40"
+                  : "bg-rose-500/15 text-rose-300 ring-rose-400/40"
+              }`}
+            >
+              {modal.type === "success" ? <CheckCircle2 size={30} /> : <AlertCircle size={30} />}
+            </div>
+            <h2 className="mt-4 text-xl font-semibold">
+              {modal.type === "success" ? "Thank You!" : "Unable to Register"}
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">{modal.text}</p>
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className={`mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
+                modal.type === "success"
+                  ? "bg-emerald-500 hover:bg-emerald-600"
+                  : "bg-rose-500 hover:bg-rose-600"
+              }`}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -639,8 +645,8 @@ export default function StudentEventDetails({ mode = "details" }) {
         <section
           className={
             isRegistrationMode
-              ? "mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
-              : "mt-3"
+              ? "mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900"
+              : "mt-4"
           }
         >
           {isRegistrationMode && (
@@ -681,6 +687,44 @@ export default function StudentEventDetails({ mode = "details" }) {
           <div className={isRegistrationMode ? "px-4 py-5 sm:px-6" : ""}>
             {isRegistrationMode ? (
               <>
+                {message && (
+                  <p
+                    className={`mb-4 rounded-lg px-3 py-2 text-sm ${
+                      message.type === "success"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                        : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
+                    }`}
+                  >
+                    {message.text}
+                  </p>
+                )}
+                {message?.type === "success" && (
+                  <div className="mb-4 flex flex-wrap gap-3">
+                    {pendingTeamRegistrationId && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/student-dashboard/team-registration/${encodeURIComponent(
+                              pendingTeamRegistrationId
+                            )}`
+                          )
+                        }
+                        className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                      >
+                        View Team Invitations
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => navigate("/student-dashboard/my-events")}
+                      className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600"
+                    >
+                      Open My Events
+                    </button>
+                  </div>
+                )}
+
                 {registrationWarning && (
                   <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
                     {registrationWarning}
@@ -693,7 +737,11 @@ export default function StudentEventDetails({ mode = "details" }) {
                       ? "You are assigned as a coordinator for this event. Coordinators cannot register."
                       : "Coordinator accounts cannot register for team events."}
                   </div>
-                ) : isRegistered ? null : (
+                ) : isRegistered ? (
+                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
+                    You are already registered for this event.
+                  </div>
+                ) : (
                   <>
                     {event.participationMode === "BOTH" && (
                       <div className="mb-4 grid grid-cols-2 gap-2">
@@ -719,10 +767,8 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                     {isTeamRegistration && (
                       <div className="mb-4">
-                        <label htmlFor="student-event-team-name" className="text-xs font-medium text-slate-600 dark:text-slate-300">Team Name *</label>
+                        <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Team Name *</label>
                         <input
-                          id="student-event-team-name"
-                          name="teamName"
                           value={teamName}
                           onChange={(inputEvent) => setTeamName(inputEvent.target.value)}
                           className="mt-1 w-full rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100"
@@ -731,18 +777,17 @@ export default function StudentEventDetails({ mode = "details" }) {
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input name="leaderFullName" placeholder="Full Name *" value={leaderProfile.fullName} onChange={(eventValue) => updateLeaderField("fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input name="leaderEmail" type="email" placeholder="Email Address *" value={leaderProfile.email} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200" />
-                      <input name="leaderMobileNumber" placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
-                      <input name="leaderCollegeName" placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input placeholder="Full Name *" value={leaderProfile.fullName} onChange={(eventValue) => updateLeaderField("fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input type="email" placeholder="Email Address *" value={leaderProfile.email} readOnly className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/5 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200" />
+                      <input placeholder="Mobile Number *" value={leaderProfile.mobileNumber} onChange={(eventValue) => updateLeaderField("mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input placeholder="College Name *" value={leaderProfile.collegeName} onChange={(eventValue) => updateLeaderField("collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                       <input
-                        name="leaderBranch"
                         placeholder="Department *"
                         value={leaderProfile.branch}
                         readOnly
                         className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2.5 text-sm text-slate-700 dark:text-slate-200 cursor-not-allowed"
                       />
-                      <input name="leaderYear" placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
+                      <input placeholder="Year *" value={leaderProfile.year} onChange={(eventValue) => updateLeaderField("year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
                     </div>
 
                     {isTeamRegistration && (
@@ -764,10 +809,9 @@ export default function StudentEventDetails({ mode = "details" }) {
                                 )}
                               </div>
                               <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <input name={`memberFullName-${index}`} placeholder="Full Name *" value={member.fullName} onChange={(eventValue) => updateMemberField(index, "fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input placeholder="Full Name *" value={member.fullName} onChange={(eventValue) => updateMemberField(index, "fullName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 <div className="space-y-1">
                                   <input
-                                    name={`memberEmail-${index}`}
                                     placeholder="Email Address *"
                                     value={member.email}
                                     onChange={(eventValue) => handleMemberEmailChange(index, eventValue.target.value)}
@@ -785,18 +829,16 @@ export default function StudentEventDetails({ mode = "details" }) {
                                     </p>
                                   )}
                                 </div>
-                                <input name={`memberMobileNumber-${index}`} placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
-                                <input name={`memberCollegeName-${index}`} placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input placeholder="Mobile Number *" value={member.mobileNumber} onChange={(eventValue) => updateMemberField(index, "mobileNumber", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input placeholder="College Name *" value={member.collegeName} onChange={(eventValue) => updateMemberField(index, "collegeName", eventValue.target.value)} className="sm:col-span-2 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                                 {isDepartmentEvent ? (
                                   <input
-                                    name={`memberDepartment-${index}`}
                                     value={eventVisibilityDepartment}
                                     readOnly
                                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-white/10 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 cursor-not-allowed"
                                   />
                                 ) : (
                                   <select
-                                    name={`memberBranch-${index}`}
                                     value={member.branch}
                                     onChange={(eventValue) => updateMemberField(index, "branch", eventValue.target.value)}
                                     className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100"
@@ -809,7 +851,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                                     ))}
                                   </select>
                                 )}
-                                <input name={`memberYear-${index}`} placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
+                                <input placeholder="Year *" value={member.year} onChange={(eventValue) => updateMemberField(index, "year", eventValue.target.value)} className="rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-3 py-2 text-xs text-slate-900 dark:text-slate-100" />
                               </div>
                             </div>
                           ))}
@@ -829,11 +871,11 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                     <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
                       <label className="flex items-start gap-2">
-                        <input name="studentAuthenticity" type="checkbox" checked={declarations.studentAuthenticity} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, studentAuthenticity: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
+                        <input type="checkbox" checked={declarations.studentAuthenticity} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, studentAuthenticity: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
                         I confirm that the submitted details are genuine.
                       </label>
                       <label className="flex items-start gap-2">
-                        <input name="certificateAwareness" type="checkbox" checked={declarations.certificateAwareness} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, certificateAwareness: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
+                        <input type="checkbox" checked={declarations.certificateAwareness} onChange={(eventValue) => setDeclarations((prev) => ({ ...prev, certificateAwareness: eventValue.target.checked }))} className="mt-0.5 h-4 w-4" />
                         I understand certificates are issued only after attendance verification.
                       </label>
                     </div>
@@ -932,19 +974,17 @@ export default function StudentEventDetails({ mode = "details" }) {
                     >
                       Contact
                     </button>
-                    {hasMentorJudgeSection ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveDetailTab("mentor")}
-                        className={`pb-2 border-b-2 transition-colors ${
-                          activeDetailTab === "mentor"
-                            ? "border-indigo-600 text-indigo-600 dark:text-indigo-300 dark:border-indigo-300"
-                            : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                        }`}
-                      >
-                        Mentor & Judge
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setActiveDetailTab("mentor")}
+                      className={`pb-2 border-b-2 transition-colors ${
+                        activeDetailTab === "mentor"
+                          ? "border-indigo-600 text-indigo-600 dark:text-indigo-300 dark:border-indigo-300"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      Mentor & Judge
+                    </button>
                   </div>
                 </div>
 
@@ -1036,57 +1076,41 @@ export default function StudentEventDetails({ mode = "details" }) {
                       </section>
                     )}
 
-                    {activeDetailTab === "mentor" && hasMentorJudgeSection && (
+                    {activeDetailTab === "mentor" && (
                       <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-4 sm:p-5">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Mentor & Judge</h3>
-                        <div className={`mt-4 grid gap-4 ${mentorEntries.length > 0 && judgeEntries.length > 0 ? "md:grid-cols-2" : "grid-cols-1"}`}>
-                          {mentorEntries.length > 0 ? (
-                            <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400">Mentors</p>
-                              <div className="mt-2 space-y-3">
-                                {mentorEntries.map((mentor, index) => (
-                                  <div key={`mentor-${index}`} className="rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
-                                      <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
-                                      {mentor.name}
-                                    </p>
-                                    {mentor.occupation ? (
-                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{mentor.occupation}</p>
-                                    ) : null}
-                                    {[mentor.organization, mentor.department].filter(Boolean).length > 0 ? (
-                                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        {[mentor.organization, mentor.department].filter(Boolean).join(" | ")}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
+                        <div className="mt-4 grid md:grid-cols-2 gap-4">
+                          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">Mentors</p>
+                            <div className="mt-2 space-y-2">
+                              {Array.isArray(event.mentors) && event.mentors.length > 0 ? (
+                                event.mentors.map((mentor, index) => (
+                                  <p key={`mentor-${index}`} className="text-sm text-gray-700 dark:text-gray-200 inline-flex items-center gap-2">
+                                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
+                                    {mentor}
+                                  </p>
+                                ))
+                              ) : (
+                                <p className="text-sm text-gray-600 dark:text-gray-300">Mentors will be announced soon.</p>
+                              )}
                             </div>
-                          ) : null}
+                          </div>
 
-                          {judgeEntries.length > 0 ? (
-                            <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400">Judges</p>
-                              <div className="mt-2 space-y-3">
-                                {judgeEntries.map((judge, index) => (
-                                  <div key={`judge-${index}`} className="rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white inline-flex items-center gap-2">
-                                      <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
-                                      {judge.name}
-                                    </p>
-                                    {judge.occupation ? (
-                                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{judge.occupation}</p>
-                                    ) : null}
-                                    {[judge.organization, judge.department].filter(Boolean).length > 0 ? (
-                                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        {[judge.organization, judge.department].filter(Boolean).join(" | ")}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
+                          <div className="rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">Judges</p>
+                            <div className="mt-2 space-y-2">
+                              {Array.isArray(event.judges) && event.judges.length > 0 ? (
+                                event.judges.map((judge, index) => (
+                                  <p key={`judge-${index}`} className="text-sm text-gray-700 dark:text-gray-200 inline-flex items-center gap-2">
+                                    <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-300" />
+                                    {judge}
+                                  </p>
+                                ))
+                              ) : (
+                                <p className="text-sm text-gray-600 dark:text-gray-300">Judges will be announced soon.</p>
+                              )}
                             </div>
-                          ) : null}
+                          </div>
                         </div>
                       </section>
                     )}
@@ -1139,6 +1163,12 @@ export default function StudentEventDetails({ mode = "details" }) {
                   </aside>
                 </div>
 
+                {isRegistered ? (
+                  <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
+                    You are already registered for this event.
+                  </div>
+                ) : null}
+
                 {canViewTeamInvites ? (
                   <button
                     type="button"
@@ -1188,8 +1218,3 @@ export default function StudentEventDetails({ mode = "details" }) {
     </div>
   );
 }
-
-
-
-
-
