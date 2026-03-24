@@ -10,6 +10,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { fetchMyRegistrations } from "../lib/registrationApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const parseDateValue = (value) => {
   if (!value) return null;
@@ -59,6 +60,15 @@ export default function StudentEventQRCode() {
   const [registration, setRegistration] = useState(null);
   const [warning, setWarning] = useState(null);
   const requestIdRef = useRef(0);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the QR pass right now.",
+  });
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "QR pass update available.",
+  });
 
   useEffect(() => {
     let isActive = true;
@@ -122,20 +132,14 @@ export default function StudentEventQRCode() {
         Back to My Events
       </button>
 
-      {warning && (
-        <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-          {warning}
-        </p>
-      )}
-
       {loading ? (
         <div className="mt-8 inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
           <Loader2 size={14} className="animate-spin" />
           Loading QR pass...
         </div>
       ) : error ? (
-        <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-          {error}
+        <div className="mt-8 rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-600 dark:text-slate-300">
+          Your QR pass is unavailable right now.
         </div>
       ) : (
         <section className="mt-6 mx-auto max-w-xl rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-5 sm:p-6 shadow-sm">

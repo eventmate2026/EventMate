@@ -14,6 +14,7 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
@@ -125,6 +126,15 @@ export default function AdminOrganizerManagement() {
         .some((value) => value.includes(term));
     });
   }, [organizers, searchTerm]);
+
+  useToastFeedback(message, {
+    successFallback: "Organizer updated successfully.",
+    errorFallback: "We couldn't update the organizer right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load organizers right now.",
+  });
 
   const metrics = useMemo(() => {
     const total = organizers.length;
@@ -312,25 +322,12 @@ export default function AdminOrganizerManagement() {
             </div>
           </div>
 
-          {message && (
-            <p
-              className={`mt-4 rounded-lg px-3 py-2 text-sm ${
-                message.type === "success"
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
-
           {loading && (
             <p className="mt-6 inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
               <Loader2 size={15} className="animate-spin" />
               Loading organizers...
             </p>
           )}
-          {error && !loading && <p className="mt-6 text-sm text-red-600 dark:text-red-300">{error}</p>}
 
           {!loading && !error && (
             <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">

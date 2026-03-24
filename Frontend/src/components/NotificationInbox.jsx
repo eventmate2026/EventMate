@@ -5,6 +5,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { SOCKET_BASE_URL } from "../lib/backendUrl";
 import { getStoredUser } from "../lib/auth";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const parseNotifications = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -59,6 +60,11 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
   const [warning, setWarning] = useState("");
   const socketRef = useRef(null);
   const pollRef = useRef(null);
+
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "Notification update available.",
+  });
 
   const unreadCount = useMemo(
     () => items.filter((item) => !item?.isRead).length,
@@ -207,12 +213,6 @@ export default function NotificationInbox({ title, subtitle, unreadEventName }) 
             </div>
           </div>
         </section>
-
-        {warning && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-            {warning}
-          </div>
-        )}
 
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex items-center justify-between gap-2 mb-4">

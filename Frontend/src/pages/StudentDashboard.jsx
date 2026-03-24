@@ -5,6 +5,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { fetchRegisteredEventIds } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
@@ -239,6 +240,19 @@ export default function StudentDashboard() {
     });
   }, []);
 
+  useToastFeedback(message, {
+    successFallback: "Student action completed successfully.",
+    errorFallback: "We couldn't complete that action right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the dashboard right now.",
+  });
+  useToastFeedback(registrationWarning, {
+    defaultType: "info",
+    infoFallback: "Registration status updated.",
+  });
+
   const goToEventDetails = (eventId) => {
     const normalizedId = String(eventId || "").trim();
     if (!normalizedId) return;
@@ -320,24 +334,6 @@ export default function StudentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
-      {message && (
-        <p
-          className={`mb-6 rounded-lg px-3 py-2 text-sm ${
-            message.type === "success"
-              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-              : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-          }`}
-        >
-          {message.text}
-        </p>
-      )}
-
-      {registrationWarning && (
-        <p className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-          {registrationWarning}
-        </p>
-      )}
-
       <section className="eventmate-panel mb-8 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-4 sm:p-5">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((item) => {
@@ -369,12 +365,6 @@ export default function StudentDashboard() {
           <Loader2 size={14} className="animate-spin" />
           Loading dashboard...
         </p>
-      )}
-
-      {error && !loading && (
-        <div className="mb-8 rounded-xl border border-dashed border-red-300 dark:border-red-500/30 bg-white dark:bg-gray-800 p-5 text-red-600 dark:text-red-300">
-          {error}
-        </div>
       )}
 
       <div className="grid md:grid-cols-3 gap-8">

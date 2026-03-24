@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
 import defaultAccreditationLogo from "../assets/nba-accreditation.png";
 import defaultCertificateLogo from "../assets/logo.png";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const formatDate = (value) => {
   const parsed = new Date(value || 0);
@@ -1062,6 +1063,16 @@ export default function OrganizerCertificateManagement() {
     }
   }, [eventId]);
 
+  useToastFeedback(notice, {
+    successFallback: "Certificate settings updated successfully.",
+    errorFallback: "We couldn't complete that certificate action right now.",
+    infoFallback: "Certificate update available.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the certificate workspace right now.",
+  });
+
   useEffect(() => {
     load();
   }, [load]);
@@ -1132,7 +1143,7 @@ export default function OrganizerCertificateManagement() {
   const handleDownloadDemo = async () => {
     if (!eventData?._id) return;
     if (!eventData?.certificate?.isEnabled) {
-      setNotice("Save the certificate template before downloading a demo certificate.");
+      setNotice({ type: "info", text: "Save the certificate template before downloading a demo certificate." });
       return;
     }
 
@@ -1169,7 +1180,10 @@ export default function OrganizerCertificateManagement() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (demoError) {
-      setNotice(demoError.response?.data?.message || "Unable to download demo certificate.");
+      setNotice({
+        type: "error",
+        text: demoError.response?.data?.message || "Unable to download the demo certificate.",
+      });
     } finally {
       setDownloadingDemo(false);
     }
@@ -1311,9 +1325,12 @@ export default function OrganizerCertificateManagement() {
       setDraftCustomization((prev) =>
         mergePersistedCustomizationIntoDraft(prev, savedCustomization, ["backgroundImageUrl"])
       );
-      setNotice("Certificate background image updated.");
+      setNotice({ type: "success", text: "Certificate background image updated." });
     } catch (uploadError) {
-      setNotice(uploadError.response?.data?.message || "Unable to upload certificate background image.");
+      setNotice({
+        type: "error",
+        text: uploadError.response?.data?.message || "Unable to upload the certificate background image.",
+      });
     } finally {
       setUploadingBackground(false);
     }
@@ -1358,9 +1375,12 @@ export default function OrganizerCertificateManagement() {
       setDraftCustomization((prev) =>
         mergePersistedCustomizationIntoDraft(prev, savedCustomization, ["logoUrl"])
       );
-      setNotice("Certificate logo updated.");
+      setNotice({ type: "success", text: "Certificate logo updated." });
     } catch (uploadError) {
-      setNotice(uploadError.response?.data?.message || "Unable to upload certificate logo.");
+      setNotice({
+        type: "error",
+        text: uploadError.response?.data?.message || "Unable to upload the certificate logo.",
+      });
     } finally {
       setUploadingLogo(false);
     }
@@ -1391,9 +1411,12 @@ export default function OrganizerCertificateManagement() {
       setDraftCustomization((prev) =>
         mergePersistedCustomizationIntoDraft(prev, savedCustomization, ["accreditationLogoUrl"])
       );
-      setNotice("Accreditation logo updated.");
+      setNotice({ type: "success", text: "Accreditation logo updated." });
     } catch (uploadError) {
-      setNotice(uploadError.response?.data?.message || "Unable to upload accreditation logo.");
+      setNotice({
+        type: "error",
+        text: uploadError.response?.data?.message || "Unable to upload the accreditation logo.",
+      });
     } finally {
       setUploadingAccreditationLogo(false);
     }
@@ -1406,7 +1429,7 @@ export default function OrganizerCertificateManagement() {
 
   const handleAutoArrangeSignatures = () => {
     setDraftCustomization((prev) => applyAutoArrangeToCustomization(prev));
-    setNotice("Signatures auto-arranged.");
+    setNotice({ type: "success", text: "Signatures auto-arranged." });
   };
 
   const handleSignatureFileSelected = (role) => async (eventValue) => {
@@ -1415,7 +1438,7 @@ export default function OrganizerCertificateManagement() {
     if (!selectedFile) return;
 
     if (selectedFile.type !== "image/png") {
-      setNotice("Please upload a PNG signature file.");
+      setNotice({ type: "info", text: "Please upload a PNG signature file." });
       return;
     }
 
@@ -1440,9 +1463,12 @@ export default function OrganizerCertificateManagement() {
 
       const savedCustomization = syncSavedCustomizationState(response?.data?.data?.customization);
       setDraftCustomization((prev) => mergeUploadedSignatureIntoDraft(prev, savedCustomization, role));
-      setNotice("Signature updated and auto-arranged.");
+      setNotice({ type: "success", text: "Signature updated and auto-arranged." });
     } catch (uploadError) {
-      setNotice(uploadError.response?.data?.message || "Unable to upload signature.");
+      setNotice({
+        type: "error",
+        text: uploadError.response?.data?.message || "Unable to upload the signature.",
+      });
     } finally {
       setUploadingSignature((prev) => ({ ...prev, [role]: false }));
     }
@@ -1483,9 +1509,12 @@ export default function OrganizerCertificateManagement() {
       );
       updateCustomizationState(savedCustomization);
       setIsCustomizeDialogOpen(false);
-      setNotice("Certificate customization saved.");
+      setNotice({ type: "success", text: "Certificate customization saved." });
     } catch (saveError) {
-      setNotice(saveError.response?.data?.message || "Unable to save certificate customization.");
+      setNotice({
+        type: "error",
+        text: saveError.response?.data?.message || "Unable to save the certificate customization.",
+      });
     } finally {
       setSavingCustomization(false);
     }
@@ -1565,22 +1594,10 @@ export default function OrganizerCertificateManagement() {
           />
         ))}
 
-        {notice && (
-          <p className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200">
-            {notice}
-          </p>
-        )}
-
         {loading && (
           <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-500 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading certificate workspace...
-          </section>
-        )}
-
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </section>
         )}
 

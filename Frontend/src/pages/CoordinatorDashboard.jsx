@@ -20,6 +20,7 @@ import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { computeProfileProgress } from "../lib/profileProgress";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const FALLBACK_POSTERS = [
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=900&q=80",
@@ -158,6 +159,11 @@ export default function CoordinatorDashboard() {
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the coordinator dashboard right now.",
+  });
 
   const loadEvents = async ({ silent = false } = {}) => {
     if (silent) {
@@ -420,12 +426,6 @@ export default function CoordinatorDashboard() {
           <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
             <Loader2 size={14} className="animate-spin" />
             Loading coordinator workspace...
-          </p>
-        )}
-
-        {error && !loading && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </p>
         )}
 

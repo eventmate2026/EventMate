@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
@@ -63,6 +64,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load admin metrics right now.",
+  });
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -260,8 +266,6 @@ export default function AdminDashboard() {
         </section>
 
         {loading && <p className="text-sm text-slate-500 dark:text-slate-300">Loading admin metrics...</p>}
-        {error && !loading && <p className="text-sm text-red-600 dark:text-red-300">{error}</p>}
-
         {!loading && !error && (
           <>
             <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

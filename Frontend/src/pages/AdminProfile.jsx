@@ -16,6 +16,7 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser, storeAuth } from "../lib/auth";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { logoutUser } from "../lib/logout";
 
 const DEFAULT_AVATAR =
@@ -153,6 +154,16 @@ export default function AdminProfile() {
     [lastLoginLabel, loginsLast30, securityScore, sessions.length]
   );
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load profile details right now.",
+  });
+  useToastFeedback(notice, {
+    successFallback: "Security action completed successfully.",
+    errorFallback: "We couldn't complete that security action right now.",
+    infoFallback: "Profile updated.",
+  });
+
   const handleForceLogoutAll = async () => {
     const confirmed = window.confirm(
       "Force logout all sessions? You will be logged out and must sign in again."
@@ -239,26 +250,6 @@ export default function AdminProfile() {
           <div className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading profile data...
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="eventmate-panel rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 inline-flex items-center gap-2">
-            <AlertTriangle size={14} />
-            {error}
-          </div>
-        )}
-
-        {notice && (
-          <div
-            className={`eventmate-panel rounded-2xl border p-4 text-sm inline-flex items-center gap-2 ${
-              notice.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
-                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300"
-            }`}
-          >
-            {notice.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-            {notice.text}
           </div>
         )}
 

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const toList = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -95,6 +96,11 @@ export default function AdminSystemOversight() {
   const [activeControlId, setActiveControlId] = useState(null);
   const [actionBusyId, setActionBusyId] = useState(null);
   const [actionNotice, setActionNotice] = useState(null);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load system oversight right now.",
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -321,12 +327,6 @@ export default function AdminSystemOversight() {
           <article className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading system oversight...
-          </article>
-        )}
-
-        {error && !loading && (
-          <article className="eventmate-panel rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </article>
         )}
 

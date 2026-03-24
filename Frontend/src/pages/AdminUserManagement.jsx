@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, RefreshCcw, Search, ShieldCheck, Trash2, U
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
 const ROLE_LABELS = {
@@ -118,6 +119,15 @@ export default function AdminUserManagement() {
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [users, searchTerm, roleFilter, statusFilter]);
+
+  useToastFeedback(message, {
+    successFallback: "User updated successfully.",
+    errorFallback: "We couldn't update the user right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load users right now.",
+  });
 
   const updateUser = async (userId, payload) => {
     setMessage(null);
@@ -280,20 +290,7 @@ export default function AdminUserManagement() {
             Verification labels are system-managed and can be viewed here, but not edited from admin actions.
           </p>
 
-          {message && (
-            <p
-              className={`mt-4 text-sm text-center rounded-lg py-2 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
-
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading users...</p>}
-          {error && !loading && <p className="mt-6 text-sm text-red-600 dark:text-red-300">{error}</p>}
 
           {!loading && !error && (
             <div className="mt-6 overflow-x-auto">

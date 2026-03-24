@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const DEFAULT_POSTER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80";
@@ -68,6 +69,15 @@ export default function CoordinatorEventDetails() {
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load event details right now.",
+  });
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "Registration details are limited for this event.",
+  });
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -100,9 +110,9 @@ export default function CoordinatorEventDetails() {
         } catch (registrationError) {
           const status = Number(registrationError?.response?.status);
           if (status === 403) {
-            setWarning("Registration list is not available for this event in current permissions.");
+            setWarning("Registration details are unavailable for this event right now.");
           } else {
-            setWarning("Detailed registration list is unavailable in this backend build.");
+            setWarning("Detailed registration information is unavailable right now.");
           }
           setRegistrationSummary({ count: 0, rows: [] });
         }
@@ -222,12 +232,6 @@ export default function CoordinatorEventDetails() {
           </section>
         )}
 
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
-          </section>
-        )}
-
         {!loading && !error && eventMeta && (
           <>
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 overflow-hidden">
@@ -274,12 +278,6 @@ export default function CoordinatorEventDetails() {
                 </article>
               </div>
             </section>
-
-            {warning && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-                {warning}
-              </p>
-            )}
 
             <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_240px] gap-4">
               <div>

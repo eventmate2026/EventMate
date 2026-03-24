@@ -12,6 +12,7 @@ import {
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 
 export default function PublicEventDetails() {
@@ -20,6 +21,11 @@ export default function PublicEventDetails() {
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load event details right now.",
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -71,12 +77,6 @@ export default function PublicEventDetails() {
         {loading && (
           <section className="eventmate-panel rounded-2xl border border-slate-200/80 bg-white/90 p-6 text-sm text-slate-500 dark:border-white/10 dark:bg-gray-900/70 dark:text-slate-300">
             Loading event details...
-          </section>
-        )}
-
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </section>
         )}
 

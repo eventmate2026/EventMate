@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Clock3, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const formatDateLabel = (value) => {
   const parsed = new Date(value || "");
@@ -284,6 +285,16 @@ export default function MyCertificates() {
     [certificateRows]
   );
 
+  useToastFeedback(notice, {
+    successFallback: "Certificate update available.",
+    errorFallback: "We couldn't complete that certificate action right now.",
+    infoFallback: "Certificate update available.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load certificate records right now.",
+  });
+
   const handleDownloadClick = async (row) => {
     const urls = Array.isArray(row?.downloadCandidates)
       ? row.downloadCandidates.filter((value) => String(value || "").trim().length > 0)
@@ -291,7 +302,7 @@ export default function MyCertificates() {
     const inlineCertificateData = resolveCertificateData(row?.rawCertificateData);
 
     if (urls.length === 0 && !inlineCertificateData) {
-      setNotice("Certificate download details are missing for this entry.");
+      setNotice({ type: "info", text: "Certificate download details are unavailable for this entry." });
       return;
     }
 
@@ -359,11 +370,17 @@ export default function MyCertificates() {
 
       const errorStatus = Number(downloadError?.response?.status || 0);
       if (errorStatus === 404 || /status code 404/i.test(String(downloadError?.message || ""))) {
-        setNotice("Certificate is not available on the download route yet. Please try again later.");
+        setNotice({
+          type: "info",
+          text: "This certificate is not ready to download yet. Please try again later.",
+        });
         return;
       }
 
-      setNotice(downloadError?.message || "Unable to download this certificate right now. Please try again.");
+      setNotice({
+        type: "error",
+        text: downloadError?.message || "Unable to download this certificate right now. Please try again.",
+      });
     } finally {
       setDownloadingRowId(null);
     }
@@ -394,22 +411,10 @@ export default function MyCertificates() {
           </p>
         </header>
 
-        {notice && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-            {notice}
-          </p>
-        )}
-
         {loading && (
           <section className="eventmate-panel rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-300 inline-flex items-center gap-2">
             <Clock3 size={14} />
             Loading certificate records...
-          </section>
-        )}
-
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </section>
         )}
 

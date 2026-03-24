@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const toList = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -80,6 +81,11 @@ export default function AdminCertificatesAuditLogs() {
     verificationAttempts: 0,
     verificationSuccessRate: 100,
     lastAuditAt: null
+  });
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load certificate audit logs right now.",
   });
   const [registryStatus, setRegistryStatus] = useState("ALL");
   const [registrySearch, setRegistrySearch] = useState("");
@@ -302,13 +308,6 @@ export default function AdminCertificatesAuditLogs() {
           <article className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             {loading ? "Loading certificates and logs..." : "Refreshing data..."}
-          </article>
-        )}
-
-        {error && !loading && (
-          <article className="eventmate-panel rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300 inline-flex items-start gap-2">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            {error}
           </article>
         )}
 

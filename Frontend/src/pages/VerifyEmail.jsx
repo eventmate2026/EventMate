@@ -7,6 +7,7 @@ import {
   storePendingVerificationEmail,
 } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
+import { emitToast } from "../lib/toastBus";
 
 export default function VerifyEmail() {
   const location = useLocation();
@@ -23,9 +24,6 @@ export default function VerifyEmail() {
     email: presetEmail,
     otp: "",
   });
-  const [message, setMessage] = useState(
-    location.state?.message ? { type: "info", text: location.state.message } : null
-  );
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
 
@@ -35,6 +33,12 @@ export default function VerifyEmail() {
     setFormData((prev) => (prev.email ? prev : { ...prev, email: nextEmail }));
     storePendingVerificationEmail(nextEmail);
   }, [location.search, location.state]);
+
+  useEffect(() => {
+    const infoMessage = String(location.state?.message || "").trim();
+    if (!infoMessage) return;
+    emitToast({ type: "info", text: infoMessage });
+  }, [location.state]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -46,26 +50,33 @@ export default function VerifyEmail() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(null);
 
     if (!formData.email || !formData.otp) {
-      setMessage({ type: "error", text: "Email and OTP are required." });
+      emitToast({ type: "error", text: "Email and OTP are required." });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await api({ ...SummaryApi.verify_email, data: formData });
+      const response = await api({
+        ...SummaryApi.verify_email,
+        data: formData,
+        skipSuccessToast: true,
+        skipErrorToast: true,
+      });
       clearPendingVerificationEmail();
-      setMessage({ type: "success", text: response.data?.message || "Email verified successfully." });
+      emitToast({
+        type: "success",
+        text: response.data?.message || "Email verified successfully.",
+      });
       setTimeout(
         () => navigate(`/login?email=${encodeURIComponent(formData.email)}`, { replace: true }),
         900
       );
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: error.response?.data?.message || "Verification failed. Please try again.",
+        text: error.response?.data?.message || error.message || "Verification failed. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -74,26 +85,27 @@ export default function VerifyEmail() {
 
   const handleResendOtp = async () => {
     if (!formData.email) {
-      setMessage({ type: "error", text: "Enter your email to resend the OTP." });
+      emitToast({ type: "error", text: "Enter your email to resend the OTP." });
       return;
     }
 
-    setMessage(null);
     setIsResending(true);
     try {
       const response = await api({
         ...SummaryApi.resend_verification_otp,
         data: { email: formData.email },
+        skipSuccessToast: true,
+        skipErrorToast: true,
       });
       storePendingVerificationEmail(formData.email);
-      setMessage({
+      emitToast({
         type: "success",
         text: response.data?.message || "A new OTP has been sent to your email.",
       });
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: error.response?.data?.message || "Unable to resend OTP right now.",
+        text: error.response?.data?.message || error.message || "Unable to resend the OTP right now.",
       });
     } finally {
       setIsResending(false);
@@ -133,20 +145,6 @@ export default function VerifyEmail() {
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
             />
           </div>
-
-          {message && (
-            <p
-              className={`text-sm text-center rounded-lg py-2 ${
-                message.type === "success"
-                  ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : message.type === "info"
-                    ? "text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-300"
-                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
 
           <button
             type="submit"

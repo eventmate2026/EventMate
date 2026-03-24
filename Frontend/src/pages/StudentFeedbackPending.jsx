@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
 
@@ -129,6 +130,19 @@ export default function StudentFeedbackPending() {
       }),
     [rows]
   );
+
+  useToastFeedback(notice, {
+    successFallback: "Feedback submitted successfully.",
+    errorFallback: "We couldn't complete that feedback action right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load pending feedback right now.",
+  });
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "Feedback update available.",
+  });
 
   const markEventAsSubmitted = (eventId) => {
     const normalized = String(eventId || "").trim();
@@ -277,34 +291,10 @@ export default function StudentFeedbackPending() {
           </p>
         </header>
 
-        {notice && (
-          <p
-            className={`rounded-lg px-3 py-2 text-sm ${
-              notice.type === "success"
-                ? "border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
-                : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
-            }`}
-          >
-            {notice.text}
-          </p>
-        )}
-
-        {warning && (
-          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-            {warning}
-          </p>
-        )}
-
         {loading && (
           <section className="eventmate-panel rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading feedback queue...
-          </section>
-        )}
-
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </section>
         )}
 

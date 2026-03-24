@@ -2,6 +2,8 @@ import axios from "axios";
 import SummaryApi from "../api/SummaryApi";
 import { clearAuth, getStoredRefreshToken, getStoredToken, storeAuth } from "./auth";
 import { API_BASE_URL } from "./backendUrl";
+import { getSafeApiMessage, getSafeSuccessMessage } from "./safeMessage";
+import { emitToast } from "./toastBus";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -41,6 +43,44 @@ const resolveAdapter = (config) => {
   if (typeof api.defaults.adapter === "function") return api.defaults.adapter;
   if (typeof axios.defaults.adapter === "function") return axios.defaults.adapter;
   return null;
+};
+
+const shouldShowSuccessToast = (config, response) => {
+  const method = String(config?.method || response?.config?.method || "get").toLowerCase();
+  if (method === "get") return false;
+  if (config?.skipSuccessToast) return false;
+  const candidate = config?.successToastMessage ?? response?.data?.message;
+  return Boolean(getSafeSuccessMessage(candidate, ""));
+};
+
+const shouldShowErrorToast = (config) => !config?.skipErrorToast;
+
+const sanitizeErrorPayload = (error, fallbackMessage) => {
+  const safeMessage = getSafeApiMessage(error, fallbackMessage);
+  error.message = safeMessage;
+
+  if (error.response) {
+    const data = error.response.data;
+    if (Array.isArray(data?.errors)) {
+      data.errors = data.errors.map((item) =>
+        typeof item === "string" ? getSafeSuccessMessage(item, safeMessage) : item
+      );
+    }
+
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      error.response.data = {
+        ...data,
+        message: safeMessage,
+      };
+    } else {
+      error.response.data = {
+        success: false,
+        message: safeMessage,
+      };
+    }
+  }
+
+  return safeMessage;
 };
 
 api.interceptors.request.use((config) => {
@@ -123,6 +163,15 @@ api.interceptors.response.use(
 
     if (method !== "get") {
       responseCache.clear();
+      if (shouldShowSuccessToast(response.config, response)) {
+        emitToast({
+          type: "success",
+          text: getSafeSuccessMessage(
+            response.config?.successToastMessage ?? response.data?.message,
+            ""
+          ),
+        });
+      }
       return response;
     }
 
@@ -156,7 +205,7 @@ api.interceptors.response.use(
     ) {
       error.response.data = {
         success: false,
-        message: "Backend is unreachable. Start the backend server and try again.",
+        message: "The service is unavailable right now. Please try again.",
       };
     }
 
@@ -165,12 +214,20 @@ api.interceptors.response.use(
     }
 
     if (!original || original.skipAuth || original._retry || isRefreshRequest(original) || status !== 401) {
+      const safeMessage = sanitizeErrorPayload(error);
+      if (shouldShowErrorToast(original)) {
+        emitToast({ type: "error", text: safeMessage });
+      }
       throw error;
     }
 
     const refreshToken = getStoredRefreshToken();
     if (!refreshToken) {
       clearAuth();
+      const safeMessage = sanitizeErrorPayload(error);
+      if (shouldShowErrorToast(original)) {
+        emitToast({ type: "error", text: safeMessage });
+      }
       throw error;
     }
 
@@ -180,6 +237,8 @@ api.interceptors.response.use(
           ...SummaryApi.refresh_token,
           data: { refreshToken },
           skipAuth: true,
+          skipErrorToast: true,
+          skipSuccessToast: true,
         })
           .then((response) => {
             const nextAccess = response.data?.accessToken;
@@ -200,6 +259,10 @@ api.interceptors.response.use(
       return api(original);
     } catch (refreshError) {
       clearAuth();
+      const safeMessage = sanitizeErrorPayload(refreshError);
+      if (shouldShowErrorToast(original)) {
+        emitToast({ type: "error", text: safeMessage });
+      }
       throw refreshError;
     }
   }

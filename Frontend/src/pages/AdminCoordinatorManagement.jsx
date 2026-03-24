@@ -3,6 +3,7 @@ import { AlertCircle, Loader2, Pencil, Search, Trash2, UserPlus, X } from "lucid
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
@@ -92,6 +93,15 @@ export default function AdminCoordinatorManagement() {
     const inactive = total - active;
     return { total, active, inactive };
   }, [coordinators]);
+
+  useToastFeedback(message, {
+    successFallback: "Coordinator updated successfully.",
+    errorFallback: "We couldn't update the coordinator right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load coordinators right now.",
+  });
 
   const upsertCoordinator = (nextCoordinator) => {
     setCoordinators((prev) => {
@@ -299,20 +309,7 @@ export default function AdminCoordinatorManagement() {
             </label>
           </div>
 
-          {message && (
-            <p
-              className={`mt-4 text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
-
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading coordinators...</p>}
-          {error && !loading && <p className="mt-6 text-sm text-red-600 dark:text-red-300">{error}</p>}
 
           {!loading && !error && (
             <div className="mt-6 overflow-x-auto">

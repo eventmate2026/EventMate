@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
 import { fetchMyRegistrations } from "../lib/registrationApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -177,6 +178,15 @@ export default function StudentMyEvents() {
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load your events right now.",
+  });
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "Registration update available.",
+  });
+
   useEffect(() => {
     const loadMyEvents = async () => {
       setLoading(true);
@@ -319,20 +329,14 @@ export default function StudentMyEvents() {
           </button>
         </div>
 
-        {warning && (
-          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-            {warning}
-          </p>
-        )}
-
         {loading ? (
           <p className="mt-6 inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
             <Loader2 size={14} className="animate-spin" />
             Loading your events...
           </p>
         ) : error ? (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
+          <div className="mt-6 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+            Your events are unavailable right now.
           </div>
         ) : filteredRows.length > 0 ? (
           <div className="mt-6 border-l-2 border-indigo-300/70 pl-4 space-y-4">

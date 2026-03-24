@@ -14,6 +14,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
+import { emitToast } from "../lib/toastBus";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -182,13 +184,17 @@ export default function OrganizerEventViewList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [winnerNotice, setWinnerNotice] = useState(null);
   const [pendingWinnerUpdates, setPendingWinnerUpdates] = useState({});
   const [savingWinnerChanges, setSavingWinnerChanges] = useState(false);
 
   const [query, setQuery] = useState("");
   const [registrationFilter, setRegistrationFilter] = useState("All");
   const [attendanceFilter, setAttendanceFilter] = useState("All");
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the participant list right now.",
+  });
 
   const load = useCallback(
     async ({ silent = false } = {}) => {
@@ -340,7 +346,7 @@ export default function OrganizerEventViewList() {
 
     const takenBy = positionTakenBy.get(normalizedPosition);
     if (takenBy && takenBy !== normalizedId) {
-      setWinnerNotice({
+      emitToast({
         type: "error",
         text: `${normalizedPosition} place is already selected.`,
       });
@@ -377,7 +383,6 @@ export default function OrganizerEventViewList() {
     const pendingEntries = Object.entries(pendingWinnerUpdates);
     if (pendingEntries.length === 0) return;
 
-    setWinnerNotice(null);
     setSavingWinnerChanges(true);
 
     const clearEntries = pendingEntries.filter(([, update]) => update?.action === "clear");
@@ -396,6 +401,8 @@ export default function OrganizerEventViewList() {
               ":registrationId",
               encodeURIComponent(registrationId)
             ),
+            skipSuccessToast: true,
+            skipErrorToast: true,
           });
           hasSuccess = true;
           setPendingWinnerUpdates((prev) => {
@@ -420,6 +427,8 @@ export default function OrganizerEventViewList() {
                 encodeURIComponent(registrationId)
               ),
               data: { position: update.position },
+              skipSuccessToast: true,
+              skipErrorToast: true,
             });
             hasSuccess = true;
             setPendingWinnerUpdates((prev) => {
@@ -440,9 +449,9 @@ export default function OrganizerEventViewList() {
       }
 
       if (hadError) {
-        setWinnerNotice({ type: "error", text: errorMessage });
+        emitToast({ type: "error", text: errorMessage });
       } else {
-        setWinnerNotice({
+        emitToast({
           type: "success",
           text: "Winner changes saved successfully.",
         });
@@ -494,12 +503,6 @@ export default function OrganizerEventViewList() {
           </section>
         )}
 
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
-          </section>
-        )}
-
         {!loading && !error && eventData && (
           <>
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
@@ -539,18 +542,6 @@ export default function OrganizerEventViewList() {
             </section>
 
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
-              {winnerNotice && (
-                <p
-                  className={`mb-4 rounded-lg px-3 py-2 text-sm ${
-                    winnerNotice.type === "success"
-                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
-                      : "border border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
-                  }`}
-                >
-                  {winnerNotice.text}
-                </p>
-              )}
-
               {!canAssignWinners && (
                 <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
                   Winner selection opens on the event start date.

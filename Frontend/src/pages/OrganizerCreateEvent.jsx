@@ -3,6 +3,7 @@ import { AlertCircle, ArrowLeft, CalendarDays, Loader2, Plus, Trash2, UploadClou
 import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { extractUsersList } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
 import { resolveUserDepartment } from "../lib/userDepartment";
@@ -128,6 +129,11 @@ export default function OrganizerCreateEvent() {
 
     loadCoordinatorOptions();
   }, [form.visibilityScope]);
+
+  useToastFeedback(message, {
+    successFallback: "Event saved successfully.",
+    errorFallback: "We couldn't save the event right now.",
+  });
 
   const handleChange = (event) => {
     const { name, value, type, checked, files } = event.target;
@@ -465,18 +471,6 @@ export default function OrganizerCreateEvent() {
             </div>
           </div>
 
-          {message && (
-            <p
-              className={`mt-4 text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15"
-                  : "text-red-600 bg-red-50 dark:text-red-300 dark:bg-red-500/15"
-              }`}
-            >
-              {message.text}
-            </p>
-          )}
-
           <div className="mt-6 space-y-4">
             <section className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 p-4">
               <p className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
@@ -567,7 +561,7 @@ export default function OrganizerCreateEvent() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setMessage({ type: "success", text: "Multi-slot support is not available in this backend build; one schedule is used." })}
+                  onClick={() => setMessage({ type: "info", text: "Additional schedule slots are unavailable right now, so one schedule will be used." })}
                   className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                 >
                   + Add Section

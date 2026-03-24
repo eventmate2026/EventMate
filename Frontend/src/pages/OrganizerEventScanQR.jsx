@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -246,6 +247,11 @@ export default function OrganizerEventScanQR() {
   const [marking, setMarking] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the scan dashboard right now.",
+  });
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
@@ -691,12 +697,6 @@ export default function OrganizerEventScanQR() {
           <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-500 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading scan workspace...
-          </section>
-        )}
-
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </section>
         )}
 

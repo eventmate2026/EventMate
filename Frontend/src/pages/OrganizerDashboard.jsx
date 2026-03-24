@@ -23,6 +23,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 import { computeProfileProgress } from "../lib/profileProgress";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   Draft: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -294,6 +295,15 @@ export default function OrganizerDashboard() {
       setUser(getStoredUser());
     });
   }, []);
+
+  useToastFeedback(message, {
+    successFallback: "Organizer action completed successfully.",
+    errorFallback: "We couldn't complete that organizer action right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the organizer workspace right now.",
+  });
 
   const handlePublishEvent = async (eventId) => {
     if (!eventId) return;
@@ -610,28 +620,10 @@ export default function OrganizerDashboard() {
           })}
         </section>
 
-        {message && (
-          <p
-            className={`rounded-lg px-3 py-2 text-sm ${
-              message.type === "success"
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
-
         {loading && (
           <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
             <Loader2 size={14} className="animate-spin" />
             Loading organizer workspace...
-          </p>
-        )}
-
-        {error && !loading && (
-          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </p>
         )}
 

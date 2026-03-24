@@ -6,6 +6,7 @@ import api from "../lib/api";
 import { storeAuth } from "../lib/auth";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
+import { emitToast } from "../lib/toastBus";
 
 const dashboardRoutes = {
   MAIN_ADMIN: "/admin-dashboard",
@@ -75,34 +76,26 @@ export default function Login() {
         email: !data.email ? "Email is required" : "",
         password: !data.password ? "Password is required" : "",
       });
+      emitToast({ type: "error", text: "Email and password are required." });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await api({ ...SummaryApi.login, data });
+      const response = await api({
+        ...SummaryApi.login,
+        data,
+        skipErrorToast: true,
+      });
       const { accessToken, refreshToken, role, token, user } = response.data || {};
       finalizeLogin({ accessToken: accessToken || token, refreshToken, role, user });
     } catch (error) {
       const status = error.response?.status;
-      const retryAfter = Number(error.response?.data?.retryAfterSeconds);
       const responseData = error.response?.data;
       const backendMessage =
         typeof responseData?.message === "string" && responseData.message.trim()
           ? responseData.message
           : null;
-      const isLikelyProxyHtmlError =
-        status === 500 &&
-        typeof responseData === "string" &&
-        responseData.toLowerCase().includes("<!doctype html");
-      const rateLimitMessage =
-        status === 429 && Number.isFinite(retryAfter)
-          ? `Too many attempts. Try again in ${retryAfter} seconds.`
-          : backendMessage;
-      const fallbackMessage = isLikelyProxyHtmlError
-        ? "Backend is unreachable. Start the backend server and try again."
-        : "Login failed. Please try again.";
-      const networkMessage = status ? fallbackMessage : (error.message || fallbackMessage);
       if (status === 403 && backendMessage === "Verify email first") {
         const pendingEmail = String(data.email || "").trim().toLowerCase();
         if (pendingEmail) {
@@ -113,7 +106,10 @@ export default function Login() {
           return;
         }
       }
-      setErrors({ submit: rateLimitMessage || networkMessage });
+      emitToast({
+        type: "error",
+        text: backendMessage || error.message || "Login failed. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -270,12 +266,6 @@ export default function Login() {
                   Admins, Organizers, Coordinators, and Students login here. Access is provided by role after
                   authentication.
                 </p>
-
-                {errors.submit && (
-                  <p className="rounded-lg bg-red-50 py-2 text-center text-sm text-red-600">
-                    {errors.submit}
-                  </p>
-                )}
 
                 <button
                   disabled={!isValid || isLoading}

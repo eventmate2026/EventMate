@@ -15,6 +15,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
 import { getStoredUser } from "../lib/auth";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
@@ -225,6 +226,11 @@ export default function CoordinatorRegistrations() {
   const [registrationError, setRegistrationError] = useState("");
   const [registrationQuery, setRegistrationQuery] = useState("");
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load registrations right now.",
+  });
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -397,10 +403,6 @@ export default function CoordinatorRegistrations() {
             </label>
           )}
         </div>
-
-        {error && (
-          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">{error}</p>
-        )}
 
         {loading ? (
           <section className="eventmate-panel mt-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-500 dark:text-slate-300">

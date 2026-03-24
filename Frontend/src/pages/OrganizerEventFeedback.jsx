@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventItem } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const normalizeId = (value) => String(value || "").trim();
 
@@ -42,6 +43,15 @@ export default function OrganizerEventFeedback() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load event feedback right now.",
+  });
+  useToastFeedback(warning, {
+    defaultType: "info",
+    infoFallback: "Feedback details are limited for this event.",
+  });
 
   useEffect(() => {
     const load = async () => {
@@ -137,12 +147,6 @@ export default function OrganizerEventFeedback() {
           </section>
         )}
 
-        {error && !loading && (
-          <section className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
-          </section>
-        )}
-
         {!loading && !error && (
           <>
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
@@ -168,12 +172,6 @@ export default function OrganizerEventFeedback() {
                 </button>
               </div>
             </section>
-
-            {warning && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-                {warning}
-              </p>
-            )}
 
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BellRing,
-  CheckCircle2,
   Loader2,
   LockKeyhole,
   Power,
@@ -11,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const DEFAULT_SECURITY_SETTINGS = Object.freeze({
   maxFailedLoginAttempts: 5,
@@ -68,7 +68,7 @@ export default function AdminSecurityReports() {
   const [saving, setSaving] = useState(false);
   const [rotatingSecret, setRotatingSecret] = useState(false);
   const [forcingLogout, setForcingLogout] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -102,9 +102,19 @@ export default function AdminSecurityReports() {
     return Math.max(0, Math.min(100, score));
   }, [settings]);
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load security settings right now.",
+  });
+  useToastFeedback(notice, {
+    successFallback: "Security settings updated.",
+    errorFallback: "We couldn't update security settings right now.",
+    infoFallback: "Settings updated.",
+  });
+
   const handleRotateSecret = async () => {
     setRotatingSecret(true);
-    setNotice("");
+    setNotice(null);
     try {
       const response = await api({ ...SummaryApi.rotate_security_secret });
       const data = response.data?.data;
@@ -112,9 +122,15 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice(response.data?.message || "JWT secret rotated. Current sessions now require fresh login.");
+      setNotice({
+        type: "success",
+        text: response.data?.message || "Security signing key rotated. Current sessions now require fresh login.",
+      });
     } catch (err) {
-      setNotice(err.response?.data?.message || "Unable to rotate secret right now.");
+      setNotice({
+        type: "error",
+        text: err.response?.data?.message || "Unable to rotate the security signing key right now.",
+      });
     } finally {
       setRotatingSecret(false);
     }
@@ -122,7 +138,7 @@ export default function AdminSecurityReports() {
 
   const handleForceLogoutAll = async () => {
     setForcingLogout(true);
-    setNotice("");
+    setNotice(null);
     try {
       const response = await api({ ...SummaryApi.force_logout_all });
       const data = response.data?.data;
@@ -130,9 +146,15 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice(response.data?.message || "Forced logout applied to all active sessions.");
+      setNotice({
+        type: "success",
+        text: response.data?.message || "All active sessions were signed out.",
+      });
     } catch (err) {
-      setNotice(err.response?.data?.message || "Unable to force logout right now.");
+      setNotice({
+        type: "error",
+        text: err.response?.data?.message || "Unable to sign out all active sessions right now.",
+      });
     } finally {
       setForcingLogout(false);
     }
@@ -140,12 +162,12 @@ export default function AdminSecurityReports() {
 
   const handleDiscardChanges = () => {
     setSettings(initialSettings);
-    setNotice("Unsaved changes discarded.");
+    setNotice({ type: "info", text: "Unsaved changes were discarded." });
   };
 
   const handleSaveConfiguration = async () => {
     setSaving(true);
-    setNotice("");
+    setNotice(null);
     try {
       const response = await api({
         ...SummaryApi.update_security_settings,
@@ -156,9 +178,15 @@ export default function AdminSecurityReports() {
         setSettings(data);
         setInitialSettings(data);
       }
-      setNotice(response.data?.message || "System security configuration saved.");
+      setNotice({
+        type: "success",
+        text: response.data?.message || "Security settings saved.",
+      });
     } catch (err) {
-      setNotice(err.response?.data?.message || "Unable to save configuration.");
+      setNotice({
+        type: "error",
+        text: err.response?.data?.message || "Unable to save security settings.",
+      });
     } finally {
       setSaving(false);
     }
@@ -183,27 +211,15 @@ export default function AdminSecurityReports() {
           </article>
         )}
 
-        {error && !loading ? (
-          <article className="eventmate-panel rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-            {error}
-          </article>
-        ) : null}
-
-        {notice ? (
-          <article className="eventmate-panel rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-200">
-            {notice}
-          </article>
-        ) : null}
-
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)] gap-4">
           <div className="space-y-4">
             <article className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 sm:p-5">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">JWT Secret Rotation</h2>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Session Signing Key</h2>
                 <RefreshCcw size={16} className="text-indigo-500" />
               </div>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">
-                Rotate the primary signing secret. Existing sessions must re-authenticate.
+                Rotate the security signing key. Existing sessions must sign in again.
               </p>
 
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
@@ -222,7 +238,7 @@ export default function AdminSecurityReports() {
                   className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                 >
                   {rotatingSecret ? <Loader2 size={13} className="animate-spin" /> : <RefreshCcw size={13} />}
-                  {rotatingSecret ? "Rotating..." : "Rotate Secret Key"}
+                  {rotatingSecret ? "Rotating..." : "Rotate Signing Key"}
                 </button>
               </div>
             </article>
@@ -295,10 +311,12 @@ export default function AdminSecurityReports() {
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  onClick={() => setNotice("Token settings staged. Save system configuration to persist.")}
+                  onClick={() =>
+                    setNotice({ type: "info", text: "Changes are ready. Save settings to apply them." })
+                  }
                   className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
                 >
-                  Apply Token Settings
+                  Apply Session Settings
                 </button>
               </div>
             </article>

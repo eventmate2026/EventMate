@@ -21,6 +21,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiData";
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
+import useToastFeedback from "../hooks/useToastFeedback";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 
 const registrationTypeLabels = {
@@ -242,6 +243,19 @@ export default function StudentEventDetails({ mode = "details" }) {
 
     fetchEventDetails();
   }, [eventId]);
+
+  useToastFeedback(message, {
+    successFallback: "Registration updated successfully.",
+    errorFallback: "We couldn't complete the registration request right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load event details right now.",
+  });
+  useToastFeedback(registrationWarning, {
+    defaultType: "info",
+    infoFallback: "Registration status updated.",
+  });
 
   const handleModalClose = () => {
     setModal(null);
@@ -594,7 +608,7 @@ export default function StudentEventDetails({ mode = "details" }) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Event not found</h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">{error || "This event is not available."}</p>
+          <p className="text-gray-600 dark:text-gray-300 mt-2">This event is not available right now.</p>
         </div>
       </div>
     );
@@ -687,17 +701,6 @@ export default function StudentEventDetails({ mode = "details" }) {
           <div className={isRegistrationMode ? "px-4 py-5 sm:px-6" : ""}>
             {isRegistrationMode ? (
               <>
-                {message && (
-                  <p
-                    className={`mb-4 rounded-lg px-3 py-2 text-sm ${
-                      message.type === "success"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                        : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-                    }`}
-                  >
-                    {message.text}
-                  </p>
-                )}
                 {message?.type === "success" && (
                   <div className="mb-4 flex flex-wrap gap-3">
                     {pendingTeamRegistrationId && (
@@ -723,12 +726,6 @@ export default function StudentEventDetails({ mode = "details" }) {
                       Open My Events
                     </button>
                   </div>
-                )}
-
-                {registrationWarning && (
-                  <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-                    {registrationWarning}
-                  </p>
                 )}
 
                 {isCoordinatorBlocked ? (

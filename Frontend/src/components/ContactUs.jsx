@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
+import { emitToast } from "../lib/toastBus";
 
 export default function ContactUs() {
   const [user, setUser] = useState(() => getStoredUser());
@@ -11,7 +12,6 @@ export default function ContactUs() {
     message: "",
   });
 
-  const [status, setStatus] = useState({ type: "", message: "" });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -27,39 +27,38 @@ export default function ContactUs() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    if (status.message) setStatus({ type: "", message: "" });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
-      setStatus({ type: "error", message: "Please fill in all fields." });
+      emitToast({ type: "error", text: "Please fill in all fields." });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      setStatus({ type: "error", message: "Please enter a valid email address." });
+      emitToast({ type: "error", text: "Please enter a valid email address." });
       return;
     }
 
     setIsLoading(true);
-    setStatus({ type: "", message: "" });
 
     try {
       const response = await api({
         ...SummaryApi.submit_contact,
+        skipSuccessToast: true,
+        skipErrorToast: true,
         data: {
           fullName: formData.name.trim(),
           email: formData.email.trim(),
           message: formData.message.trim(),
         },
       });
-
-      setStatus({
+      emitToast({
         type: "success",
-        message: response.data?.message || "Message sent successfully.",
+        text: response.data?.message || "Message sent successfully.",
       });
 
       setFormData({
@@ -68,9 +67,9 @@ export default function ContactUs() {
         message: "",
       });
     } catch (error) {
-      setStatus({
+      emitToast({
         type: "error",
-        message: error.response?.data?.message || "Unable to send message right now.",
+        text: error.response?.data?.message || error.message || "Unable to send your message right now.",
       });
     } finally {
       setIsLoading(false);
@@ -156,17 +155,6 @@ export default function ContactUs() {
                     className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all resize-none dark:text-white disabled:opacity-50"
                   />
                 </div>
-
-                {/* Status Alert */}
-                {status.message && (
-                  <div className={`p-4 rounded-xl text-sm font-semibold animate-fade-in ${
-                    status.type === "success" 
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800" 
-                      : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800"
-                  }`}>
-                    {status.message}
-                  </div>
-                )}
 
                 {/* Submit Button */}
                 <button

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link2, Loader2, Plus, Users } from "lucide-react";
 import api from "../lib/api";
@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { extractCreatedUser, extractEventList } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
+import { emitToast } from "../lib/toastBus";
 
 const formDefaults = {
   fullName: "",
@@ -109,9 +110,6 @@ export default function OrganizerCoordinatorManagement() {
   const [assigning, setAssigning] = useState(false);
 
   const [listWarning, setListWarning] = useState(null);
-  const [message, setMessage] = useState(null);
-  const [toast, setToast] = useState(null);
-  const toastTimerRef = useRef(null);
 
   const coordinatorCatalog = useMemo(
     () => buildCoordinatorCatalog(myEvents, createdCoordinators),
@@ -135,7 +133,11 @@ export default function OrganizerCoordinatorManagement() {
     setListWarning(null);
 
     try {
-      const response = await api({ ...SummaryApi.get_my_events, cacheTTL: 90000 });
+      const response = await api({
+        ...SummaryApi.get_my_events,
+        cacheTTL: 90000,
+        skipErrorToast: true,
+      });
       const events = sortByRecent(extractEventList(response.data));
       setMyEvents(events);
 
@@ -144,7 +146,11 @@ export default function OrganizerCoordinatorManagement() {
       }
     } catch (error) {
       setMyEvents([]);
-      setListWarning(error.response?.data?.message || "Unable to load organizer events.");
+      setListWarning(null);
+      emitToast({
+        type: "error",
+        text: error.response?.data?.message || error.message || "Unable to load organizer events.",
+      });
     } finally {
       setLoadingWorkspace(false);
     }
@@ -153,24 +159,6 @@ export default function OrganizerCoordinatorManagement() {
   useEffect(() => {
     refreshWorkspace();
   }, [user?._id]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  const pushToast = (payload) => {
-    setToast(payload);
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 4500);
-  };
 
   useEffect(() => {
     const firstEventId = normalizeId(myEvents[0]?._id);
@@ -182,7 +170,6 @@ export default function OrganizerCoordinatorManagement() {
 
   const handleCreateCoordinator = async (event) => {
     event.preventDefault();
-    setMessage(null);
 
     const fullName = String(form.fullName || "").trim();
     const email = normalizeEmail(form.email);
@@ -190,7 +177,10 @@ export default function OrganizerCoordinatorManagement() {
     const assignEventId = normalizeId(form.assignEventId);
 
     if (!fullName || !email || password.length < 8) {
-      setMessage({ type: "error", text: "Name, email and password (min 8 chars) are required." });
+      emitToast({
+        type: "error",
+        text: "Name, email and password (minimum 8 characters) are required.",
+      });
       return;
     }
 
@@ -198,6 +188,8 @@ export default function OrganizerCoordinatorManagement() {
     try {
       const response = await api({
         ...SummaryApi.create_event_coordinator,
+        skipSuccessToast: true,
+        skipErrorToast: true,
         data: { fullName, email, password },
       });
 
@@ -218,26 +210,24 @@ export default function OrganizerCoordinatorManagement() {
       let assignmentMessage = "";
       if (assignEventId) {
         if (!createdCoordinatorId) {
-          throw new Error("Coordinator created, but assignment failed because coordinator id was missing in response.");
+          throw new Error("Coordinator was created, but the assignment could not be completed.");
         }
 
         await api({
           ...SummaryApi.assign_coordinator_to_event,
           url: SummaryApi.assign_coordinator_to_event.url.replace(":eventId", assignEventId),
           data: { coordinatorId: createdCoordinatorId },
+          skipSuccessToast: true,
+          skipErrorToast: true,
         });
 
         const eventTitle = eventsById.get(assignEventId)?.title || "selected event";
         assignmentMessage = ` Assigned to ${eventTitle}.`;
       }
 
-      setMessage({
+      emitToast({
         type: "success",
-        text: `${response.data?.message || "Coordinator created successfully."}${assignmentMessage}`,
-      });
-      pushToast({
-        type: "success",
-        text: "Verification OTP sent to the coordinator email.",
+        text: `${response.data?.message || "Coordinator created successfully."}${assignmentMessage} Verification code sent to the coordinator email.`,
       });
 
       const nextEmail = created?.email || email;
@@ -254,9 +244,9 @@ export default function OrganizerCoordinatorManagement() {
 
       await refreshWorkspace({ silent: true });
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: error.response?.data?.message || error.message || "Unable to create coordinator.",
+        text: error.response?.data?.message || error.message || "Unable to create the coordinator.",
       });
     } finally {
       setCreating(false);
@@ -265,13 +255,15 @@ export default function OrganizerCoordinatorManagement() {
 
   const handleAssignCoordinator = async (event) => {
     event.preventDefault();
-    setMessage(null);
 
     const eventId = normalizeId(assignForm.eventId);
     const coordinatorId = normalizeId(assignForm.coordinatorId);
 
     if (!eventId || !coordinatorId) {
-      setMessage({ type: "error", text: "Select both event and coordinator to assign." });
+      emitToast({
+        type: "error",
+        text: "Select both an event and a coordinator before assigning.",
+      });
       return;
     }
 
@@ -281,19 +273,21 @@ export default function OrganizerCoordinatorManagement() {
         ...SummaryApi.assign_coordinator_to_event,
         url: SummaryApi.assign_coordinator_to_event.url.replace(":eventId", eventId),
         data: { coordinatorId },
+        skipSuccessToast: true,
+        skipErrorToast: true,
       });
 
       const eventTitle = eventsById.get(eventId)?.title || "event";
-      setMessage({
+      emitToast({
         type: "success",
         text: `${response.data?.message || "Coordinator assigned successfully."} (${eventTitle})`,
       });
 
       await refreshWorkspace({ silent: true });
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: error.response?.data?.message || "Unable to assign coordinator.",
+        text: error.response?.data?.message || error.message || "Unable to assign the coordinator.",
       });
     } finally {
       setAssigning(false);
@@ -303,19 +297,6 @@ export default function OrganizerCoordinatorManagement() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
-        {toast && (
-          <div className="fixed top-6 right-6 z-50">
-            <div
-              className={`rounded-xl px-4 py-3 shadow-lg text-sm ${
-                toast.type === "success"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-red-600 text-white"
-              }`}
-            >
-              {toast.text}
-            </div>
-          </div>
-        )}
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Coordinator Management</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
@@ -400,7 +381,7 @@ export default function OrganizerCoordinatorManagement() {
               <option value="">Select coordinator</option>
               {assignableCoordinators.map((item) => (
                 <option key={item.key} value={item.coordinatorId}>
-                  {item.fullName} ({item.email}){item.department ? ` • ${item.department}` : ""}
+                  {item.fullName} ({item.email}){item.department ? ` - ${item.department}` : ""}
                 </option>
               ))}
             </select>
@@ -415,18 +396,6 @@ export default function OrganizerCoordinatorManagement() {
             </button>
           </form>
         </section>
-
-        {message && (
-          <p
-            className={`rounded-lg px-3 py-2 text-sm ${
-              message.type === "success"
-                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                : "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300"
-            }`}
-          >
-            {message.text}
-          </p>
-        )}
 
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white inline-flex items-center gap-2">

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { extractEventList, extractUsersList } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
@@ -104,6 +105,11 @@ export default function AdminContactCenter() {
   const [feedback, setFeedback] = useState(null);
   const [sentGroups, setSentGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
+
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the contact center right now.",
+  });
   const [groupsError, setGroupsError] = useState(null);
   const [activeGroupId, setActiveGroupId] = useState("");
   const [receipts, setReceipts] = useState([]);
@@ -568,12 +574,6 @@ export default function AdminContactCenter() {
           <div className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/70 p-4 text-sm text-slate-500 dark:text-slate-300 inline-flex items-center gap-2 shadow-sm">
             <Loader2 size={14} className="animate-spin" />
             Loading contact directory...
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="eventmate-panel rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
           </div>
         )}
 

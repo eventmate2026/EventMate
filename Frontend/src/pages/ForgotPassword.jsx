@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { emitToast } from "../lib/toastBus";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -12,16 +13,8 @@ export default function ForgotPassword() {
     newPassword: "",
     confirmPassword: "",
   });
-  const [message, setMessage] = useState(null);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-
-  const getErrorMessage = (error, fallback) => {
-    const apiMessage = error.response?.data?.message;
-    if (apiMessage) return apiMessage;
-    if (error.request) return "Backend not reachable. Start the backend server and try again.";
-    return fallback;
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,6 +27,7 @@ export default function ForgotPassword() {
   const submitEmail = async () => {
     if (!formData.email) {
       setErrors({ email: "Email is required" });
+      emitToast({ type: "error", text: "Email is required." });
       return;
     }
 
@@ -41,16 +35,20 @@ export default function ForgotPassword() {
     try {
       const response = await api({
         ...SummaryApi.forgot_password,
+        skipSuccessToast: true,
+        skipErrorToast: true,
         data: { email: formData.email },
       });
-      const apiMessage = response.data?.message || "OTP sent to your email.";
-      const otp = response.data?.otp;
-      setMessage({ type: "success", text: otp ? `${apiMessage} OTP: ${otp}` : apiMessage });
+      const apiMessage = response.data?.message || "A verification code has been sent to your email.";
+      emitToast({ type: "success", text: apiMessage });
       setStep("reset");
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: getErrorMessage(error, "Unable to send OTP. Try again."),
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Unable to send the verification code. Try again.",
       });
     } finally {
       setIsLoading(false);
@@ -66,6 +64,10 @@ export default function ForgotPassword() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      emitToast({
+        type: "error",
+        text: Object.values(newErrors)[0] || "Please review the form and try again.",
+      });
       return;
     }
 
@@ -73,18 +75,26 @@ export default function ForgotPassword() {
     try {
       const response = await api({
         ...SummaryApi.reset_password,
+        skipSuccessToast: true,
+        skipErrorToast: true,
         data: {
           email: formData.email,
           otp: formData.otp,
           newPassword: formData.newPassword,
         },
       });
-      setMessage({ type: "success", text: response.data?.message || "Password reset successful." });
+      emitToast({
+        type: "success",
+        text: response.data?.message || "Password reset successful.",
+      });
       setTimeout(() => navigate("/login"), 900);
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
-        text: getErrorMessage(error, "Unable to reset password. Try again."),
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          "Unable to reset the password. Try again.",
       });
     } finally {
       setIsLoading(false);
@@ -93,7 +103,6 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage(null);
     if (step === "email") {
       await submitEmail();
     } else {
@@ -169,18 +178,6 @@ export default function ForgotPassword() {
                 {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
               </div>
             </>
-          )}
-
-          {message && (
-            <p
-              className={`text-sm text-center rounded-lg py-2 ${
-                message.type === "success"
-                  ? "text-green-700 bg-green-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
-            </p>
           )}
 
           <button

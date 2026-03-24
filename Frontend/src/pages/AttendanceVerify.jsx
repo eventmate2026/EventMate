@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredToken, getStoredUser } from "../lib/auth";
+import { emitToast } from "../lib/toastBus";
 
 const parseToken = (value) => String(value || "").trim();
 
@@ -23,17 +24,23 @@ export default function AttendanceVerify() {
   useEffect(() => {
     const markFromToken = async () => {
       if (!token) {
-        setMessage("Attendance token is missing in this QR link.");
+        const nextMessage = "Attendance link is invalid or incomplete.";
+        setMessage(nextMessage);
+        emitToast({ type: "error", text: nextMessage });
         return;
       }
 
       if (!user || !accessToken) {
-        setMessage("Please log in as organizer or assigned coordinator to verify attendance.");
+        const nextMessage = "Please log in as an organizer or assigned coordinator to verify attendance.";
+        setMessage(nextMessage);
+        emitToast({ type: "error", text: nextMessage });
         return;
       }
 
       if (!["ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"].includes(user.role)) {
-        setMessage("Only organizers or assigned coordinators can verify attendance.");
+        const nextMessage = "Only organizers or assigned coordinators can verify attendance.";
+        setMessage(nextMessage);
+        emitToast({ type: "error", text: nextMessage });
         return;
       }
 
@@ -47,7 +54,9 @@ export default function AttendanceVerify() {
           url: SummaryApi.mark_attendance_by_token.url.replace(
             ":token",
             encodeURIComponent(token)
-          )
+          ),
+          skipSuccessToast: true,
+          skipErrorToast: true,
         });
 
         const payload = response?.data?.data || {};
@@ -57,11 +66,19 @@ export default function AttendanceVerify() {
             `Attendance marked for ${payload?.participantName || "participant"}.`
         );
         setSuccess(true);
+        emitToast({
+          type: "success",
+          text:
+            response?.data?.message ||
+            `Attendance marked for ${payload?.participantName || "participant"}.`,
+        });
       } catch (error) {
-        setMessage(
+        const nextMessage =
           error?.response?.data?.message ||
-            "Unable to verify attendance from this QR link."
-        );
+          error?.message ||
+          "Unable to verify attendance from this QR link.";
+        setMessage(nextMessage);
+        emitToast({ type: "error", text: nextMessage });
       } finally {
         setLoading(false);
       }
@@ -98,24 +115,11 @@ export default function AttendanceVerify() {
               Verifying attendance...
             </p>
           ) : (
-            <p
-              className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-                success
-                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-              {message || "No verification response."}
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {message || (success ? "Attendance verification completed." : "No verification response.")}
             </p>
           )}
         </div>
-
-        {!token ? null : (
-          <p className="mt-4 text-xs text-slate-500 dark:text-slate-400 break-all">
-            Token: {token}
-          </p>
-        )}
       </article>
     </section>
   );

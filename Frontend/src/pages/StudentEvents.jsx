@@ -6,6 +6,7 @@ import SummaryApi from "../api/SummaryApi";
 import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations } from "../lib/registrationApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const statusStyles = {
   current: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
@@ -172,6 +173,15 @@ export default function StudentEvents() {
   const [error, setError] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
 
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load events right now.",
+  });
+  useToastFeedback(registrationWarning, {
+    defaultType: "info",
+    infoFallback: "Registration status updated.",
+  });
+
   const fetchEvents = async () => {
     setLoading(true);
     setError(null);
@@ -314,18 +324,6 @@ export default function StudentEvents() {
         <p className="text-sm text-gray-500 dark:text-gray-300 inline-flex items-center gap-2">
           <Loader2 size={14} className="animate-spin" />
           Loading events...
-        </p>
-      )}
-
-      {error && !loading && (
-        <div className="eventmate-kpi rounded-xl border border-dashed border-red-200 dark:border-red-500/30 p-6 text-red-600 dark:text-red-300">
-          {error}
-        </div>
-      )}
-
-      {registrationWarning && !loading && !error && (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-          {registrationWarning}
         </p>
       )}
 

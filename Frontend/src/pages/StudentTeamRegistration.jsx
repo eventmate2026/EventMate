@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, RefreshCcw, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import useToastFeedback from "../hooks/useToastFeedback";
 
 const STATUS_STYLES = {
   ACCEPTED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
@@ -60,6 +61,15 @@ export default function StudentTeamRegistration() {
     setEditingEmailIndex(null);
     setEmailDrafts({});
   }, [registration?.registrationId]);
+
+  useToastFeedback(notice, {
+    successFallback: "Team registration updated successfully.",
+    errorFallback: "We couldn't update the team registration right now.",
+  });
+  useToastFeedback(error, {
+    defaultType: "error",
+    errorFallback: "We couldn't load the team registration right now.",
+  });
 
   const handleResend = async () => {
     if (!registrationId || resending) return;
@@ -159,8 +169,8 @@ export default function StudentTeamRegistration() {
             Loading team registration status...
           </div>
         ) : error ? (
-          <div className="eventmate-panel rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300">
-            {error}
+          <div className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 text-sm text-slate-600 dark:text-slate-300">
+            This team registration is unavailable right now.
           </div>
         ) : registration ? (
           <>
@@ -203,18 +213,6 @@ export default function StudentTeamRegistration() {
                 </div>
               </div>
             </section>
-
-            {notice && (
-              <section
-                className={`rounded-xl border px-4 py-3 text-sm ${
-                  notice.type === "success"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
-                    : "border-red-200 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-300"
-                }`}
-              >
-                {notice.text}
-              </section>
-            )}
 
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getStoredUser } from "../lib/auth";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { emitToast } from "../lib/toastBus";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -33,19 +34,18 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [apiWarning, setApiWarning] = useState(null);
   const [canReadHistory, setCanReadHistory] = useState(false);
 
   const [adminContacts, setAdminContacts] = useState([]);
-  const [contactsWarning, setContactsWarning] = useState(null);
 
   const fetchMessages = async () => {
     setLoadingMessages(true);
-    setApiWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_contacts, cacheTTL: 45000 });
+      const response = await api({
+        ...SummaryApi.get_contacts,
+        cacheTTL: 45000,
+        skipErrorToast: true,
+      });
       const rows = parseContactRows(response.data).sort(
         (a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()
       );
@@ -55,9 +55,14 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
       const status = Number(fetchError?.response?.status);
       if (status === 401 || status === 403) {
         setCanReadHistory(false);
-        setApiWarning(null);
       } else {
-        setApiWarning(fetchError.response?.data?.message || "Unable to load message history.");
+        emitToast({
+          type: "error",
+          text:
+            fetchError.response?.data?.message ||
+            fetchError.message ||
+            "Unable to load message history.",
+        });
       }
       setMessages([]);
     } finally {
@@ -66,19 +71,24 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
   };
 
   const fetchAdminContacts = async () => {
-    setContactsWarning(null);
     try {
-      const response = await api({ ...SummaryApi.get_all_users, cacheTTL: 90000 });
+      const response = await api({
+        ...SummaryApi.get_all_users,
+        cacheTTL: 90000,
+        skipErrorToast: true,
+      });
       const users = Array.isArray(response.data?.users) ? response.data.users : [];
       const admins = users.filter((item) => item?.role === "MAIN_ADMIN");
       setAdminContacts(admins);
-
-      if (!admins.length) {
-        setContactsWarning("No MAIN_ADMIN users found in current records.");
-      }
     } catch (fetchError) {
       setAdminContacts([]);
-      setContactsWarning(fetchError.response?.data?.message || "Unable to load admin contacts.");
+      emitToast({
+        type: "error",
+        text:
+          fetchError.response?.data?.message ||
+          fetchError.message ||
+          "Unable to load admin contacts.",
+      });
     }
   };
 
@@ -89,23 +99,24 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError(null);
-    setSuccess(null);
 
     if (subject.trim().length < 3) {
-      setError("Subject must be at least 3 characters.");
+      emitToast({ type: "error", text: "Subject must be at least 3 characters." });
       return;
     }
 
     if (message.trim().length < 10) {
-      setError("Message must be at least 10 characters.");
+      emitToast({ type: "error", text: "Message must be at least 10 characters." });
       return;
     }
 
     const fullName = String(user?.fullName || "").trim();
     const email = String(user?.email || "").trim();
     if (!fullName || !email) {
-      setError("Your profile is missing name or email. Update profile and retry.");
+      emitToast({
+        type: "error",
+        text: "Your profile is missing name or email. Update profile and retry.",
+      });
       return;
     }
 
@@ -113,6 +124,8 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
       const composedMessage = `Subject: ${subject.trim()}\n\n${message.trim()}`;
       const response = await api({
         ...SummaryApi.submit_contact,
+        skipSuccessToast: true,
+        skipErrorToast: true,
         data: {
           fullName,
           email,
@@ -120,7 +133,10 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         },
       });
 
-      setSuccess(response.data?.message || "Message sent successfully.");
+      emitToast({
+        type: "success",
+        text: response.data?.message || "Message sent successfully.",
+      });
       setSubject("");
       setMessage("");
 
@@ -140,7 +156,13 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
         ]);
       }
     } catch (submitError) {
-      setError(submitError.response?.data?.message || "Unable to send message.");
+      emitToast({
+        type: "error",
+        text:
+          submitError.response?.data?.message ||
+          submitError.message ||
+          "Unable to send your message.",
+      });
     }
   };
 
@@ -189,15 +211,6 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                 />
               </div>
 
-              {error && (
-                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-500/15 dark:text-red-300">{error}</p>
-              )}
-              {success && (
-                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-                  {success}
-                </p>
-              )}
-
               <button
                 type="submit"
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
@@ -220,12 +233,6 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
                 Refresh
               </button>
             </div>
-
-            {apiWarning && (
-              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200">
-                {apiWarning}
-              </p>
-            )}
 
             {loadingMessages ? (
               <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
@@ -261,10 +268,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
 
             <div className="mt-5 pt-4 border-t border-slate-200 dark:border-white/10">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Main Admin Contacts</h3>
-              {contactsWarning && (
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">{contactsWarning}</p>
-              )}
-              {!contactsWarning && adminContacts.length === 0 && (
+              {adminContacts.length === 0 && (
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">No admin contacts available.</p>
               )}
               {adminContacts.length > 0 && (
