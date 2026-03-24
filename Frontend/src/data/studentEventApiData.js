@@ -38,6 +38,12 @@ const parseDateValue = (value) => {
   return parsed;
 };
 
+const toLocalDate = (value) => {
+  const parsed = parseDateValue(value);
+  if (!parsed) return null;
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+};
+
 export const formatEventDate = (value) => {
   const parsed = parseDateValue(value);
   if (!parsed) return "Date TBD";
