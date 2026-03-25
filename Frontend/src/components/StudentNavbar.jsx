@@ -168,14 +168,14 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   return (
     <>
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+      <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10">
+        <div className="flex h-14 items-center justify-between gap-2 md:h-[72px] md:gap-3">
           
           {/* --- LEFT SIDE: Logo & Desktop Nav --- */}
-          <div className="flex">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => handleNavClick('home')}>
-              <span className="font-extrabold text-2xl tracking-tight relative">
+              <span className="relative text-xl font-extrabold tracking-tight sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
@@ -184,7 +184,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
             </div>
 
             {/* Desktop Navigation Links */}
-            <div className="hidden sm:ml-10 sm:flex sm:space-x-8">
+            <div className="hidden md:ml-8 md:flex md:space-x-6 lg:space-x-8">
               <button
                 onClick={() => handleNavClick('home')}
                 className={desktopLinkClass("home")}
@@ -214,7 +214,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           </div>
 
           {/* --- RIGHT SIDE: Notifications, User --- */}
-          <div className="hidden sm:ml-6 sm:flex sm:items-center gap-4">
+          <div className="hidden md:ml-6 md:flex md:items-center md:gap-3 lg:gap-4">
 
             {/* Notifications Bell */}
             <button
@@ -278,7 +278,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
           </div>
 
           {/* --- MOBILE MENU BUTTON --- */}
-          <div className="-mr-2 flex items-center gap-2 sm:hidden">
+          <div className="-mr-1 flex items-center gap-1.5 sm:gap-2 md:hidden">
             <button
               type="button"
               onClick={() => handleNavClick("notifications")}
@@ -370,7 +370,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
-        <div className="sm:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
+        <div className="max-h-[calc(100vh-3.5rem)] overflow-y-auto overscroll-contain border-b border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900 md:hidden">
           <div className="pt-2 pb-3 space-y-1">
             <button
               onClick={() => handleNavClick('home')}
@@ -403,7 +403,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
         </div>
       )}
     </nav>
-    <div aria-hidden="true" className="h-16 shrink-0" />
+    <div aria-hidden="true" className="h-14 shrink-0 md:h-[72px]" />
     </>
   );
 };

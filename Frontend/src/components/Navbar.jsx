@@ -248,7 +248,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     : isPrivileged
       ? "fixed inset-x-0 top-0 z-[110] bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10"
       : "fixed inset-x-0 top-0 z-[110] bg-white/85 dark:bg-gray-900/80 backdrop-blur-xl border-b border-white/60 dark:border-white/10 shadow-[0_12px_30px_-20px_rgba(79,70,229,0.6)]";
-  const mobileVisibilityClass = isPublic ? "md:hidden" : "sm:hidden";
+  const mobileVisibilityClass = "md:hidden";
   const isAdminUsersRoute =
     location.pathname.startsWith("/admin-dashboard/user-management") ||
     location.pathname.startsWith("/admin-dashboard/organizer-management") ||
@@ -314,17 +314,17 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
         </>
       )}
-      <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
-        <div className="flex items-center justify-between h-16 sm:h-[72px]">
+      <div className="relative mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10">
+        <div className="flex h-14 items-center justify-between gap-2 md:h-[72px] md:gap-3">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
               onClick={() => handleNavClick('home')}
             >
-              <span className="font-extrabold text-2xl tracking-tight relative">
+              <span className="relative text-xl font-extrabold tracking-tight sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
@@ -335,7 +335,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
             {/* Desktop Navigation Links */}
             {!isPublic && !isPrivileged && (
-              <div className="hidden sm:ml-10 sm:flex sm:space-x-8">
+              <div className="hidden md:ml-8 md:flex md:space-x-6 lg:space-x-8">
                 {isCoordinator && (
                   <>
                     <Link
@@ -626,7 +626,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           )}
 
           {/* RIGHT SIDE: Search, Notifications, User */}
-          <div className="hidden sm:ml-6 sm:flex sm:items-center gap-4">
+          <div className="hidden md:ml-6 md:flex md:items-center md:gap-3 lg:gap-4">
             {isAdmin ? (
               <>
                 {!hideNavExtras && (
@@ -848,18 +848,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-2 flex items-center gap-2 ${mobileVisibilityClass}`}>
+          <div className={`-mr-1 flex shrink-0 items-center gap-1.5 sm:gap-2 ${mobileVisibilityClass}`}>
             {isPublic && !isAuthenticated && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <Link
                   to="/login"
-                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                  className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:px-3 sm:text-xs"
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm sm:px-3 sm:text-xs"
                 >
                   Sign Up
                 </Link>
@@ -867,7 +867,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                  className="rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:p-2"
                 >
                   {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
@@ -976,7 +976,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       {/* --- MOBILE MENU PANEL --- */}
       {isMobileMenuOpen && (
         <div
-          className={`${mobileVisibilityClass} max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}
+          className={`${mobileVisibilityClass} max-h-[calc(100vh-3.5rem)] overflow-y-auto overscroll-contain border-b border-gray-200 dark:border-white/10 backdrop-blur ${isPublic ? "nav-public-mobile-panel bg-white/88 dark:bg-slate-950/88" : "bg-white/95 dark:bg-gray-900/95"}`}
         >
           <div className="pt-2 pb-3 space-y-1">
             {isPublic ? (
@@ -1145,71 +1145,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   </>
                 )}
               </>
-            )}
-          </div>
-          <div className="pt-4 pb-4 border-t border-gray-200 dark:border-white/10">
-            {isAuthenticated ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    closeMenus();
-                    navigate(currentProfilePath);
-                  }}
-                  className="w-full flex items-center px-4 py-2 text-left hover:bg-gray-50 dark:hover:bg-white/5"
-                  aria-label="Open profile"
-                >
-                  <AvatarWithFrame
-                    src={avatarUrl}
-                    alt="Profile"
-                    className="h-10 w-10"
-                    coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
-                    fallback={<span>{avatarInitials.charAt(0) || "U"}</span>}
-                  />
-                  <div className="ml-3">
-                    <div className="text-base font-medium text-gray-800 dark:text-gray-100">{displayName}</div>
-                    <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{user?.email || 'student@college.com'}</div>
-                  </div>
-                </button>
-                <div className="mt-3 space-y-1">
-                  <button
-                    type="button"
-                    onClick={toggleTheme}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-base font-medium text-gray-700 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-500/25"
-                  >
-                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    Toggle theme
-                  </button>
-                  <button onClick={() => { onLogout?.(); setIsMobileMenuOpen(false); }} className="block w-full text-left px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 hover:text-red-800 flex items-center gap-2">
-                    <LogOut size={18} /> Sign out
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="px-4 space-y-2">
-                <Link
-                  to="/login"
-                  onClick={closeMenus}
-                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/signup"
-                  onClick={closeMenus}
-                  className="block w-full text-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-                >
-                  Sign Up
-                </Link>
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-indigo-100 hover:bg-indigo-50 dark:hover:bg-indigo-500/25"
-                >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  Toggle theme
-                </button>
-              </div>
             )}
           </div>
         </div>
@@ -1438,7 +1373,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
       `}</style>
       )}
       </motion.nav>
-      <div aria-hidden="true" className="h-16 sm:h-[72px] shrink-0" />
+      <div aria-hidden="true" className="h-14 shrink-0 md:h-[72px]" />
     </>
   );
 };
