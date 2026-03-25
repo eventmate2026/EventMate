@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { emitToast } from "../lib/toastBus";
 
 const formatStatus = (status) =>
   String(status || "")
@@ -20,12 +21,11 @@ export default function TeamInvite() {
   const [invite, setInvite] = useState(null);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState(false);
-  const [message, setMessage] = useState({ type: "info", text: "Loading invitation..." });
   const [autoResponded, setAutoResponded] = useState(false);
 
   const loadInvite = async () => {
     if (!token) {
-      setMessage({ type: "error", text: "Missing invitation token." });
+      emitToast({ type: "error", text: "Missing invitation token." });
       setLoading(false);
       return;
     }
@@ -37,10 +37,10 @@ export default function TeamInvite() {
         skipAuth: true,
       });
       setInvite(response.data?.data || null);
-      setMessage({ type: "info", text: "Invitation loaded." });
+      emitToast({ type: "info", text: "Invitation loaded." });
     } catch (error) {
       setInvite(null);
-      setMessage({
+      emitToast({
         type: "error",
         text: error.response?.data?.message || "Unable to load invitation.",
       });
@@ -57,7 +57,7 @@ export default function TeamInvite() {
     if (!token) return;
     const normalized = String(nextAction || "").trim().toLowerCase();
     if (normalized !== "accept" && normalized !== "reject") {
-      setMessage({ type: "error", text: "Invalid invitation action." });
+      emitToast({ type: "error", text: "Invalid invitation action." });
       return;
     }
 
@@ -72,12 +72,12 @@ export default function TeamInvite() {
       });
       const data = response.data?.data || {};
       setInvite((prev) => (prev ? { ...prev, status: data.status || prev.status } : prev));
-      setMessage({
+      emitToast({
         type: "success",
         text: response.data?.message || "Response recorded.",
       });
     } catch (error) {
-      setMessage({
+      emitToast({
         type: "error",
         text: error.response?.data?.message || "Unable to update invitation response.",
       });
@@ -141,20 +141,9 @@ export default function TeamInvite() {
                 </p>
               </div>
             ) : null}
-
-            <div className="mt-6">
-              <p
-                className={`text-sm rounded-lg py-2 px-3 ${
-                  message.type === "success"
-                    ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                    : message.type === "error"
-                      ? "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-                      : "text-slate-600 bg-slate-100 dark:bg-white/5 dark:text-slate-300"
-                }`}
-              >
-                {message.text}
-              </p>
-            </div>
+            <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">
+              Check the centered toast for the latest invitation update.
+            </p>
 
             {invite?.status && (
               <div className="mt-4 text-xs text-slate-500 dark:text-slate-300">

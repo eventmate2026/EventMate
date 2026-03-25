@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import api from "../lib/api";
+import { emitToast } from "../lib/toastBus";
 
 export default function VerifyRegistration() {
   const [params] = useSearchParams();
   const token = params.get("token");
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState({ type: "info", text: "Verifying registration..." });
 
   useEffect(() => {
     const verify = async () => {
       if (!token) {
-        setMessage({ type: "error", text: "Missing verification token." });
+        emitToast({ type: "error", text: "Missing verification token." });
         setLoading(false);
         return;
       }
@@ -23,12 +23,12 @@ export default function VerifyRegistration() {
           method: "get",
           skipAuth: true,
         });
-        setMessage({
+        emitToast({
           type: "success",
           text: response.data?.message || "Registration verified successfully.",
         });
       } catch (error) {
-        setMessage({
+        emitToast({
           type: "error",
           text: error.response?.data?.message || "Unable to verify registration.",
         });
@@ -53,14 +53,8 @@ export default function VerifyRegistration() {
               Verifying...
             </p>
           ) : (
-            <p
-              className={`text-sm rounded-lg py-2 px-3 ${
-                message.type === "success"
-                  ? "text-emerald-700 bg-emerald-50 dark:bg-emerald-500/15 dark:text-emerald-300"
-                  : "text-red-600 bg-red-50 dark:bg-red-500/15 dark:text-red-300"
-              }`}
-            >
-              {message.text}
+            <p className="text-sm text-slate-500 dark:text-slate-300">
+              Check the centered toast for the registration result.
             </p>
           )}
         </div>

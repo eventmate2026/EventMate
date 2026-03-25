@@ -137,7 +137,6 @@ export default function ForgotPassword() {
               className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
               disabled={step === "reset"}
             />
-            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
           </div>
 
           {step === "reset" && (
@@ -151,7 +150,6 @@ export default function ForgotPassword() {
                   placeholder="Enter 6 digit code"
                   className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                 />
-                {errors.otp && <p className="text-xs text-red-600 mt-1">{errors.otp}</p>}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">New Password</label>
@@ -163,7 +161,6 @@ export default function ForgotPassword() {
                   placeholder="Minimum 8 characters"
                   className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                 />
-                {errors.newPassword && <p className="text-xs text-red-600 mt-1">{errors.newPassword}</p>}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Confirm Password</label>
@@ -175,7 +172,6 @@ export default function ForgotPassword() {
                   placeholder="Re-enter new password"
                   className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
                 />
-                {errors.confirmPassword && <p className="text-xs text-red-600 mt-1">{errors.confirmPassword}</p>}
               </div>
             </>
           )}

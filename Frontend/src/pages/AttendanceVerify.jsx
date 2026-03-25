@@ -18,34 +18,29 @@ export default function AttendanceVerify() {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [message, setMessage] = useState("");
   const [eventName, setEventName] = useState("");
 
   useEffect(() => {
     const markFromToken = async () => {
       if (!token) {
         const nextMessage = "Attendance link is invalid or incomplete.";
-        setMessage(nextMessage);
         emitToast({ type: "error", text: nextMessage });
         return;
       }
 
       if (!user || !accessToken) {
         const nextMessage = "Please log in as an organizer or assigned coordinator to verify attendance.";
-        setMessage(nextMessage);
         emitToast({ type: "error", text: nextMessage });
         return;
       }
 
       if (!["ORGANIZER", "STUDENT_COORDINATOR", "STUDENT"].includes(user.role)) {
         const nextMessage = "Only organizers or assigned coordinators can verify attendance.";
-        setMessage(nextMessage);
         emitToast({ type: "error", text: nextMessage });
         return;
       }
 
       setLoading(true);
-      setMessage("");
       setSuccess(false);
 
       try {
@@ -61,10 +56,6 @@ export default function AttendanceVerify() {
 
         const payload = response?.data?.data || {};
         setEventName(String(payload?.eventName || "").trim());
-        setMessage(
-          response?.data?.message ||
-            `Attendance marked for ${payload?.participantName || "participant"}.`
-        );
         setSuccess(true);
         emitToast({
           type: "success",
@@ -77,7 +68,6 @@ export default function AttendanceVerify() {
           error?.response?.data?.message ||
           error?.message ||
           "Unable to verify attendance from this QR link.";
-        setMessage(nextMessage);
         emitToast({ type: "error", text: nextMessage });
       } finally {
         setLoading(false);
@@ -116,7 +106,9 @@ export default function AttendanceVerify() {
             </p>
           ) : (
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {message || (success ? "Attendance verification completed." : "No verification response.")}
+              {success
+                ? "Attendance verification completed. Check the centered toast for the result."
+                : "Check the centered toast for the latest verification update."}
             </p>
           )}
         </div>

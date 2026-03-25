@@ -228,7 +228,6 @@ export default function Login() {
                       onChange={handleChange}
                     />
                   </div>
-                  {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
                 </div>
 
                 <div>

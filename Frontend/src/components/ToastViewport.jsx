@@ -27,23 +27,33 @@ export default function ToastViewport() {
   const [toasts, setToasts] = useState([]);
   const timersRef = useRef(new Map());
 
+  const clearToastTimer = (toastId) => {
+    const timeoutId = timersRef.current.get(toastId);
+    if (!timeoutId) return;
+    clearTimeout(timeoutId);
+    timersRef.current.delete(toastId);
+  };
+
   useEffect(() => {
     const unsubscribe = subscribeToasts((toast) => {
       setToasts((current) => {
-        const lastToast = current[current.length - 1];
+        current.forEach((item) => clearToastTimer(item.id));
+        const activeToast = current[0];
+
         if (
-          lastToast &&
-          lastToast.type === toast.type &&
-          lastToast.text === toast.text
+          activeToast &&
+          activeToast.type === toast.type &&
+          activeToast.text === toast.text
         ) {
-          return current;
+          return [{ ...activeToast, id: toast.id, duration: toast.duration }];
         }
-        return [...current, toast];
+
+        return [toast];
       });
 
       const timeoutId = setTimeout(() => {
         setToasts((current) => current.filter((item) => item.id !== toast.id));
-        timersRef.current.delete(toast.id);
+        clearToastTimer(toast.id);
       }, toast.duration);
 
       timersRef.current.set(toast.id, timeoutId);
@@ -57,11 +67,7 @@ export default function ToastViewport() {
   }, []);
 
   const dismissToast = (toastId) => {
-    const timeoutId = timersRef.current.get(toastId);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-      timersRef.current.delete(toastId);
-    }
+    clearToastTimer(toastId);
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
   };
 
@@ -70,31 +76,33 @@ export default function ToastViewport() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed right-4 top-4 z-[140] flex max-w-sm flex-col gap-3 sm:right-6 sm:top-6"
+      className="pointer-events-none fixed inset-0 z-[140] flex items-center justify-center px-4"
     >
-      {toasts.map((toast) => {
-        const variant = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
-        const Icon = variant.icon;
-        return (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto rounded-2xl border px-4 py-3 backdrop-blur ${variant.className}`}
-          >
-            <div className="flex items-start gap-3">
-              <Icon size={18} className={`mt-0.5 shrink-0 ${variant.iconClassName}`} />
-              <p className="flex-1 text-sm font-medium leading-6">{toast.text}</p>
-              <button
-                type="button"
-                onClick={() => dismissToast(toast.id)}
-                className="rounded-full p-1 text-slate-400 transition hover:bg-black/5 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-200"
-                aria-label="Dismiss notification"
-              >
-                <X size={14} />
-              </button>
+      <div className="mx-auto flex w-full max-w-lg flex-col items-center justify-center">
+        {toasts.map((toast) => {
+          const variant = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
+          const Icon = variant.icon;
+          return (
+            <div
+              key={toast.id}
+              className={`pointer-events-auto w-full rounded-2xl border px-5 py-4 backdrop-blur ${variant.className}`}
+            >
+              <div className="flex items-start gap-3">
+                <Icon size={18} className={`mt-0.5 shrink-0 ${variant.iconClassName}`} />
+                <p className="flex-1 text-center text-sm font-medium leading-6 sm:text-left">{toast.text}</p>
+                <button
+                  type="button"
+                  onClick={() => dismissToast(toast.id)}
+                  className="rounded-full p-1 text-slate-400 transition hover:bg-black/5 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-200"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -201,7 +201,6 @@ export default function Signup() {
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
-                  {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
                 </div>
 
                 <div>
@@ -215,7 +214,6 @@ export default function Signup() {
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
-                  {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
                 </div>
 
                 <div>
@@ -228,7 +226,6 @@ export default function Signup() {
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
-                  {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
                 </div>
 
                 <div>
@@ -241,7 +238,6 @@ export default function Signup() {
                     required
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
-                  {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
                 </div>
 
                 <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
@@ -263,8 +259,6 @@ export default function Signup() {
                     </span>
                   </span>
                 </div>
-                {errors.agree && <p className="text-xs text-red-600">{errors.agree}</p>}
-
                 <button
                   type="submit"
                   disabled={isLoading}
