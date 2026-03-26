@@ -398,8 +398,6 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
               Contact us
             </button>
           </div>
-          
-          <div className="pt-4 pb-4 border-t border-gray-200" />
         </div>
       )}
     </nav>

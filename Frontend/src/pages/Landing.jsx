@@ -6,6 +6,7 @@ import { motion, useReducedMotion, useScroll } from "framer-motion";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { extractEventList } from "../lib/backendAdapters";
+import { scrollToPublicSection } from "../lib/publicNavigation";
 
 // --- Icons ---
 const SearchIcon = () => (
@@ -266,14 +267,27 @@ export default function Landing() {
     const { hash } = location;
     if (!hash) return;
 
-    const target = document.querySelector(hash);
-    if (!target) return;
+    const sectionId = hash.replace(/^#/, "").trim();
+    if (!sectionId) return;
+
+    let attempts = 0;
+    let frameId = 0;
 
     const scrollToTarget = () => {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      const didScroll = scrollToPublicSection(sectionId, { behavior: "smooth" });
+      if (!didScroll && attempts < 6) {
+        attempts += 1;
+        frameId = requestAnimationFrame(scrollToTarget);
+      }
     };
 
-    requestAnimationFrame(scrollToTarget);
+    frameId = requestAnimationFrame(scrollToTarget);
+
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
   }, [location.hash]);
 
   const viewportOnce = { once: true, amount: 0.25 };

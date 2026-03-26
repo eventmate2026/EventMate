@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import { PUBLIC_SECTION_IDS, scrollToPublicSection } from "../lib/publicNavigation";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -186,6 +187,40 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
     closeAdminUsersMenuImmediately();
   };
 
+  const navigatePublicSection = (sectionKey) => {
+    const sectionId = PUBLIC_SECTION_IDS[sectionKey] ?? "";
+    const hash = sectionId ? `#${sectionId}` : "";
+
+    closeMenus();
+
+    if (sectionKey === "home") {
+      if (location.pathname === "/") {
+        if (location.hash) {
+          navigate("/");
+        }
+        requestAnimationFrame(() => {
+          scrollToPublicSection("", { behavior: "smooth" });
+        });
+        return;
+      }
+
+      navigate("/");
+      return;
+    }
+
+    if (location.pathname !== "/") {
+      navigate({ pathname: "/", hash });
+      return;
+    }
+
+    if (location.hash !== hash) {
+      navigate({ pathname: "/", hash });
+      return;
+    }
+
+    scrollToPublicSection(sectionId, { behavior: "smooth" });
+  };
+
   useEffect(() => {
     closeMenus();
   }, [location.pathname, location.hash, location.search]);
@@ -293,6 +328,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         animate={chromeMotion.animate}
         transition={chromeTransition}
         className={navClass}
+        data-public-nav={isPublic ? "true" : undefined}
       >
       {!isPublic && !isPrivileged && (
         <>
@@ -395,9 +431,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           {isPublic && !isPrivileged && (
             <div className="hidden md:flex flex-1 items-center justify-center gap-6">
               {[
-                { label: "Home", to: "/" , key: "home" },
-                { label: "Events", to: "/#events", key: "events" },
-                { label: "Contact us", to: "/#contact", key: "contact" },
+                { label: "Home", key: "home" },
+                { label: "Events", key: "events" },
+                { label: "Contact us", key: "contact" },
               ].map((item) => {
                 const isCurrent =
                   (item.key === "home" && location.pathname === "/" && !location.hash) ||
@@ -405,9 +441,10 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   (item.key === "contact" && location.hash === "#contact");
 
                 return (
-                  <Link
+                  <button
                     key={item.key}
-                    to={item.to}
+                    type="button"
+                    onClick={() => navigatePublicSection(item.key)}
                     className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
                       isCurrent
                         ? "text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500"
@@ -415,7 +452,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     }`}
                   >
                     {item.label}
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -981,27 +1018,27 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="pt-2 pb-3 space-y-1">
             {isPublic ? (
               <>
-                <Link
-                  to="/"
-                  onClick={closeMenus}
+                <button
+                  type="button"
+                  onClick={() => navigatePublicSection("home")}
                   className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                 >
                   Home
-                </Link>
-                <Link
-                  to="/#events"
-                  onClick={closeMenus}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigatePublicSection("events")}
                   className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                 >
                   Events
-                </Link>
-                <Link
-                  to="/#contact"
-                  onClick={closeMenus}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigatePublicSection("contact")}
                   className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
                 >
                   Contact us
-                </Link>
+                </button>
               </>
             ) : isAdmin ? (
               <>
