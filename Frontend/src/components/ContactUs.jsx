@@ -3,8 +3,9 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { emitToast } from "../lib/toastBus";
+import PageBackButton from "./PageBackButton";
 
-export default function ContactUs() {
+export default function ContactUs({ backTo = "", backLabel = "Back" }) {
   const [user, setUser] = useState(() => getStoredUser());
   const [formData, setFormData] = useState({
     name: "",
@@ -86,6 +87,11 @@ export default function ContactUs() {
       </div>
 
       <div className="max-w-7xl mx-auto">
+        {backTo && (
+          <div className="mb-6">
+            <PageBackButton to={backTo} label={backLabel} />
+          </div>
+        )}
         {/* Header */}
         <div className="text-center mb-12 sm:mb-16 animate-fade-in-up">
           <span className="inline-block py-1 px-3 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs font-bold tracking-wider uppercase mb-4">

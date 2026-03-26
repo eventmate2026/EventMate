@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link2, Loader2, Plus, Users } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import PageBackButton from "../components/PageBackButton";
 import { getStoredUser } from "../lib/auth";
 import { extractCreatedUser, extractEventList } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
@@ -297,6 +298,8 @@ export default function OrganizerCoordinatorManagement() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-5xl mx-auto space-y-6">
+        <PageBackButton to="/organizer-dashboard" label="Back to Dashboard" />
+
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Coordinator Management</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">

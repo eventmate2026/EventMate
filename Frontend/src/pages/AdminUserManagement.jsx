@@ -3,6 +3,7 @@ import { CheckCircle2, Download, Eye, RefreshCcw, Search, ShieldCheck, Trash2, U
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { resolveUserDepartment } from "../lib/userDepartment";
 
@@ -186,6 +187,8 @@ export default function AdminUserManagement() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-50 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-6">
+        <PageBackButton to="/admin-dashboard" label="Back to Dashboard" />
+
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>

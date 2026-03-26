@@ -8,6 +8,7 @@ import {
 } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { emitToast } from "../lib/toastBus";
+import PageBackButton from "../components/PageBackButton";
 
 export default function VerifyEmail() {
   const location = useLocation();
@@ -114,16 +115,19 @@ export default function VerifyEmail() {
 
   return (
     <section className="eventmate-page min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/60 flex items-center justify-center px-6 py-16">
-      <div className="max-w-lg w-full bg-white/90 dark:bg-slate-900/85 backdrop-blur rounded-3xl shadow-2xl border border-white/60 dark:border-white/10 p-8">
-        <div className="mb-6">
+      <div className="max-w-lg w-full space-y-4">
+        <PageBackButton to="/login" label="Back to Login" />
+
+        <div className="bg-white/90 dark:bg-slate-900/85 backdrop-blur rounded-3xl shadow-2xl border border-white/60 dark:border-white/10 p-8">
+          <div className="mb-6">
           <p className="text-xs uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-300 font-semibold">Verify Email</p>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">Confirm your account</h1>
           <p className="text-sm text-slate-500 dark:text-slate-300 mt-2">
             Enter the OTP sent to your email to activate your EventMate account.
           </p>
-        </div>
+          </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <input
@@ -162,11 +166,12 @@ export default function VerifyEmail() {
           >
             {isResending ? "Sending OTP..." : "Resend OTP"}
           </button>
-        </form>
+          </form>
 
-        <div className="mt-6 flex items-center justify-between text-sm text-slate-500 dark:text-slate-300">
-          <Link to="/signup" className="hover:text-indigo-600 dark:hover:text-indigo-300">Back to signup</Link>
-          <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-300 hover:underline">Go to login</Link>
+          <div className="mt-6 flex items-center justify-between text-sm text-slate-500 dark:text-slate-300">
+            <Link to="/signup" className="hover:text-indigo-600 dark:hover:text-indigo-300">Back to signup</Link>
+            <Link to="/login" className="font-semibold text-indigo-600 dark:text-indigo-300 hover:underline">Go to login</Link>
+          </div>
         </div>
       </div>
     </section>

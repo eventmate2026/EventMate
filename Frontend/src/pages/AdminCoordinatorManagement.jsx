@@ -3,6 +3,7 @@ import { AlertCircle, Loader2, Pencil, Search, Trash2, UserPlus, X } from "lucid
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { extractCreatedUser, extractUsersList, filterUsersByRole } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
@@ -273,6 +274,8 @@ export default function AdminCoordinatorManagement() {
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-6">
+        <PageBackButton to="/admin-dashboard" label="Back to Dashboard" />
+
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>

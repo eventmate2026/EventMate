@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Loader2, Mail, RefreshCcw, SendHorizontal } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Loader2, Mail, RefreshCcw, SendHorizontal } from "lucide-react";
 import { getStoredUser } from "../lib/auth";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { emitToast } from "../lib/toastBus";
+import PageBackButton from "./PageBackButton";
 
 const formatDateTime = (value) => {
   if (!value) return "N/A";
@@ -27,7 +27,6 @@ const parseContactRows = (payload) => {
 };
 
 export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }) {
-  const navigate = useNavigate();
   const user = getStoredUser();
 
   const [subject, setSubject] = useState("");
@@ -169,14 +168,7 @@ export default function ContactAdminWorkspace({ title, subtitle, dashboardPath }
   return (
     <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-6">
-        <button
-          type="button"
-          onClick={() => navigate(dashboardPath)}
-          className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-sm"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
+        <PageBackButton to={dashboardPath} label="Back to Dashboard" />
 
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{title}</h1>

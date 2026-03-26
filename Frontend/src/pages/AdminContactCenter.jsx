@@ -13,6 +13,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import AvatarWithFrame from "../components/AvatarWithFrame";
+import PageBackButton from "../components/PageBackButton";
 import { extractEventList, extractUsersList } from "../lib/backendAdapters";
 import { resolveUserDepartment } from "../lib/userDepartment";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
@@ -509,6 +510,8 @@ export default function AdminContactCenter() {
         <div className="absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
       </div>
       <div className="relative max-w-6xl mx-auto space-y-5">
+        <PageBackButton to="/admin-dashboard" label="Back to Dashboard" />
+
         <header className="eventmate-panel relative overflow-hidden rounded-3xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/70 p-6 sm:p-7 shadow-sm">
           <div className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
           <div className="pointer-events-none absolute -left-20 -bottom-24 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl" />

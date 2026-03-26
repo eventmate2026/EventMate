@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
 
 const toList = (payload) => {
@@ -234,6 +235,8 @@ export default function AdminCertificatesAuditLogs() {
   return (
     <section className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
       <div className="max-w-6xl mx-auto space-y-5">
+        <PageBackButton to="/admin-dashboard" label="Back to Dashboard" />
+
         <header className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             Certificate Authority Management

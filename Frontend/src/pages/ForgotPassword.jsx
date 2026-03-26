@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import { emitToast } from "../lib/toastBus";
+import PageBackButton from "../components/PageBackButton";
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -112,8 +113,11 @@ export default function ForgotPassword() {
 
   return (
     <section className="eventmate-page min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/60 flex items-center justify-center px-6 py-16">
-      <div className="max-w-lg w-full bg-white/90 dark:bg-slate-900/85 backdrop-blur rounded-3xl shadow-2xl border border-white/60 dark:border-white/10 p-8">
-        <div className="mb-6">
+      <div className="max-w-lg w-full space-y-4">
+        <PageBackButton to="/login" label="Back to Login" />
+
+        <div className="bg-white/90 dark:bg-slate-900/85 backdrop-blur rounded-3xl shadow-2xl border border-white/60 dark:border-white/10 p-8">
+          <div className="mb-6">
           <p className="text-xs uppercase tracking-[0.3em] text-indigo-500 dark:text-indigo-300 font-semibold">Reset Password</p>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-2">
             {step === "email" ? "Request OTP" : "Set a new password"}
@@ -125,7 +129,7 @@ export default function ForgotPassword() {
           </p>
         </div>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Email</label>
             <input
@@ -183,19 +187,20 @@ export default function ForgotPassword() {
           >
             {isLoading ? "Please wait..." : step === "email" ? "Send OTP" : "Reset Password"}
           </button>
-        </form>
+          </form>
 
-        <div className="mt-6 flex items-center justify-between text-sm text-slate-500 dark:text-slate-300">
-          <Link to="/login" className="hover:text-indigo-600 dark:hover:text-indigo-300">Back to login</Link>
-          {step === "reset" && (
-            <button
-              type="button"
-              className="font-semibold text-indigo-600 dark:text-indigo-300 hover:underline"
-              onClick={() => setStep("email")}
-            >
-              Resend OTP
-            </button>
-          )}
+          <div className="mt-6 flex items-center justify-between text-sm text-slate-500 dark:text-slate-300">
+            <Link to="/login" className="hover:text-indigo-600 dark:hover:text-indigo-300">Back to login</Link>
+            {step === "reset" && (
+              <button
+                type="button"
+                className="font-semibold text-indigo-600 dark:text-indigo-300 hover:underline"
+                onClick={() => setStep("email")}
+              >
+                Resend OTP
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </section>

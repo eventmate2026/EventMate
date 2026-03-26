@@ -6,6 +6,7 @@ export default function OrganizerNotifications() {
       title="Organizer Notifications"
       subtitle="Your backend notifications are listed here."
       unreadEventName="eventmate:organizer-unread-count"
+      dashboardPath="/organizer-dashboard"
     />
   );
 }
