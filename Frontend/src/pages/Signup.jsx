@@ -142,7 +142,7 @@ export default function Signup() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-white/20 dark:from-slate-950/40 dark:via-transparent dark:to-slate-900/20 pointer-events-none" />
 
-      <section className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 px-6 py-6 sm:py-8 lg:py-10 items-start lg:items-center min-h-[calc(100vh-72px)]">
+      <section className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-10 px-3 min-[360px]:px-4 sm:px-6 py-6 sm:py-8 lg:py-10 items-start lg:items-center min-h-[calc(100vh-72px)]">
         <div className="space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <Link
@@ -158,7 +158,7 @@ export default function Signup() {
           </div>
 
           <div>
-            <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight text-gray-900 dark:text-slate-100">
+            <h1 className="text-3xl min-[360px]:text-4xl xl:text-5xl font-extrabold leading-tight text-gray-900 dark:text-slate-100">
               Manage Campus <br />
               Events Like a{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
@@ -166,7 +166,7 @@ export default function Signup() {
               </span>
             </h1>
 
-            <p className="mt-6 text-gray-700 dark:text-slate-300 max-w-md leading-relaxed text-lg">
+            <p className="mt-4 sm:mt-6 text-gray-700 dark:text-slate-300 max-w-md leading-relaxed text-base sm:text-lg">
               EventMate connects students and organizers. Discover, plan, and
               attend the best events happening on your campus today.
             </p>
@@ -177,7 +177,7 @@ export default function Signup() {
           <div className="w-full max-w-[420px] bg-white/90 dark:bg-slate-900/85 backdrop-blur-lg rounded-2xl shadow-2xl hover:shadow-3xl transition duration-500 border border-white/20 dark:border-white/10">
             <div className="h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
 
-            <div className="p-8">
+            <div className="p-5 min-[360px]:p-6 sm:p-8">
               <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
                 Student Registration
               </h2>
@@ -240,7 +240,7 @@ export default function Signup() {
                   />
                 </div>
 
-                <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
+                <div className="flex items-start gap-3 text-sm text-gray-600 dark:text-slate-300">
                   <input
                     type="checkbox"
                     name="agree"
@@ -248,7 +248,7 @@ export default function Signup() {
                     onChange={handleChange}
                     className="w-4 h-4 rounded accent-indigo-600"
                   />
-                  <span>
+                  <span className="leading-relaxed">
                     I agree to the{" "}
                     <span className="text-indigo-600 dark:text-indigo-300 font-medium hover:underline cursor-pointer">
                       Terms

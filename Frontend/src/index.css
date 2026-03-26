@@ -151,6 +151,7 @@ table {
 }
 
 @media (max-width: 360px) {
+  .eventmate-main-brand,
   .eventmate-student-brand {
     font-size: 1rem;
   }

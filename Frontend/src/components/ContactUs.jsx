@@ -77,7 +77,7 @@ export default function ContactUs() {
   };
 
   return (
-    <section className="eventmate-page relative py-20 px-4 sm:px-6 overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <section className="eventmate-page relative overflow-hidden bg-gray-50 px-3 py-16 min-[360px]:px-4 sm:px-6 sm:py-20 dark:bg-gray-900">
       
       {/* Background Decorative Gradients */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
@@ -87,14 +87,14 @@ export default function ContactUs() {
 
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-16 animate-fade-in-up">
+        <div className="text-center mb-12 sm:mb-16 animate-fade-in-up">
           <span className="inline-block py-1 px-3 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 text-xs font-bold tracking-wider uppercase mb-4">
             Contact Us
           </span>
-          <h2 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 mb-6">
+          <h2 className="text-3xl min-[340px]:text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 mb-4 sm:mb-6">
             Let's start a conversation
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
             Whether you have feedback, a question, or just want to say hi, our team is always ready to chat.
           </p>
         </div>
@@ -102,12 +102,12 @@ export default function ContactUs() {
         <div className="grid grid-cols-1 gap-12 items-start">
           {/* Contact Form */}
           <div className="w-full max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-2xl border border-white/50 dark:border-gray-700 relative overflow-hidden">
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-5 min-[360px]:p-6 md:p-10 rounded-[2rem] shadow-2xl border border-white/50 dark:border-gray-700 relative overflow-hidden">
               
               {/* Decorative top gradient line */}
               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
 
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Send us a message</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-6">Send us a message</h3>
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

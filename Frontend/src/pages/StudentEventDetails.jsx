@@ -596,7 +596,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-10 text-sm text-gray-600 dark:text-gray-300 inline-flex items-center gap-2">
         <Loader2 size={14} className="animate-spin" />
         Loading event details...
       </div>
@@ -605,7 +605,7 @@ export default function StudentEventDetails({ mode = "details" }) {
 
   if (error || !event) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-4xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-10">
         <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Event not found</h1>
           <p className="text-gray-600 dark:text-gray-300 mt-2">This event is not available right now.</p>
@@ -646,7 +646,7 @@ export default function StudentEventDetails({ mode = "details" }) {
           </div>
         </div>
       )}
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-3 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate(isRegistrationMode ? detailsPath : "/student-dashboard/events")}
@@ -916,7 +916,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                       </span>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 text-white">
-                      <h2 className="text-2xl sm:text-3xl font-bold">{event.title}</h2>
+                      <h2 className="text-xl min-[340px]:text-2xl sm:text-3xl font-bold">{event.title}</h2>
                     </div>
                   </div>
 
@@ -926,7 +926,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                         <CalendarDays size={13} />
                         Date & Time
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white break-words">
                         {formatEventDate(event.startDate)} • {event.time}
                       </p>
                     </div>
@@ -935,20 +935,20 @@ export default function StudentEventDetails({ mode = "details" }) {
                         <MapPin size={13} />
                         Venue
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{event.venue}</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white break-words">{event.venue}</p>
                     </div>
                     <div className="px-4 py-3">
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 inline-flex items-center gap-1">
                         <Building2 size={13} />
                         Organized By
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{organizerLabel}</p>
+                      <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-white break-words">{organizerLabel}</p>
                     </div>
                   </div>
                 </section>
 
                 <div className="border-b border-gray-200 dark:border-white/10">
-                  <div className="flex items-center gap-6 text-sm">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm">
                     <button
                       type="button"
                       onClick={() => setActiveDetailTab("about")}
@@ -985,7 +985,7 @@ export default function StudentEventDetails({ mode = "details" }) {
                   </div>
                 </div>
 
-                <div className="grid lg:grid-cols-[minmax(0,1fr)_280px] gap-4">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
                   <div className="space-y-4">
                     {activeDetailTab === "about" && (
                       <>

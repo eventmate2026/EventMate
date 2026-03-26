@@ -39,16 +39,16 @@ export default function Footer() {
       <div className="pointer-events-none absolute -bottom-24 -right-20 h-56 w-56 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-500/20" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+      <div className="max-w-7xl mx-auto px-3 min-[360px]:px-4 sm:px-6 py-10">
         <div className="sm:hidden">
-          <div className="rounded-2xl border border-slate-200/70 bg-white/95 px-6 py-7 text-slate-900 shadow-2xl dark:border-white/10 dark:bg-slate-950/95 dark:text-slate-100">
+          <div className="rounded-2xl border border-slate-200/70 bg-white/95 px-5 py-6 text-slate-900 shadow-2xl dark:border-white/10 dark:bg-slate-950/95 dark:text-slate-100">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-500 dark:text-slate-400">EventMate</p>
             <h3 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">Campus events, simplified.</h3>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
               Making campus events smarter, simpler, and more rewarding for everyone.
             </p>
 
-            <div className="mt-6 grid grid-cols-2 gap-6 text-sm">
+            <div className="mt-6 grid grid-cols-1 min-[360px]:grid-cols-2 gap-6 text-sm">
               {MOBILE_GROUPS.map((group) => (
                 <div key={group.title}>
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -145,7 +145,7 @@ export default function Footer() {
       </div>
 
       <div className="hidden sm:block border-t border-gray-300/80 dark:border-indigo-300/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col items-center sm:flex-row sm:items-center justify-between gap-3 text-sm text-gray-600 dark:text-slate-300 text-center sm:text-left">
+        <div className="max-w-7xl mx-auto px-3 min-[360px]:px-4 sm:px-6 py-4 flex flex-col items-center sm:flex-row sm:items-center justify-between gap-3 text-sm text-gray-600 dark:text-slate-300 text-center sm:text-left">
           <p>Copyright 2026 EventMate Inc. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <span className="cursor-pointer transition-colors hover:text-indigo-600 dark:hover:text-cyan-300">Privacy Policy</span>

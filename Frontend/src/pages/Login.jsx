@@ -124,7 +124,7 @@ export default function Login() {
       <div className="pointer-events-none absolute top-10 right-0 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-purple-500/15 blur-3xl" />
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-2 pb-8 sm:px-6 sm:pt-3">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-3 min-[360px]:px-4 pt-2 pb-8 sm:px-6 sm:pt-3">
         <Link
           to="/"
           className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/70 p-2 text-slate-700 shadow-sm backdrop-blur transition hover:border-indigo-200 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300"
@@ -197,7 +197,7 @@ export default function Login() {
           </div>
 
           <div className="rounded-[26px] bg-gradient-to-br from-blue-500/25 via-indigo-500/25 to-purple-500/25 p-[1px] shadow-[0_25px_50px_-35px_rgba(79,70,229,0.85)]">
-            <div className="relative overflow-hidden rounded-[25px] border border-slate-200/80 bg-white px-6 py-7 sm:px-8 sm:py-8 dark:border-slate-800 dark:bg-slate-900">
+            <div className="relative overflow-hidden rounded-[25px] border border-slate-200/80 bg-white px-4 py-5 min-[360px]:px-5 min-[360px]:py-6 sm:px-8 sm:py-8 dark:border-slate-800 dark:bg-slate-900">
               <div className="pointer-events-none absolute -top-14 -right-10 h-28 w-28 rounded-full bg-indigo-200/45 blur-2xl dark:bg-indigo-500/15" />
               <div className="pointer-events-none absolute -bottom-14 -left-10 h-24 w-24 rounded-full bg-purple-200/40 blur-2xl dark:bg-purple-500/15" />
 
@@ -205,7 +205,7 @@ export default function Login() {
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-600 dark:text-indigo-300">
                   Sign In
                 </p>
-                <h1 className="mt-1 text-3xl font-extrabold text-slate-900 dark:text-slate-100">Welcome Back</h1>
+                <h1 className="mt-1 text-2xl min-[360px]:text-3xl font-extrabold text-slate-900 dark:text-slate-100">Welcome Back</h1>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Please enter your details to Login.</p>
               </div>
 

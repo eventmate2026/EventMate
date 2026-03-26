@@ -214,7 +214,7 @@ export default function CoordinatorEventDetails() {
   const encodedEventId = encodeURIComponent(eventMeta?.id || eventId || "");
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
+    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-3 sm:px-6 py-6 sm:py-8">
       <div className="max-w-6xl mx-auto space-y-5">
         <button
           type="button"
@@ -248,14 +248,14 @@ export default function CoordinatorEventDetails() {
                       {eventMeta.category}
                     </span>
                   </div>
-                  <h1 className="mt-2 text-2xl sm:text-4xl font-extrabold tracking-tight text-white">{eventMeta.title}</h1>
+                  <h1 className="mt-2 text-xl min-[340px]:text-2xl sm:text-4xl font-extrabold tracking-tight text-white break-words">{eventMeta.title}</h1>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-200/80 dark:border-white/10 p-4 sm:p-5 bg-white/95 dark:bg-slate-900/80">
                 <article className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Date & Time</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
+                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5 break-words">
                     <CalendarDays size={13} className="text-indigo-500" />
                     {formatDateTime(eventMeta.startDate, eventMeta.startTime)}
                   </p>
@@ -263,7 +263,7 @@ export default function CoordinatorEventDetails() {
 
                 <article className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Venue</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
+                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5 break-words">
                     <MapPin size={13} className="text-indigo-500" />
                     {eventMeta.venue}
                   </p>
@@ -271,7 +271,7 @@ export default function CoordinatorEventDetails() {
 
                 <article className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 p-3">
                   <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Organized By</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
+                  <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5 break-words">
                     <Building2 size={13} className="text-indigo-500" />
                     {eventMeta.organizedBy}
                   </p>
@@ -281,13 +281,13 @@ export default function CoordinatorEventDetails() {
 
             <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.65fr)_240px] gap-4">
               <div>
-                <div className="border-b border-slate-200 dark:border-white/10 mb-4 flex items-center gap-6">
+                <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 dark:border-white/10">
                   {detailTabs.map((tab) => (
                     <button
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`pb-2 text-sm font-medium transition-colors ${
+                      className={`pb-2 text-xs sm:text-sm font-medium transition-colors ${
                         activeTab === tab.id
                           ? "text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-600 dark:border-indigo-300"
                           : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border-b-2 border-transparent"

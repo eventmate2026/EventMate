@@ -314,7 +314,7 @@ export default function Landing() {
       </div>
 
       {/* --- HERO SECTION (Synced Animation) --- */}
-      <section className="relative z-10 pt-24 pb-12 px-4 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
+      <section className="relative z-10 pt-24 pb-12 px-3 min-[360px]:px-4 sm:px-6 sm:pt-32 sm:pb-16 lg:pt-48 lg:pb-24">
         <div className="absolute inset-0 -z-10 overflow-hidden">
           <div className="hero-spotlight hero-spotlight--one" />
           <div className="hero-spotlight hero-spotlight--two" />
@@ -342,7 +342,7 @@ export default function Landing() {
               {/* Main Title (Word by word effect) */}
               <motion.h1
                 variants={textReveal}
-                className="hero-title text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
+                className="hero-title text-[2.35rem] min-[340px]:text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.05] text-transparent bg-clip-text bg-gradient-to-b from-gray-900 to-gray-600 dark:from-white dark:to-white/40"
               >
                 Manage Campus Events <br />
                 <motion.span
@@ -356,7 +356,7 @@ export default function Landing() {
               </motion.h1>
 
               {/* Description */}
-              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
+              <motion.p variants={textReveal} className="mt-6 max-w-2xl mx-auto text-sm min-[340px]:text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 leading-relaxed">
                 The all-in-one platform for students and organizers. Discover events, register instantly, check-in with QR codes, and earn digital certificates.
               </motion.p>
 
@@ -387,7 +387,7 @@ export default function Landing() {
           className="text-center mb-20"
         >
           <motion.p variants={fadeUp} className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-xs mb-4">How It Works</motion.p>
-          <motion.h2 variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">How EventMate Works</motion.h2>
+          <motion.h2 variants={fadeUp} className="text-2xl min-[340px]:text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">How EventMate Works</motion.h2>
           <motion.div variants={fadeUp} className="w-20 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto rounded-full"></motion.div>
         </motion.div>
 
@@ -432,7 +432,7 @@ export default function Landing() {
           className="mb-16 text-center"
         >
           <motion.p variants={fadeUp} className="text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-widest text-xs mb-4">Why Choose Us</motion.p>
-          <motion.h2 variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white">Why EventMate?</motion.h2>
+          <motion.h2 variants={fadeUp} className="text-2xl min-[340px]:text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white">Why EventMate?</motion.h2>
         </motion.div>
 
         <motion.div
@@ -491,7 +491,7 @@ export default function Landing() {
         <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={stagger} className="mb-16">
           <div className="flex flex-col md:flex-row justify-between items-center md:items-end gap-8 mb-12">
             <div className="text-center md:text-left">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
+              <h2 className="text-2xl min-[340px]:text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">Upcoming Events</h2>
               <div className="w-24 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full mx-auto md:mx-0"></div>
             </div>
 
@@ -615,7 +615,7 @@ export default function Landing() {
 
       {/* --- FEATURES SECTION --- */}
       <section className="relative z-10 mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-24">
-        <motion.h2 initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-3xl sm:text-4xl md:text-5xl font-black text-center mb-16 text-gray-900 dark:text-white">
+        <motion.h2 initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-2xl min-[340px]:text-3xl sm:text-4xl md:text-5xl font-black text-center mb-16 text-gray-900 dark:text-white">
           Everything you need to run events
         </motion.h2>
 
@@ -643,7 +643,7 @@ export default function Landing() {
       <section id="contact" className="relative z-10 py-16 sm:py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <motion.div initial="hidden" whileInView="show" viewport={viewportOnce} variants={fadeUp} className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">Get in Touch</h2>
+            <h2 className="text-2xl min-[340px]:text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 dark:text-white mb-6">Get in Touch</h2>
             <p className="text-base sm:text-lg text-gray-600 dark:text-gray-400">Need to talk to us? Send us a message.</p>
           </motion.div>
           <ContactUs />

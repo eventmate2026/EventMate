@@ -305,7 +305,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-4 sm:px-6 py-8">
+    <div className="eventmate-page min-h-screen bg-slate-100/80 dark:bg-gray-900 px-3 sm:px-6 py-6 sm:py-8">
       <div className="max-w-6xl mx-auto space-y-6">
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -351,9 +351,9 @@ export default function Profile() {
                   <Plus size={14} />
                 </button>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-semibold text-slate-900 dark:text-white">{profile?.fullName || "User"}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{profile?.email || "user@eventmate.com"}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 break-all">{profile?.email || "user@eventmate.com"}</p>
                 {profileDepartment ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400">{profileDepartment}</p>
                 ) : null}
@@ -443,7 +443,7 @@ export default function Profile() {
                   </label>
                   <label className="block">
                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Education Level</span>
-                    <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="mt-1 grid grid-cols-1 min-[360px]:grid-cols-2 gap-2 sm:grid-cols-4">
                       {EDUCATION_LEVELS.map((level) => {
                         const isSelected = formData.educationLevel === level;
                         return (
@@ -452,7 +452,7 @@ export default function Profile() {
                             type="button"
                             onClick={() => handleEducationLevelSelect(level)}
                             aria-pressed={isSelected}
-                            className={`rounded-xl border px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold whitespace-nowrap transition ${
+                            className={`rounded-xl border px-2 sm:px-3 py-2 text-[10px] min-[360px]:text-[11px] sm:text-xs font-semibold transition ${
                               isSelected
                                 ? "border-indigo-600 bg-indigo-600 text-white"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
