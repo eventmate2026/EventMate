@@ -371,7 +371,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
 
             {/* Desktop Navigation Links */}
             {!isPublic && !isPrivileged && (
-              <div className="hidden md:ml-8 md:flex md:space-x-6 lg:space-x-8">
+              <div className="hidden md:ml-14 md:flex md:space-x-6 lg:ml-16 lg:space-x-8 xl:ml-20">
                 {isCoordinator && (
                   <>
                     <Link
