@@ -351,10 +351,10 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
         </>
       )}
       <div className="relative mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10">
-        <div className="flex h-14 items-center justify-between gap-2 md:h-[72px] md:gap-3">
+        <div className="flex h-14 items-center justify-between gap-3 md:h-[72px] md:gap-4">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-5">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
@@ -429,7 +429,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {isPublic && !isPrivileged && (
-            <div className="hidden md:flex flex-1 items-center justify-center gap-6">
+            <div className="hidden md:flex flex-1 items-center justify-center gap-8 lg:gap-10">
               {[
                 { label: "Home", key: "home" },
                 { label: "Events", key: "events" },
@@ -445,7 +445,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                     key={item.key}
                     type="button"
                     onClick={() => navigatePublicSection(item.key)}
-                    className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-all duration-200 ${
+                    className={`inline-flex items-center px-2 py-1.5 text-sm font-medium transition-all duration-200 ${
                       isCurrent
                         ? "text-indigo-600 dark:text-indigo-300 border-b-2 border-indigo-500"
                         : "text-gray-600 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-300 border-b-2 border-transparent hover:border-gray-300 dark:hover:border-white/20"
@@ -885,18 +885,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-1 flex shrink-0 items-center gap-1.5 sm:gap-2 ${mobileVisibilityClass}`}>
+          <div className={`-mr-1 flex shrink-0 items-center gap-2 sm:gap-2.5 ${mobileVisibilityClass}`}>
             {isPublic && !isAuthenticated && (
-              <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-2 sm:gap-2.5">
                 <Link
                   to="/login"
-                  className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:px-3 sm:text-xs"
+                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:px-3.5"
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm sm:px-3 sm:text-xs"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm sm:px-3.5"
                 >
                   Sign Up
                 </Link>
@@ -904,7 +904,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:p-2"
+                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
                 >
                   {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
