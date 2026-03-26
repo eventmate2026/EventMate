@@ -98,12 +98,12 @@ const EventCard = ({ event, onRegister, onViewDetails, showRegister = true, meta
         </div>
       </div>
       <div className="p-4 flex-grow flex flex-col">
-        <div className="flex items-center justify-between gap-2 text-xs mb-2">
+        <div className="mb-2 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-300">
             <CalendarDays size={14} />
-            <span>{event.date} | {event.time}</span>
+            <span className="break-words">{event.date} | {event.time}</span>
           </div>
-          <div className="inline-flex items-center gap-1.5">
+          <div className="inline-flex flex-wrap items-center gap-1.5">
             {metaBadge ? (
               <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${metaBadge.className}`}>
                 {metaBadge.label}
@@ -126,13 +126,13 @@ const EventCard = ({ event, onRegister, onViewDetails, showRegister = true, meta
         </div>
         <div className="inline-flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-300 mb-2">
           <MapPin size={14} />
-          <span>{event.venue}, {event.dept}</span>
+          <span className="break-words">{event.venue}, {event.dept}</span>
         </div>
-        <h3 className="font-bold text-xl leading-tight text-gray-900 dark:text-white line-clamp-1 mb-2">{event.title}</h3>
+        <h3 className="font-bold text-lg sm:text-xl leading-tight text-gray-900 dark:text-white line-clamp-2 mb-2">{event.title}</h3>
         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2 mb-4">
           {event.description}
         </p>
-        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
           {showRegisterButton && (
             <button
               type="button"
@@ -304,7 +304,7 @@ export default function StudentEvents() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard")}
@@ -314,7 +314,7 @@ export default function StudentEvents() {
       </button>
 
       <div className="mt-4 mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">All Events</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">All Events</h1>
         <p className="text-gray-600 dark:text-gray-300">
           Events created by organizers are loaded from database.
         </p>

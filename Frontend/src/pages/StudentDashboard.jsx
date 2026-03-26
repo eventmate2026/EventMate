@@ -10,13 +10,6 @@ import { fetchRegisteredEventIds } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 
-const StatCard = ({ label, value, color = "bg-purple-100 text-purple-700 dark:bg-indigo-500/20 dark:text-indigo-200" }) => (
-  <div className={`eventmate-kpi flex flex-col items-center p-6 rounded-2xl ${color} shadow-sm`}>
-    <div className="text-sm">{label}</div>
-    <div className="text-2xl font-bold mt-1">{value}</div>
-  </div>
-);
-
 const statusRank = {
   current: 0,
   upcoming: 1,
@@ -38,34 +31,6 @@ const dateValue = (value) => {
   const parsed = new Date(value || "");
   return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 };
-
-const formatTime = (date) =>
-  date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-const formatDate = (date) =>
-  date.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-
-const resolveGreeting = (date) => {
-  const hour = date.getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  if (hour < 21) return "Good evening";
-  return "Good night";
-};
-
-const LIVE_TIPS = [
-  "Tap an event card to view full details and coordinator info.",
-  "Complete your profile to unlock smarter event recommendations.",
-  "Check feedback tasks after you attend an event.",
-  "Use My Events to track registrations in one place.",
-];
 
 const resolveDashboardStatus = (event) => {
   const mappedStatus = normalizeStatus(event?.status);
@@ -89,7 +54,7 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
 
   return (
     <div className="eventmate-panel bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full border border-gray-100 dark:border-gray-700 group">
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-44 sm:h-48 overflow-hidden">
         <img src={event.imageUrl} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-sm font-medium bg-white/90 dark:bg-gray-900/80 dark:text-gray-100 shadow-sm backdrop-blur-sm z-10">
           {event.isFree ? "Free" : `Rs ${event.price}`}
@@ -106,11 +71,11 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
           {statusLabel}
         </div>
       </div>
-      <div className="p-5 flex-grow flex flex-col">
-        <div className="flex items-center justify-between gap-3 text-sm mb-3">
+      <div className="p-4 sm:p-5 flex-grow flex flex-col">
+        <div className="mb-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-300">
             <CalendarDays size={16} />
-            <span>{event.date} | {event.time}</span>
+            <span className="break-words">{event.date} | {event.time}</span>
           </div>
           <span
             className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -128,19 +93,19 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
         </div>
         <div className="inline-flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-300 mb-3">
           <MapPin size={16} />
-          <span>{event.venue}, {event.dept}</span>
+          <span className="break-words">{event.venue}, {event.dept}</span>
         </div>
-        <h3 className="font-bold text-2xl leading-tight text-gray-900 dark:text-white line-clamp-1 mb-2">{event.title}</h3>
+        <h3 className="font-bold text-xl sm:text-2xl leading-tight text-gray-900 dark:text-white line-clamp-2 mb-2">{event.title}</h3>
         <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2 mb-6">
           {event.description}
         </p>
-        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
           {showRegisterButton && (
             <button
               type="button"
               onClick={() => onRegister(event.id)}
               disabled={event.isRegistered || registering || !event.registrationOpen}
-              className="w-full py-2.5 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
+              className="w-full py-2.5 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 text-sm font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
             >
               {registering ? "Registering..." : event.isRegistered ? "Registered" : event.registrationOpen ? "Register" : "Closed"}
             </button>
@@ -148,7 +113,7 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
           <button
             type="button"
             onClick={() => onViewDetails(event.id)}
-            className="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+            className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition"
           >
             View Details
           </button>
@@ -169,7 +134,6 @@ export default function StudentDashboard() {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [registrationWarning, setRegistrationWarning] = useState(null);
-  const [clock, setClock] = useState(() => new Date());
 
   const fetchDashboardEvents = async () => {
     setLoading(true);
@@ -211,13 +175,6 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     fetchDashboardEvents();
-  }, []);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setClock(new Date());
-    }, 30000);
-    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -278,11 +235,6 @@ export default function StudentDashboard() {
 
   const profileProgress = useMemo(() => computeProfileProgress(user), [user]);
   const showProfileCard = profileProgress.left > 0;
-  const liveGreeting = useMemo(() => resolveGreeting(clock), [clock]);
-  const liveTimeLabel = useMemo(() => formatTime(clock), [clock]);
-  const liveDateLabel = useMemo(() => formatDate(clock), [clock]);
-  const liveTip = useMemo(() => LIVE_TIPS[clock.getMinutes() % LIVE_TIPS.length], [clock]);
-  const userFirstName = String(user?.fullName || "Student").split(" ")[0];
 
   const coordinatorAction =
     assignedEventsCount > 0
@@ -333,7 +285,7 @@ export default function StudentDashboard() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 text-gray-900 dark:text-gray-100">
       <section className="eventmate-panel mb-8 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-4 sm:p-5">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((item) => {
@@ -367,25 +319,25 @@ export default function StudentDashboard() {
         </p>
       )}
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <div className="md:col-span-2">
-          <section className="eventmate-panel rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-gray-900/60 p-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+      <div className={showProfileCard ? "grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.95fr)]" : ""}>
+        <div>
+          <section className="eventmate-panel rounded-2xl border border-gray-200 dark:border-white/10 bg-white/80 dark:bg-gray-900/60 p-4 sm:p-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Event Highlights</h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-1">Recommended events from database</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Event Highlights</h2>
+                <p className="mt-1 text-sm sm:text-base text-gray-600 dark:text-gray-300">Recommended events from database</p>
               </div>
-              <div className="mt-3 sm:mt-0 flex gap-2">
+              <div className="mt-1 flex flex-col gap-2 sm:mt-0 sm:flex-row">
                 <button
                   onClick={() => setShowAllRecommended((prev) => !prev)}
                   disabled={recommendedEvents.length <= 3}
-                  className="px-5 py-2 bg-purple-100 dark:bg-indigo-500/20 text-purple-700 dark:text-indigo-200 rounded-lg hover:bg-purple-200 dark:hover:bg-indigo-500/30 transition font-medium disabled:opacity-60"
+                  className="w-full sm:w-auto px-4 py-2 bg-purple-100 dark:bg-indigo-500/20 text-purple-700 dark:text-indigo-200 rounded-lg hover:bg-purple-200 dark:hover:bg-indigo-500/30 transition text-sm font-medium disabled:opacity-60"
                 >
                   {showAllRecommended ? "Show Less" : "Show More"}
                 </button>
                 <button
                   onClick={() => navigate("/student-dashboard/events")}
-                  className="px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+                  className="w-full sm:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium"
                 >
                   View All Events
                 </button>
@@ -393,7 +345,7 @@ export default function StudentDashboard() {
             </div>
 
             {!loading && !error && displayedEvents.length > 0 ? (
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid gap-5 sm:grid-cols-2">
                 {displayedEvents.map((event) => (
                   <EventCard
                     key={event.id}
@@ -412,11 +364,11 @@ export default function StudentDashboard() {
           </section>
         </div>
 
-        <div className="space-y-6">
-          {showProfileCard && (
-            <div className="bg-gradient-to-br from-purple-600 to-indigo-600 dark:from-indigo-700 dark:to-slate-800 text-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-3">Complete your profile</h2>
-              <p className="mb-4 text-purple-100 dark:text-indigo-100 text-sm">
+        {showProfileCard && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-br from-purple-600 to-indigo-600 dark:from-indigo-700 dark:to-slate-800 text-white rounded-2xl shadow-lg p-5 sm:p-6">
+              <h2 className="text-lg sm:text-xl font-bold mb-3">Complete your profile</h2>
+              <p className="mb-4 text-purple-100 dark:text-indigo-100 text-sm leading-relaxed">
                 Keep your profile complete for better event targeting and communication.
               </p>
               <div className="mb-5">
@@ -438,38 +390,8 @@ export default function StudentDashboard() {
                 Continue Setup
               </button>
             </div>
-          )}
-
-          <div className="relative overflow-hidden rounded-2xl border border-indigo-200/30 dark:border-white/10 bg-gradient-to-br from-indigo-600 via-purple-600 to-slate-900 text-white shadow-lg p-6">
-            <div className="absolute -top-16 -right-10 h-32 w-32 rounded-full bg-fuchsia-300/40 blur-3xl animate-pulse" />
-            <div className="absolute -bottom-16 -left-10 h-32 w-32 rounded-full bg-indigo-300/35 blur-3xl animate-pulse" />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-indigo-100/80">Live Campus Pulse</p>
-                  <h3 className="mt-2 text-2xl font-semibold">{liveGreeting}, {userFirstName}</h3>
-                </div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs whitespace-nowrap shrink-0">
-                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
-                  Live
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-xl bg-white/12 p-3">
-                  <p className="text-xs text-indigo-100/90">Time now</p>
-                  <p className="mt-1 text-lg font-semibold">{liveTimeLabel}</p>
-                  <p className="text-xs text-indigo-100/90">{liveDateLabel}</p>
-                </div>
-                <div className="rounded-xl bg-white/12 p-3">
-                  <p className="text-xs text-indigo-100/90">Your snapshot</p>
-                  <p className="mt-1 text-lg font-semibold">{displayedEvents.length} picks</p>
-                  <p className="text-xs text-indigo-100/90">{myEvents.length} registered</p>
-                </div>
-              </div>
-              <p className="mt-4 text-xs text-indigo-100/90">{liveTip}</p>
-            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

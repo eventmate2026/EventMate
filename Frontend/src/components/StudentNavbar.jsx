@@ -168,14 +168,14 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   return (
     <>
     <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10 fixed inset-x-0 top-0 z-[110] shadow-sm">
-      <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-[1400px] px-2.5 sm:px-6 lg:px-10">
         <div className="flex h-14 items-center justify-between gap-2 md:h-[72px] md:gap-3">
           
           {/* --- LEFT SIDE: Logo & Desktop Nav --- */}
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
             {/* Logo */}
-            <div className="flex-shrink-0 flex items-center cursor-pointer" onClick={() => handleNavClick('home')}>
-              <span className="relative text-xl font-extrabold tracking-tight sm:text-2xl">
+            <div className="flex min-w-0 flex-shrink items-center cursor-pointer" onClick={() => handleNavClick('home')}>
+              <span className="eventmate-student-brand relative text-lg font-extrabold tracking-tight sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
@@ -322,7 +322,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                     exit={mobileProfilePanelMotion.exit}
                     transition={mobileProfilePanelTransition}
                     role="menu"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-64 max-w-[90vw] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-60 max-w-[calc(100vw-1rem)] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
                   >
                     <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>

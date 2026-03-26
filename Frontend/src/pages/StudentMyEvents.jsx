@@ -128,7 +128,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
           )}
         </div>
 
-        <h3 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{row.eventTitle || "Registered Event"}</h3>
+        <h3 className="mt-2 text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{row.eventTitle || "Registered Event"}</h3>
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
           <p className="inline-flex items-center gap-1.5">
             <CalendarDays size={12} className="text-emerald-500" />
@@ -151,7 +151,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
             type="button"
             onClick={() => onViewQr(row.id)}
             disabled={!row.hasQr}
-            className="rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
+            className="w-full sm:w-auto rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
           >
             {row.hasQr ? "View QR" : "QR Pending"}
           </button>
@@ -159,7 +159,7 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
             type="button"
             onClick={() => onViewDetails(row.eventId)}
             disabled={!row.eventId}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full sm:w-auto rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             View Details
           </button>
@@ -253,7 +253,7 @@ export default function StudentMyEvents() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-gray-900 dark:text-gray-100">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 text-gray-900 dark:text-gray-100">
       <button
         type="button"
         onClick={() => navigate("/student-dashboard")}
@@ -265,7 +265,7 @@ export default function StudentMyEvents() {
       <section className="mt-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-white/70 dark:bg-gray-900/60 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Events</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">My Events</h1>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
               Manage your registrations, attendance, and QR passes.
             </p>
@@ -339,7 +339,7 @@ export default function StudentMyEvents() {
             Your events are unavailable right now.
           </div>
         ) : filteredRows.length > 0 ? (
-          <div className="mt-6 border-l-2 border-indigo-300/70 pl-4 space-y-4">
+          <div className="mt-6 space-y-4 border-indigo-300/70 sm:border-l-2 sm:pl-4">
             {filteredRows.map((row) => (
               <MyEventCard
                 key={row.id || `${row.eventId}-${row.createdAt || "row"}`}

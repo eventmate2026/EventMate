@@ -150,6 +150,20 @@ table {
   }
 }
 
+@media (max-width: 360px) {
+  .eventmate-student-brand {
+    font-size: 1rem;
+  }
+
+  :where(.eventmate-page, .eventmate-route-shell) :where(.eventmate-panel, .eventmate-kpi, section, article, aside) {
+    border-radius: 1rem;
+  }
+
+  :where(.eventmate-page, .eventmate-route-shell) :where(button, a, input, select, textarea) {
+    max-width: 100%;
+  }
+}
+
 /* Prevent browser autofill from forcing bright backgrounds in dark inputs. */
 :where(input, textarea, select):-webkit-autofill,
 :where(input, textarea, select):-webkit-autofill:hover,
