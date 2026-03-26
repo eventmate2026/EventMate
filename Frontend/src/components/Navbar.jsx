@@ -350,17 +350,17 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent pointer-events-none" />
         </>
       )}
-      <div className="relative mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10">
-        <div className="flex h-14 items-center justify-between gap-3 md:h-[72px] md:gap-4">
+      <div className="relative mx-auto max-w-[1400px] px-2 min-[360px]:px-3 sm:px-6 lg:px-10">
+        <div className="flex h-14 items-center justify-between gap-2 min-[360px]:gap-3 md:h-[72px] md:gap-4">
           
           {/* LEFT SIDE: Logo & Desktop Nav */}
-          <div className="flex min-w-0 items-center gap-4 sm:gap-5">
+          <div className="flex min-w-0 items-center gap-2.5 min-[360px]:gap-4 sm:gap-5">
             {/* Logo - Links to Home */}
             <div
               className={`flex-shrink-0 flex items-center cursor-pointer ${isPublic ? "group" : ""}`}
               onClick={() => handleNavClick('home')}
             >
-              <span className="relative text-xl font-extrabold tracking-tight sm:text-2xl">
+              <span className="relative text-lg font-extrabold tracking-tight leading-none min-[340px]:text-xl sm:text-2xl">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500">
                   EventMate
                 </span>
@@ -885,18 +885,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
           </div>
 
           {/* MOBILE MENU BUTTON */}
-          <div className={`-mr-1 flex shrink-0 items-center gap-2 sm:gap-2.5 ${mobileVisibilityClass}`}>
+          <div className={`-mr-1 flex shrink-0 items-center gap-1.5 min-[340px]:gap-2 sm:gap-2.5 ${mobileVisibilityClass}`}>
             {isPublic && !isAuthenticated && (
-              <div className="flex items-center gap-2 sm:gap-2.5">
+              <div className="flex items-center gap-1.5 min-[340px]:gap-2 sm:gap-2.5">
                 <Link
                   to="/login"
-                  className="rounded-full border border-gray-200 bg-white/80 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 sm:px-3.5"
+                  className="rounded-full border border-gray-200 bg-white/80 px-2 py-1.5 text-[10px] font-semibold text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 min-[340px]:px-2.5 min-[340px]:text-[11px] sm:px-3.5 sm:text-xs"
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm sm:px-3.5"
+                  className="rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 px-2.5 py-1.5 text-[10px] font-semibold text-white shadow-sm min-[340px]:px-3 min-[340px]:text-[11px] sm:px-3.5 sm:text-xs"
                 >
                   Sign Up
                 </Link>
@@ -904,9 +904,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                   type="button"
                   aria-label="Toggle theme"
                   onClick={toggleTheme}
-                  className="rounded-full border border-gray-200 bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50"
+                  className="rounded-full border border-gray-200 bg-white/80 p-1.5 text-gray-700 shadow-sm backdrop-blur hover:border-indigo-300 hover:text-indigo-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200 dark:hover:border-indigo-400/50 min-[340px]:p-2"
                 >
-                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {isDark ? <Sun className="h-3.5 w-3.5 min-[340px]:h-4 min-[340px]:w-4" /> : <Moon className="h-3.5 w-3.5 min-[340px]:h-4 min-[340px]:w-4" />}
                 </button>
               </div>
             )}
@@ -1021,21 +1021,21 @@ const Navbar = ({ activePage, setActivePage, user, onLogout, variant = "auto" })
                 <button
                   type="button"
                   onClick={() => navigatePublicSection("home")}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="block w-full border-l-4 py-3 pl-3 pr-4 text-left text-base font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 >
                   Home
                 </button>
                 <button
                   type="button"
                   onClick={() => navigatePublicSection("events")}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="block w-full border-l-4 py-3 pl-3 pr-4 text-left text-base font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 >
                   Events
                 </button>
                 <button
                   type="button"
                   onClick={() => navigatePublicSection("contact")}
-                  className="w-full block pl-3 pr-4 py-3 border-l-4 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="block w-full border-l-4 py-3 pl-3 pr-4 text-left text-base font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                 >
                   Contact us
                 </button>
