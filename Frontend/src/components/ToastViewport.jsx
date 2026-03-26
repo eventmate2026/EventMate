@@ -76,9 +76,9 @@ export default function ToastViewport() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-0 z-[140] flex items-center justify-center px-4"
+      className="pointer-events-none fixed inset-x-0 top-4 z-[140] flex justify-center px-4 sm:top-6"
     >
-      <div className="mx-auto flex w-full max-w-lg flex-col items-center justify-center">
+      <div className="mx-auto flex w-full max-w-lg flex-col items-center">
         {toasts.map((toast) => {
           const variant = TOAST_STYLES[toast.type] || TOAST_STYLES.info;
           const Icon = variant.icon;
