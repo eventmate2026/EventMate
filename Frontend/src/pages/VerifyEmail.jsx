@@ -20,6 +20,7 @@ export default function VerifyEmail() {
       .toLowerCase();
   };
   const presetEmail = resolvePresetEmail();
+  const isEmailLocked = Boolean(presetEmail);
 
   const [formData, setFormData] = useState({
     email: presetEmail,
@@ -135,8 +136,13 @@ export default function VerifyEmail() {
               type="email"
               value={formData.email}
               onChange={handleChange}
+              readOnly={isEmailLocked}
               placeholder="you@college.edu"
-              className="mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 px-4 py-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40"
+              className={`mt-1 w-full rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                isEmailLocked
+                  ? "bg-slate-100 text-slate-700 cursor-not-allowed dark:bg-slate-800/60 dark:text-slate-200"
+                  : "bg-white text-slate-900 dark:bg-slate-800/80 dark:text-slate-100"
+              } focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-500/40`}
             />
           </div>
           <div>

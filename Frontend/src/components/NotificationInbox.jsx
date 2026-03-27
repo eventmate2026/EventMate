@@ -114,7 +114,7 @@ export default function NotificationInbox({ title, subtitle, unreadEventName, da
 
     if (SOCKET_BASE_URL !== null) {
       const socket = io(SOCKET_BASE_URL, {
-        transports: ["websocket", "polling"],
+        transports: ["polling", "websocket"],
         withCredentials: true,
         reconnection: true,
         reconnectionAttempts: Infinity,

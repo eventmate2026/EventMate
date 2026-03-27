@@ -31,18 +31,18 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const isDark = theme === "dark";
   const prefersReducedMotion = useReducedMotion();
   const themeToggleClass =
-    "p-2 rounded-full border border-indigo-200/80 bg-white/80 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
-    "dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white";
+    "p-2 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition " +
+    "dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white";
   const mobileProfilePanelMotion = prefersReducedMotion
     ? {
         initial: false,
-        animate: { opacity: 1, y: 0 },
-        exit: { opacity: 0, y: 0 },
+        animate: { y: 0 },
+        exit: { y: 0 },
       }
     : {
-        initial: { opacity: 0, y: -10, scale: 0.98 },
-        animate: { opacity: 1, y: 0, scale: 1 },
-        exit: { opacity: 0, y: -6, scale: 0.98 },
+        initial: { y: -10, scale: 0.98 },
+        animate: { y: 0, scale: 1 },
+        exit: { y: -6, scale: 0.98 },
       };
   const mobileProfilePanelTransition = prefersReducedMotion
     ? { duration: 0 }
@@ -86,7 +86,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
     if (userId) {
       if (SOCKET_BASE_URL !== null) {
         const socket = io(SOCKET_BASE_URL, {
-          transports: ["websocket", "polling"],
+          transports: ["polling", "websocket"],
           withCredentials: true,
           reconnection: true,
           reconnectionAttempts: Infinity,
@@ -160,7 +160,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
       src={avatarUrl}
       alt={`${displayName} avatar`}
       className={className}
-      coreClassName="h-full w-full bg-purple-100 dark:bg-indigo-500/20 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
+      coreClassName="h-full w-full bg-purple-100 dark:bg-slate-800 dark:border dark:border-slate-700 flex items-center justify-center text-purple-700 dark:text-indigo-200 font-bold"
       fallback={<span className={textClassName}>{avatarText}</span>}
     />
   );
@@ -299,7 +299,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                 setIsMobileProfileOpen(false);
                 toggleTheme();
               }}
-              className="inline-flex items-center justify-center rounded-full border border-indigo-200/80 bg-white/80 p-2 text-indigo-700 shadow-sm backdrop-blur hover:text-indigo-800 hover:bg-indigo-50 dark:border-indigo-300/40 dark:bg-indigo-500/15 dark:text-indigo-100 dark:hover:bg-indigo-500/30 dark:hover:text-white"
+              className="inline-flex items-center justify-center rounded-full border border-indigo-200 bg-white p-2 text-indigo-700 shadow-sm hover:text-indigo-800 hover:bg-indigo-50 dark:border-slate-700 dark:bg-slate-800 dark:text-indigo-100 dark:hover:bg-slate-700 dark:hover:text-white"
             >
               {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -322,7 +322,7 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
                     exit={mobileProfilePanelMotion.exit}
                     transition={mobileProfilePanelTransition}
                     role="menu"
-                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-60 max-w-[calc(100vw-1rem)] rounded-2xl border border-slate-200/80 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-white/10 dark:bg-slate-900/95"
+                    className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] w-60 max-w-[calc(100vw-1rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
                   >
                     <div className="px-3 py-2.5 border-b border-slate-200/70 dark:border-white/10">
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">{displayName}</p>
