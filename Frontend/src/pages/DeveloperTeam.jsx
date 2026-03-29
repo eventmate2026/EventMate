@@ -20,7 +20,7 @@ const TEAM = [
       { label: "React", pct: 88 },
       { label: "Leadership", pct: 98 },
     ],
-    activity: [3,5,4,7,6,8,5,9,7,8,6,9,10,8,7],
+    activity: [3, 5, 4, 7, 6, 8, 5, 9, 7, 8, 6, 9, 10, 8, 7],
     githubUrl: "https://github.com/adityaj143",
     email: "adityajambhulkar513@gmail.com",
     xp: 9800,
@@ -47,7 +47,7 @@ const TEAM = [
       { label: "CSS Animations", pct: 90 },
       { label: "Performance", pct: 85 },
     ],
-    activity: [2,4,6,5,8,7,9,6,8,10,7,9,8,10,9],
+    activity: [2, 4, 6, 5, 8, 7, 9, 6, 8, 10, 7, 9, 8, 10, 9],
     githubUrl: "https://github.com/DakshatNagrale",
     email: "dakshatnagrale296@gmail.com",
     xp: 8200,
@@ -73,7 +73,7 @@ const TEAM = [
       { label: "Node.js", pct: 89 },
       { label: "Security", pct: 86 },
     ],
-    activity: [5,3,7,6,4,8,5,7,9,6,8,10,7,9,8],
+    activity: [5, 3, 7, 6, 4, 8, 5, 7, 9, 6, 8, 10, 7, 9, 8],
     githubUrl: "https://github.com/off-abhi-1287",
     email: "abhinayborkar1287@gmail.com",
     xp: 7900,
@@ -99,7 +99,7 @@ const TEAM = [
       { label: "Schema Design", pct: 90 },
       { label: "Query Optimisation", pct: 88 },
     ],
-    activity: [4,6,5,8,7,5,9,6,8,7,10,8,9,7,10],
+    activity: [4, 6, 5, 8, 7, 5, 9, 6, 8, 7, 10, 8, 9, 7, 10],
     githubUrl: "https://github.com/off-saksham-2007",
     email: "sakshamkhaire2007@gmail.com",
     xp: 7600,
@@ -497,8 +497,8 @@ function MemberCard({ member, index, reduceMotion }) {
               style={{ color: copied ? "#4ade80" : "rgba(200,200,220,0.7)", border: `1px solid ${copied ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.08)"}`, background: copied ? "rgba(74,222,128,0.07)" : "rgba(255,255,255,0.03)" }}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 shrink-0">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="M22 7l-10 7L2 7"/>
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="M22 7l-10 7L2 7" />
               </svg>
               <AnimatePresence mode="wait">
                 {copied
