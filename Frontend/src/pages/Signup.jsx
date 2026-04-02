@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { emitToast } from "../lib/toastBus";
-import PageBackButton from "../components/PageBackButton";
 
 export default function Signup() {
   const location = useLocation();
@@ -156,17 +155,15 @@ export default function Signup() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-white/20 dark:from-slate-950/40 dark:via-transparent dark:to-slate-900/20 pointer-events-none" />
 
-      <section className="relative z-10 max-w-7xl mx-auto px-3 min-[360px]:px-4 sm:px-6 py-4 sm:py-6 lg:py-7 lg:min-h-[calc(100vh-72px)]">
+      <section className="relative z-10 mx-auto w-full max-w-6xl px-3 min-[360px]:px-4 pt-2 pb-8 sm:px-6 sm:pt-3 lg:min-h-[calc(100vh-72px)]">
         <div className="mb-4 sm:mb-6">
-          <PageBackButton
+          <Link
             to="/"
-            fallbackTo="/"
-            preferHistory
-            showLabel={false}
-            iconSize={22}
-            ariaLabel="Back to home"
-            className="h-14 w-14 border border-white/15 bg-slate-900/35 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_14px_32px_-20px_rgba(15,23,42,0.95)] backdrop-blur-md hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/50 hover:text-white dark:border-white/12 dark:bg-slate-900/45 dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-slate-900/60"
-          />
+            className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/70 p-2 text-slate-700 shadow-sm backdrop-blur transition hover:border-indigo-200 hover:text-indigo-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:text-indigo-300"
+            aria-label="Back to home"
+          >
+            <ArrowLeft size={18} />
+          </Link>
         </div>
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,420px)] lg:items-center xl:gap-8">
