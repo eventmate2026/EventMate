@@ -7,11 +7,14 @@ const baseClassName =
 
 export default function PageBackButton({
   to = "/",
+  fallbackTo,
   label = "Back",
   ariaLabel,
   className = "",
   iconSize = 16,
   onClick,
+  preferHistory = false,
+  replace = false,
 }) {
   const navigate = useNavigate();
 
@@ -21,7 +24,12 @@ export default function PageBackButton({
       return;
     }
 
-    navigate(to);
+    if (preferHistory && typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(fallbackTo || to, { replace });
   };
 
   return (

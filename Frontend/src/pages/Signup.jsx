@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, ShieldCheck, Sparkles } from "lucide-react";
 import api from "../lib/api";
 import { storePendingVerificationEmail } from "../lib/pendingVerification";
 import SummaryApi from "../api/SummaryApi";
 import { emitToast } from "../lib/toastBus";
+import PageBackButton from "../components/PageBackButton";
 
 export default function Signup() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: "",
@@ -30,6 +32,14 @@ export default function Signup() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
+  useEffect(() => {
+    const nextEmail = String(new URLSearchParams(location.search).get("email") || "")
+      .trim()
+      .toLowerCase();
+    if (!nextEmail) return;
+    setFormData((prev) => ({ ...prev, email: prev.email || nextEmail }));
+  }, [location.search]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
@@ -52,6 +62,8 @@ export default function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLoading) return;
+
     const validationErrors = validateForm();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -146,17 +158,28 @@ export default function Signup() {
 
       <section className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-10 px-3 min-[360px]:px-4 sm:px-6 py-6 sm:py-8 lg:py-10 items-start lg:items-center min-h-[calc(100vh-72px)]">
         <div className="space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-300 transition"
-            >
-              <ArrowLeft size={16} /> Back
-            </Link>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <PageBackButton
+                to="/"
+                fallbackTo="/"
+                preferHistory
+                ariaLabel="Go back"
+                className="rounded-full border border-white/70 bg-white/65 px-4 py-2 font-semibold text-slate-700 shadow-sm backdrop-blur hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900"
+              />
 
-            <span className="inline-block px-5 py-1.5 text-xs font-semibold tracking-wider uppercase rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/20 dark:text-indigo-200 dark:border-indigo-400/30">
-              Join the Community
-            </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-100/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 backdrop-blur dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+                <Sparkles size={12} />
+                Join the Community
+              </span>
+            </div>
+
+            <Link
+              to="/login"
+              className="inline-flex items-center text-sm font-medium text-slate-600 transition hover:text-indigo-700 dark:text-slate-300 dark:hover:text-indigo-300"
+            >
+              Already registered? Login
+            </Link>
           </div>
 
           <div>
@@ -172,6 +195,28 @@ export default function Signup() {
               EventMate connects students and organizers. Discover, plan, and
               attend the best events happening on your campus today.
             </p>
+          </div>
+
+          <div className="grid gap-3 sm:max-w-xl sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <ShieldCheck size={16} className="text-emerald-500 dark:text-emerald-300" />
+                Secure onboarding
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Email verification is required before the account becomes active.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <Sparkles size={16} className="text-indigo-500 dark:text-indigo-300" />
+                Student-first access
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                Students can self-register here while organizer accounts stay admin-managed.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -194,74 +239,108 @@ export default function Signup() {
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-5">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
+                  <label htmlFor="fullName" className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
                   <input
+                    id="fullName"
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleChange}
                     placeholder="Your Name"
                     required
+                    autoComplete="name"
+                    aria-invalid={Boolean(errors.fullName)}
+                    aria-describedby={errors.fullName ? "signup-fullName-error" : undefined}
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
+                  {errors.fullName && (
+                    <p id="signup-fullName-error" className="mt-1 text-xs font-medium text-rose-500">
+                      {errors.fullName}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Email Address</label>
+                  <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-slate-200">Email Address</label>
                   <input
+                    id="email"
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="xyz@gmail.com"
                     required
+                    autoComplete="email"
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? "signup-email-error" : undefined}
                     className="mt-1 w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                   />
+                  {errors.email && (
+                    <p id="signup-email-error" className="mt-1 text-xs font-medium text-rose-500">
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Password</label>
+                  <label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-slate-200">Password</label>
                   <div className="relative mt-1">
                     <input
+                      id="password"
                       type={showPassword ? "text" : "password"}
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
                       required
+                      autoComplete="new-password"
+                      aria-invalid={Boolean(errors.password)}
+                      aria-describedby={errors.password ? "signup-password-error" : undefined}
                       className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-300 transition"
-                      tabIndex={-1}
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {errors.password && (
+                    <p id="signup-password-error" className="mt-1 text-xs font-medium text-rose-500">
+                      {errors.password}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Confirm Password</label>
+                  <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 dark:text-slate-200">Confirm Password</label>
                   <div className="relative mt-1">
                     <input
+                      id="confirmPassword"
                       type={showConfirmPassword ? "text" : "password"}
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       required
+                      autoComplete="new-password"
+                      aria-invalid={Boolean(errors.confirmPassword)}
+                      aria-describedby={errors.confirmPassword ? "signup-confirmPassword-error" : undefined}
                       className="w-full px-4 py-3 pr-11 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-500/40 focus:border-transparent outline-none transition"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-indigo-500 dark:hover:text-indigo-300 transition"
-                      tabIndex={-1}
                       aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                     >
                       {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {errors.confirmPassword && (
+                    <p id="signup-confirmPassword-error" className="mt-1 text-xs font-medium text-rose-500">
+                      {errors.confirmPassword}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-start gap-3 text-sm text-gray-600 dark:text-slate-300">
@@ -270,6 +349,8 @@ export default function Signup() {
                     name="agree"
                     checked={formData.agree}
                     onChange={handleChange}
+                    aria-invalid={Boolean(errors.agree)}
+                    aria-describedby={errors.agree ? "signup-agree-error" : undefined}
                     className="w-4 h-4 rounded accent-indigo-600"
                   />
                   <span className="leading-relaxed">
@@ -283,6 +364,11 @@ export default function Signup() {
                     </span>
                   </span>
                 </div>
+                {errors.agree && (
+                  <p id="signup-agree-error" className="-mt-3 text-xs font-medium text-rose-500">
+                    {errors.agree}
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={isLoading}
