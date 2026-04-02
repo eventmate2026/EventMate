@@ -233,7 +233,7 @@ export default function OrganizerCreateEvent() {
     }
 
     if (!form.poster) {
-      return "Event poster is required by backend for event creation.";
+      return "Please upload an event poster to continue.";
     }
 
     if (!form.venueLocation.trim()) return "Venue location is required.";
@@ -438,7 +438,7 @@ export default function OrganizerCreateEvent() {
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Create New Event</h1>
               <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-                Form fields are aligned with current backend event schema.
+                Fill in the details below to create your event.
               </p>
             </div>
 
@@ -903,7 +903,7 @@ export default function OrganizerCreateEvent() {
               </p>
 
               <div className="mt-4 rounded-lg border border-slate-200 dark:border-white/10 p-3">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Event Poster (Required by backend)</p>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Event Poster</p>
                 <label className="mt-2 flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 dark:border-white/20 p-4 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5">
                   <UploadCloud size={18} className="text-indigo-500" />
                   <span className="mt-2 text-xs text-slate-600 dark:text-slate-300">Upload .PNG, .JPG</span>

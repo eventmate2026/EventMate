@@ -199,7 +199,7 @@ export default function OrganizerEditEvent() {
     setMessage(null);
 
     if (form.status !== "Draft") {
-      setMessage({ type: "error", text: "Only Draft events can be updated by this backend." });
+      setMessage({ type: "error", text: "Only draft events can be edited." });
       return;
     }
 
@@ -310,7 +310,7 @@ export default function OrganizerEditEvent() {
           {form.status !== "Draft" && (
             <p className="text-xs text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15 rounded-lg px-3 py-2 inline-flex items-center gap-2">
               <AlertCircle size={13} />
-              This event is {form.status}. Editing is disabled by backend policy.
+              This event is {form.status}. Only draft events can be edited.
             </p>
           )}
 
