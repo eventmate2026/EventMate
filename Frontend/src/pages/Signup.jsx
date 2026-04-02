@@ -156,88 +156,89 @@ export default function Signup() {
 
       <div className="absolute inset-0 bg-gradient-to-t from-white/30 via-transparent to-white/20 dark:from-slate-950/40 dark:via-transparent dark:to-slate-900/20 pointer-events-none" />
 
-      <section className="relative z-10 max-w-7xl mx-auto grid lg:grid-cols-2 gap-8 lg:gap-10 px-3 min-[360px]:px-4 sm:px-6 py-6 sm:py-8 lg:py-10 items-start lg:items-center min-h-[calc(100vh-72px)]">
-        <div className="space-y-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <PageBackButton
-                to="/"
-                fallbackTo="/"
-                preferHistory
-                ariaLabel="Go back"
-                className="rounded-full border border-white/70 bg-white/65 px-4 py-2 font-semibold text-slate-700 shadow-sm backdrop-blur hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:hover:border-indigo-500/40 dark:hover:bg-slate-900"
-              />
-
-              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-100/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 backdrop-blur dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200">
-                <Sparkles size={12} />
-                Join the Community
-              </span>
-            </div>
-
-            <Link
-              to="/login"
-              className="inline-flex items-center text-sm font-medium text-slate-600 transition hover:text-indigo-700 dark:text-slate-300 dark:hover:text-indigo-300"
-            >
-              Already registered? Login
-            </Link>
-          </div>
-
-          <div>
-            <h1 className="text-3xl min-[360px]:text-4xl xl:text-5xl font-extrabold leading-tight text-gray-900 dark:text-slate-100">
-              Manage Campus <br />
-              Events Like a{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                Pro.
-              </span>
-            </h1>
-
-            <p className="mt-4 sm:mt-6 text-gray-700 dark:text-slate-300 max-w-md leading-relaxed text-base sm:text-lg">
-              EventMate connects students and organizers. Discover, plan, and
-              attend the best events happening on your campus today.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:max-w-xl sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                <ShieldCheck size={16} className="text-emerald-500 dark:text-emerald-300" />
-                Secure onboarding
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Email verification is required before the account becomes active.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                <Sparkles size={16} className="text-indigo-500 dark:text-indigo-300" />
-                Student-first access
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Students can self-register here while organizer accounts stay admin-managed.
-              </p>
-            </div>
-          </div>
+      <section className="relative z-10 max-w-7xl mx-auto px-3 min-[360px]:px-4 sm:px-6 py-4 sm:py-6 lg:py-7 lg:min-h-[calc(100vh-72px)]">
+        <div className="mb-4 sm:mb-6">
+          <PageBackButton
+            to="/"
+            fallbackTo="/"
+            preferHistory
+            showLabel={false}
+            iconSize={22}
+            ariaLabel="Back to home"
+            className="h-14 w-14 border border-white/15 bg-slate-900/35 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_14px_32px_-20px_rgba(15,23,42,0.95)] backdrop-blur-md hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/50 hover:text-white dark:border-white/12 dark:bg-slate-900/45 dark:text-slate-100 dark:hover:border-white/20 dark:hover:bg-slate-900/60"
+          />
         </div>
 
-        <div className="flex justify-center lg:justify-end animate-slideUp">
-          <div className="w-full max-w-[420px] bg-white/90 dark:bg-slate-900/85 backdrop-blur-lg rounded-2xl shadow-2xl hover:shadow-3xl transition duration-500 border border-white/20 dark:border-white/10">
-            <div className="h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,420px)] lg:items-center xl:gap-8">
+          <div className="space-y-6 lg:pr-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-indigo-100/80 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700 backdrop-blur dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200">
+              <Sparkles size={12} />
+              Join the Community
+            </span>
 
-            <div className="p-5 min-[360px]:p-6 sm:p-8">
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
-                Student Registration
-              </h2>
-
-              <p className="text-sm text-gray-600 dark:text-slate-300 mt-2">
-                Only students can self-register. Organizers are registered by Admin.
+            <div>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Student onboarding for campus event participation
               </p>
+              <h1 className="text-3xl min-[360px]:text-4xl xl:text-5xl font-extrabold leading-tight text-gray-900 dark:text-slate-100">
+                Manage Campus <br />
+                Events Like a{" "}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+                  Pro.
+                </span>
+              </h1>
 
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                Join EventMate to start your journey.
+              <p className="mt-4 sm:mt-6 text-gray-700 dark:text-slate-300 max-w-md leading-relaxed text-base sm:text-lg">
+                EventMate connects students and organizers. Discover, plan, and
+                attend the best events happening on your campus today.
               </p>
+            </div>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+            <div className="grid gap-3 sm:max-w-xl sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <ShieldCheck size={16} className="text-emerald-500 dark:text-emerald-300" />
+                  Secure onboarding
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  Email verification is required before the account becomes active.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/60 bg-white/10 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-slate-900/20">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <Sparkles size={16} className="text-indigo-500 dark:text-indigo-300" />
+                  Student-first access
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  Students can self-register here while organizer accounts stay admin-managed.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center lg:justify-end animate-slideUp">
+            <div className="w-full max-w-[420px] bg-white/90 dark:bg-slate-900/85 backdrop-blur-lg rounded-2xl shadow-2xl hover:shadow-3xl transition duration-500 border border-white/20 dark:border-white/10">
+              <div className="h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+
+              <div className="p-5 min-[360px]:p-6 sm:p-8">
+                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-indigo-700 dark:border-indigo-400/30 dark:bg-indigo-500/10 dark:text-indigo-200">
+                  <Sparkles size={12} />
+                  Student Sign Up
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100">
+                  Student Registration
+                </h2>
+
+                <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
+                  Only students can self-register. Organizers are registered by Admin.
+                </p>
+
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                  Join EventMate to start your journey.
+                </p>
+
+                <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                 <div>
                   <label htmlFor="fullName" className="text-sm font-medium text-gray-700 dark:text-slate-200">Full Name</label>
                   <input
@@ -377,24 +378,25 @@ export default function Signup() {
                   {isLoading ? "Signing up..." : "Sign Up"}
                 </button>
 
-              </form>
+                </form>
 
-              <div className="flex items-center my-6">
-                <div className="flex-1 h-px bg-gray-300 dark:bg-slate-700" />
-                <span className="px-4 text-xs text-gray-500 dark:text-slate-400 font-medium">
-                  Already have an account?
-                </span>
-                <div className="flex-1 h-px bg-gray-300 dark:bg-slate-700" />
+                <div className="my-6 flex items-center">
+                  <div className="h-px flex-1 bg-gray-300 dark:bg-slate-700" />
+                  <span className="px-4 text-xs font-medium text-gray-500 dark:text-slate-400">
+                    Already have an account?
+                  </span>
+                  <div className="h-px flex-1 bg-gray-300 dark:bg-slate-700" />
+                </div>
+
+                <p className="text-center">
+                  <Link
+                    to="/login"
+                    className="text-indigo-600 dark:text-indigo-300 font-semibold hover:underline text-base"
+                  >
+                    Login
+                  </Link>
+                </p>
               </div>
-
-              <p className="text-center">
-                <Link
-                  to="/login"
-                  className="text-indigo-600 dark:text-indigo-300 font-semibold hover:underline text-base"
-                >
-                  Login
-                </Link>
-              </p>
             </div>
           </div>
         </div>
