@@ -370,7 +370,7 @@ export default function CoordinatorAttendanceScanner() {
   const queuePendingToken = useCallback((rawValue, sourceLabel) => {
     const token = parseAttendanceToken(rawValue);
     if (!token) {
-      setMessage({ type: "error", text: "QR detected, but attendance token could not be parsed." });
+      setMessage({ type: "error", text: "QR detected, but the attendance code could not be read." });
       return false;
     }
 
@@ -539,7 +539,7 @@ export default function CoordinatorAttendanceScanner() {
     async (rawToken, sourceLabel) => {
       const token = parseAttendanceToken(rawToken);
       if (!token) {
-        setMessage({ type: "error", text: "Scan or enter a valid attendance token." });
+        setMessage({ type: "error", text: "Scan a valid QR code or enter a valid attendance code." });
         return false;
       }
 
@@ -622,7 +622,7 @@ export default function CoordinatorAttendanceScanner() {
         }
         return true;
       } catch (attendanceError) {
-        const errorText = attendanceError.response?.data?.message || "Unable to mark attendance for this token.";
+        const errorText = attendanceError.response?.data?.message || "Unable to mark attendance for this pass.";
         const parsedName = extractParticipantNameFromError(errorText);
         const participantName = participant?.participantName || parsedName || "Unknown participant";
         const participantEmail = participant?.participantEmail || "";

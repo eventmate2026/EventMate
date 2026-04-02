@@ -292,7 +292,7 @@ export default function AdminNotifications() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Admin Notifications</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">All backend notifications, including full contact messages.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">Notifications and full contact messages are listed here.</p>
             </div>
 
             <div className="flex flex-wrap gap-2">

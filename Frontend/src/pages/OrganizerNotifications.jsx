@@ -4,7 +4,7 @@ export default function OrganizerNotifications() {
   return (
     <NotificationInbox
       title="Organizer Notifications"
-      subtitle="Your backend notifications are listed here."
+      subtitle="Your latest notifications are listed here."
       unreadEventName="eventmate:organizer-unread-count"
       dashboardPath="/organizer-dashboard"
     />

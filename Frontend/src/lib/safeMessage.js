@@ -1,13 +1,18 @@
 const NETWORK_FALLBACK_MESSAGE = "The service is unavailable right now. Please try again.";
 const REQUEST_FALLBACK_MESSAGE = "We couldn't complete your request right now. Please try again.";
 const SESSION_FALLBACK_MESSAGE = "Your session has expired. Please log in again.";
+const LINK_FALLBACK_MESSAGE = "This link is invalid or has expired.";
+const ATTENDANCE_FALLBACK_MESSAGE = "Scan a valid QR code or enter a valid attendance code.";
+const CERTIFICATE_FALLBACK_MESSAGE = "Unable to download this certificate right now. Please try again.";
 
 const TECHNICAL_PATTERNS = [
   /<!doctype html/i,
   /<html/i,
-  /\b(axios|mongoose|mongodb|jwt|econnrefused|etimedout|econnreset|socket hang up)\b/i,
+  /\/api\/[^\s"'`]+/i,
+  /\b(axios|mongoose|mongodb|jwt|econnrefused|etimedout|econnreset|socket hang up|websocket)\b/i,
   /\b(referenceerror|syntaxerror|typeerror|validationerror)\b/i,
-  /\b(start the backend server|missing access token|stack trace|cast to objectid)\b/i,
+  /\b(endpoint|schema|database)\b/i,
+  /\b(start the backend server|missing access token|stack trace|cast to objectid|download route)\b/i,
 ];
 
 const OTP_PATTERN = /\bOTP\s*:\s*[A-Z0-9-]{4,12}\b/gi;
@@ -30,12 +35,40 @@ export const sanitizeUserMessage = (
 ) => {
   const normalized = sanitizeCoreMessage(value, fallback);
 
+  if (/verify email first/i.test(normalized)) {
+    return "Please verify your email before signing in.";
+  }
+
   if (/invalid (or expired )?(refresh )?token/i.test(normalized)) {
     return SESSION_FALLBACK_MESSAGE;
   }
 
   if (/refresh token missing/i.test(normalized)) {
     return SESSION_FALLBACK_MESSAGE;
+  }
+
+  if (/\b(invitation|verification)\s+token\b/i.test(normalized)) {
+    return LINK_FALLBACK_MESSAGE;
+  }
+
+  if (/attendance token could not be parsed/i.test(normalized)) {
+    return ATTENDANCE_FALLBACK_MESSAGE;
+  }
+
+  if (/valid attendance token/i.test(normalized)) {
+    return ATTENDANCE_FALLBACK_MESSAGE;
+  }
+
+  if (/unable to mark attendance for this token/i.test(normalized)) {
+    return "Unable to mark attendance for this pass.";
+  }
+
+  if (/only draft events can be updated by this backend|editing is disabled by backend policy/i.test(normalized)) {
+    return "Only draft events can be edited.";
+  }
+
+  if (/endpoint returned non-pdf response|download route/i.test(normalized)) {
+    return CERTIFICATE_FALLBACK_MESSAGE;
   }
 
   if (/backend is unreachable|backend not reachable|start the backend server/i.test(normalized)) {

@@ -280,7 +280,7 @@ export default function AdminCoordinatorManagement() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Coordinator Management</h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Create and manage coordinator accounts with backend-supported user routes.</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Create and manage coordinator accounts for your campus team.</p>
             </div>
 
             <button

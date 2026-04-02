@@ -26,7 +26,7 @@ export default function TeamInvite() {
 
   const loadInvite = async () => {
     if (!token) {
-      emitToast({ type: "error", text: "Missing invitation token." });
+      emitToast({ type: "error", text: "This invitation link is invalid or incomplete." });
       setLoading(false);
       return;
     }
@@ -58,7 +58,7 @@ export default function TeamInvite() {
     if (!token) return;
     const normalized = String(nextAction || "").trim().toLowerCase();
     if (normalized !== "accept" && normalized !== "reject") {
-      emitToast({ type: "error", text: "Invalid invitation action." });
+      emitToast({ type: "error", text: "This invitation action is not available." });
       return;
     }
 

@@ -37,7 +37,7 @@ export default function Login() {
   const finalizeLogin = ({ accessToken, refreshToken, role, user }) => {
     const finalAccessToken = accessToken;
     if (!finalAccessToken) {
-      throw new Error("Login failed. Missing access token.");
+      throw new Error("Login could not be completed. Please try again.");
     }
 
     const initialUser = user || (role ? { role } : undefined);
@@ -96,19 +96,24 @@ export default function Login() {
         typeof responseData?.message === "string" && responseData.message.trim()
           ? responseData.message
           : null;
-      if (status === 403 && backendMessage === "Verify email first") {
+      const verificationPrompt = "Please verify your email before signing in.";
+      const userMessage =
+        backendMessage && /verify email first|please verify your email before signing in\./i.test(backendMessage)
+          ? verificationPrompt
+          : backendMessage;
+      if (status === 403 && userMessage === verificationPrompt) {
         const pendingEmail = String(data.email || "").trim().toLowerCase();
         if (pendingEmail) {
           storePendingVerificationEmail(pendingEmail);
           navigate(`/verify-email?email=${encodeURIComponent(pendingEmail)}`, {
-            state: { email: pendingEmail, message: backendMessage },
+            state: { email: pendingEmail, message: verificationPrompt },
           });
           return;
         }
       }
       emitToast({
         type: "error",
-        text: backendMessage || error.message || "Login failed. Please try again.",
+        text: userMessage || error.message || "Login failed. Please try again.",
       });
     } finally {
       setIsLoading(false);

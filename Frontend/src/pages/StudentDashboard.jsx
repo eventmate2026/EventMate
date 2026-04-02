@@ -325,7 +325,7 @@ export default function StudentDashboard() {
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Event Highlights</h2>
-                <p className="mt-1 text-sm sm:text-base text-gray-600 dark:text-gray-300">Recommended events from database</p>
+                <p className="mt-1 text-sm sm:text-base text-gray-600 dark:text-gray-300">Recommended events for you</p>
               </div>
               <div className="mt-1 flex flex-col gap-2 sm:mt-0 sm:flex-row">
                 <button

@@ -4,7 +4,7 @@ export default function CoordinatorNotifications() {
   return (
     <NotificationInbox
       title="Coordinator Notifications"
-      subtitle="Your backend notifications are listed here."
+      subtitle="Your latest notifications are listed here."
       unreadEventName="eventmate:coordinator-unread-count"
       dashboardPath="/coordinator-dashboard"
     />

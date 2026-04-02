@@ -12,6 +12,7 @@ const api = axios.create({
 const GET_CACHE_TTL_MS = 60000;
 const responseCache = new Map();
 const pendingGetRequests = new Map();
+const isPlainObject = (value) => Object.prototype.toString.call(value) === "[object Object]";
 
 const shouldCacheRequest = (config) => {
   const method = String(config?.method || "get").toLowerCase();
@@ -81,6 +82,25 @@ const sanitizeErrorPayload = (error, fallbackMessage) => {
   }
 
   return safeMessage;
+};
+
+const sanitizeResponsePayload = (response) => {
+  if (!isPlainObject(response?.data)) return response;
+
+  const nextData = { ...response.data };
+
+  if (typeof nextData.message === "string") {
+    nextData.message = getSafeSuccessMessage(nextData.message, "");
+  }
+
+  if (Array.isArray(nextData.errors)) {
+    nextData.errors = nextData.errors
+      .map((item) => (typeof item === "string" ? getSafeSuccessMessage(item, "") : item))
+      .filter((item) => item !== "");
+  }
+
+  response.data = nextData;
+  return response;
 };
 
 api.interceptors.request.use((config) => {
@@ -159,6 +179,7 @@ const isRefreshRequest = (config) => {
 
 api.interceptors.response.use(
   (response) => {
+    sanitizeResponsePayload(response);
     const method = String(response?.config?.method || "get").toLowerCase();
 
     if (method !== "get") {

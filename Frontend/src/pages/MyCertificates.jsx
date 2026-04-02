@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import useToastFeedback from "../hooks/useToastFeedback";
+import { sanitizeUserMessage } from "../lib/safeMessage";
+
+const CERTIFICATE_DOWNLOAD_FALLBACK = "Unable to download this certificate right now. Please try again.";
 
 const formatDateLabel = (value) => {
   const parsed = new Date(value || "");
@@ -327,30 +330,35 @@ export default function MyCertificates() {
           const contentDisposition = String(response?.headers?.["content-disposition"] || "");
 
           if (!(blob instanceof Blob) || blob.size === 0) {
-            throw new Error("Received an empty certificate file.");
+            throw new Error(CERTIFICATE_DOWNLOAD_FALLBACK);
           }
 
           const mimeType = String(blob.type || "").toLowerCase();
           if (mimeType.includes("application/json") || mimeType.includes("text/html")) {
-            const apiMessage = await extractErrorMessageFromBlob(blob);
-            throw new Error(apiMessage || "Certificate endpoint returned non-PDF response.");
+            const apiMessage = sanitizeUserMessage(
+              await extractErrorMessageFromBlob(blob),
+              CERTIFICATE_DOWNLOAD_FALLBACK
+            );
+            throw new Error(apiMessage || CERTIFICATE_DOWNLOAD_FALLBACK);
           }
 
           const downloaded = triggerBlobDownload(
             blob,
             parseFileNameFromHeader(contentDisposition) || buildDefaultFilename(row)
           );
-          if (!downloaded) throw new Error("Received an empty certificate file.");
+          if (!downloaded) throw new Error(CERTIFICATE_DOWNLOAD_FALLBACK);
           return;
         } catch (errorValue) {
           if (errorValue?.response?.status === 404) {
-            downloadError = new Error("Certificate file not found on download route.");
+            downloadError = new Error(CERTIFICATE_DOWNLOAD_FALLBACK);
             continue;
           }
 
           const blobMessage = await extractErrorMessageFromBlob(errorValue?.response?.data);
           if (blobMessage) {
-            downloadError = new Error(blobMessage);
+            downloadError = new Error(
+              sanitizeUserMessage(blobMessage, CERTIFICATE_DOWNLOAD_FALLBACK)
+            );
             continue;
           }
 
@@ -379,7 +387,7 @@ export default function MyCertificates() {
 
       setNotice({
         type: "error",
-        text: downloadError?.message || "Unable to download this certificate right now. Please try again.",
+        text: sanitizeUserMessage(downloadError?.message, CERTIFICATE_DOWNLOAD_FALLBACK),
       });
     } finally {
       setDownloadingRowId(null);

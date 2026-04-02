@@ -203,7 +203,7 @@ export default function AdminSecurityReports() {
             Security & Access Control
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-            Configure global security protocols, token lifecycles, and admin incident actions.
+            Configure sign-in security and admin response controls.
           </p>
         </header>
 

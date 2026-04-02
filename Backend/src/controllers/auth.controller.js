@@ -235,7 +235,12 @@ export const loginController = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!user.emailVerified) return res.status(403).json({ success: false, message: "Verify email first" });
+  if (!user.emailVerified) {
+    return res.status(403).json({
+      success: false,
+      message: "Please verify your email before signing in.",
+    });
+  }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
@@ -314,14 +319,14 @@ export const logoutController = asyncHandler(async (req, res) => {
 export const refreshTokenController = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken)
-    return res.status(401).json({ success: false, message: "Refresh token missing" });
+    return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.userId).select("+refreshToken");
 
     if (!user || user.refreshToken?.trim() !== refreshToken?.trim()) {
-      return res.status(403).json({ success: false, message: "Invalid refresh token" });
+      return res.status(403).json({ success: false, message: "Session expired. Please log in again." });
     }
 
     const settings = await getSecuritySettings();
@@ -341,6 +346,6 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
       refreshToken: newRefreshToken,
     });
   } catch (err) {
-    return res.status(403).json({ success: false, message: "Invalid or expired refresh token" });
+    return res.status(403).json({ success: false, message: "Session expired. Please log in again." });
   }
 });

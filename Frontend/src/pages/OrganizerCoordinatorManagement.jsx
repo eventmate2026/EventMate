@@ -303,7 +303,7 @@ export default function OrganizerCoordinatorManagement() {
         <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Coordinator Management</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-            Create coordinator accounts and assign them to your events using current backend routes.
+            Create coordinator accounts and assign them to your events.
           </p>
         </section>
 

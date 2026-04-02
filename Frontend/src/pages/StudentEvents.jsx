@@ -316,7 +316,7 @@ export default function StudentEvents() {
       <div className="mt-4 mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">All Events</h1>
         <p className="text-gray-600 dark:text-gray-300">
-          Events created by organizers are loaded from database.
+          Browse events created by organizers.
         </p>
       </div>
 

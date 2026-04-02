@@ -13,7 +13,7 @@ export default function VerifyRegistration() {
   useEffect(() => {
     const verify = async () => {
       if (!token) {
-        emitToast({ type: "error", text: "Missing verification token." });
+        emitToast({ type: "error", text: "This verification link is invalid or incomplete." });
         setLoading(false);
         return;
       }
