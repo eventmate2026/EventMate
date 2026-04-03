@@ -22,7 +22,7 @@ const CertificateAuditLogSchema = new mongoose.Schema(
     },
     action: {
       type: String,
-      enum: ["ISSUED", "VERIFIED", "REVOKED"],
+      enum: ["ISSUED", "VERIFIED", "REVOKED", "DOWNLOADED"],
       required: true
     },
     outcome: {

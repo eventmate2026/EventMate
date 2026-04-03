@@ -3,10 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
-import {
-  loadSubmittedFeedbackEventIds,
-  resolveStudentEventAction,
-} from "../lib/studentEventWorkflow";
+import { emitToast } from "../lib/toastBus";
+import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
+import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -167,6 +166,8 @@ const MyEventCard = ({ row, action, onPrimaryAction, onViewDetails }) => (
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
           {action.key === "certificate"
             ? "Your final post-event step is ready."
+            : action.key === "feedback-submitted"
+              ? "Your feedback is saved. Certificate download will unlock here after issuance."
             : action.key === "feedback"
               ? "Attendance is complete. Share your feedback to finish the workflow."
               : row.qr?.attendanceMarked
@@ -205,7 +206,6 @@ export default function StudentMyEvents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
-  const feedbackSubmittedIds = useMemo(() => loadSubmittedFeedbackEventIds(), []);
 
   useToastFeedback(error, {
     defaultType: "error",
@@ -267,10 +267,9 @@ export default function StudentMyEvents() {
           eventId: row.eventId,
           registration: row,
           isCompletedEvent: row.phase === "completed",
-          feedbackSubmittedIds,
         }),
       })),
-    [feedbackSubmittedIds, filteredRows]
+    [filteredRows]
   );
 
   const tabCounts = useMemo(() => {
@@ -293,13 +292,25 @@ export default function StudentMyEvents() {
     navigate("/student-dashboard/feedback-pending");
   };
 
-  const openCertificate = (row) => {
-    const certificateUrl = String(row?.certificateUrl || "").trim();
-    if (certificateUrl) {
-      window.open(certificateUrl, "_blank", "noopener,noreferrer");
+  const openCertificate = async (row) => {
+    if (!row) {
+      navigate("/student-dashboard/my-certificates");
       return;
     }
-    navigate("/student-dashboard/my-certificates");
+
+    try {
+      await downloadStudentCertificate({
+        eventId: row.eventId,
+        participantEmail: row.participantEmail,
+        certificateUrl: row.certificateUrl,
+        participantName: row.participantName,
+      });
+    } catch (downloadError) {
+      emitToast({
+        type: "error",
+        text: String(downloadError?.message || "Unable to download this certificate right now.").trim(),
+      });
+    }
   };
 
   const openEventDetails = (eventId) => {
@@ -308,9 +319,9 @@ export default function StudentMyEvents() {
     navigate(`/student-dashboard/events/${encodeURIComponent(normalizedId)}`);
   };
 
-  const handlePrimaryAction = (row, action) => {
+  const handlePrimaryAction = async (row, action) => {
     if (action.key === "certificate") {
-      openCertificate(row);
+      await openCertificate(row);
       return;
     }
     if (action.key === "feedback") {

@@ -1471,8 +1471,9 @@ const issueCertificateForParticipant = async ({
     return { status: "exists", reason: "Certificate already issued." };
   }
 
-  const resolvedType = normalizeCertificateType(certificateType) || "participation";
-  const resolvedPosition = resolvedType === "winner" ? position || null : null;
+  const resolvedPosition = normalizeWinnerPosition(position);
+  const resolvedType =
+    resolvedPosition ? "winner" : normalizeCertificateType(certificateType) || "participation";
   const eventDate = event.schedule?.startDate
     ? formatCertificateDate(event.schedule.startDate)
     : "TBA";

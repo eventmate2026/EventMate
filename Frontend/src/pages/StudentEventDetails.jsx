@@ -23,10 +23,8 @@ import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiDa
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
-import {
-  loadSubmittedFeedbackEventIds,
-  resolveStudentEventAction,
-} from "../lib/studentEventWorkflow";
+import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
+import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -321,7 +319,6 @@ export default function StudentEventDetails({ mode = "details" }) {
     );
   });
   const isCoordinatorBlocked = isAssignedCoordinator || (isCoordinatorAccount && isTeamRegistration);
-  const feedbackSubmittedIds = useMemo(() => loadSubmittedFeedbackEventIds(), [normalizedEventId]);
   const detailPrimaryAction = useMemo(() => {
     if (isCoordinatorBlocked) {
       return {
@@ -336,12 +333,10 @@ export default function StudentEventDetails({ mode = "details" }) {
       registration: teamRegistrationInfo,
       registrationOpen: Boolean(event?.registrationOpen),
       isCompletedEvent: event?.status === "completed",
-      feedbackSubmittedIds,
     });
   }, [
     event?.registrationOpen,
     event?.status,
-    feedbackSubmittedIds,
     isAssignedCoordinator,
     isCoordinatorBlocked,
     normalizedEventId,
@@ -626,7 +621,7 @@ export default function StudentEventDetails({ mode = "details" }) {
     }
   };
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
     if (!detailPrimaryAction) return;
 
     if (detailPrimaryAction.key === "register") {
@@ -647,12 +642,23 @@ export default function StudentEventDetails({ mode = "details" }) {
     }
 
     if (detailPrimaryAction.key === "certificate") {
-      const certificateUrl = String(teamRegistrationInfo?.certificateUrl || "").trim();
-      if (certificateUrl) {
-        window.open(certificateUrl, "_blank", "noopener,noreferrer");
+      if (!teamRegistrationInfo) {
+        navigate("/student-dashboard/my-certificates");
         return;
       }
-      navigate("/student-dashboard/my-certificates");
+      try {
+        await downloadStudentCertificate({
+          eventId: teamRegistrationInfo.eventId || normalizedEventId,
+          participantEmail: teamRegistrationInfo.participantEmail,
+          certificateUrl: teamRegistrationInfo.certificateUrl,
+          participantName: teamRegistrationInfo.participantName || user?.fullName,
+        });
+      } catch (downloadError) {
+        setMessage({
+          type: "error",
+          text: downloadError?.message || "Unable to download this certificate right now.",
+        });
+      }
     }
   };
 
@@ -1226,6 +1232,8 @@ export default function StudentEventDetails({ mode = "details" }) {
                   <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
                     {detailPrimaryAction?.key === "certificate"
                       ? "You completed the event workflow. Your certificate action is ready."
+                      : detailPrimaryAction?.key === "feedback-submitted"
+                        ? "Your feedback is saved. The certificate button will unlock after issuance."
                       : detailPrimaryAction?.key === "feedback"
                         ? "Attendance is marked. Your next step is to submit feedback."
                         : detailPrimaryAction?.key === "qr"

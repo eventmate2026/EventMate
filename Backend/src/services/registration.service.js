@@ -1302,7 +1302,7 @@ export const getMyRegistrations = async (userId) => {
           ? ParticipantQR.findOne({
               registration: reg._id,
               email: lookupEmail
-            }).select("qrImageUrl role attendanceMarked")
+            }).select("qrImageUrl role attendanceMarked name email")
           : null,
         Feedback.findOne({
           event: eventId,
@@ -1319,6 +1319,8 @@ export const getMyRegistrations = async (userId) => {
       return {
         ...reg.toObject(),
         qr: qr || null,
+        participantName: String(qr?.name || reg?.teamLeader?.name || "").trim() || null,
+        participantEmail: lookupEmail || null,
         isTeamLeader,
         feedbackSubmitted: Boolean(feedback),
         feedbackSubmittedAt: feedback?.createdAt || null,

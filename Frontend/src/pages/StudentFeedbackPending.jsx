@@ -8,15 +8,12 @@ import {
   Star,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import StudentWorkflowSectionLinks from "../components/StudentWorkflowSectionLinks";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { emitToast } from "../lib/toastBus";
-import {
-  loadSubmittedFeedbackEventIds,
-  saveSubmittedFeedbackEventIds,
-} from "../lib/studentEventWorkflow";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1469493338021-0f1816e69d86?auto=format&fit=crop&w=900&q=80";
@@ -66,7 +63,6 @@ export default function StudentFeedbackPending() {
   const [expandedEventId, setExpandedEventId] = useState("");
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
-  const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedFeedbackEventIds());
 
   useEffect(() => {
     const loadRows = async () => {
@@ -80,7 +76,6 @@ export default function StudentFeedbackPending() {
           response.rows
             .filter((row) => isEventCompleted(row))
             .filter((row) => !row?.feedbackSubmitted)
-            .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
               const bTime = new Date(b?.eventStartDate || 0).getTime();
@@ -96,7 +91,7 @@ export default function StudentFeedbackPending() {
     };
 
     loadRows();
-  }, [submittedEventIds]);
+  }, []);
 
   const feedbackRows = useMemo(
     () =>
@@ -127,12 +122,7 @@ export default function StudentFeedbackPending() {
     const normalized = String(eventId || "").trim();
     if (!normalized) return;
 
-    setSubmittedEventIds((prev) => {
-      const next = new Set(prev);
-      next.add(normalized);
-      saveSubmittedFeedbackEventIds(next);
-      return next;
-    });
+    setRows((prev) => prev.filter((row) => String(row?.eventId || "").trim() !== normalized));
     setExpandedEventId((prev) => (prev === normalized ? "" : prev));
     setDrafts((prev) => {
       const next = { ...prev };
@@ -232,6 +222,8 @@ export default function StudentFeedbackPending() {
             Submit feedback for completed events to unlock certificate flow.
           </p>
         </header>
+
+        <StudentWorkflowSectionLinks currentSection="feedback-pending" />
 
         {loading && (
           <section className="eventmate-panel rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-300 inline-flex items-center gap-2">

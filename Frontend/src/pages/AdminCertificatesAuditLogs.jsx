@@ -447,6 +447,7 @@ export default function AdminCertificatesAuditLogs() {
                     <option value="ISSUED">Issued</option>
                     <option value="VERIFIED">Verified</option>
                     <option value="REVOKED">Revoked</option>
+                    <option value="DOWNLOADED">Downloaded</option>
                   </select>
                 </div>
               </div>

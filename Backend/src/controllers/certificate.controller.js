@@ -45,6 +45,9 @@ const sanitizeFileName = (value, fallback) => {
   return safe || fallback;
 };
 
+const buildCertificateDownloadFileName = (participantName) =>
+  `certificate_${sanitizeFileName(participantName, "certificate")}.pdf`;
+
 const clampCertificatePercent = (value) => Math.min(100, Math.max(0, Number(value) || 0));
 const AUTO_SIGNATURE_Y_OFFSET = 12.4;
 const DEFAULT_SIGNATURE_WIDTH = 130;
@@ -605,8 +608,18 @@ export const downloadCertificate = async (req, res, next) => {
   try {
     const { eventId, emailSlug } = req.params;
     const normalizedSlug = String(emailSlug || "").trim().toLowerCase();
+    const auditActor = resolveAuditActorContext(req);
 
     if (!normalizedSlug) {
+      await writeCertificateAuditLog({
+        eventId: eventId || null,
+        action: "DOWNLOADED",
+        outcome: "FAILED",
+        certificateStatus: "NOT_FOUND",
+        message: "Certificate download failed: invalid link.",
+        ...auditActor
+      });
+
       return res.status(400).json({
         success: false,
         message: "Invalid certificate link"
@@ -614,7 +627,7 @@ export const downloadCertificate = async (req, res, next) => {
     }
 
     const certificates = await Certificate.find({ eventId }).select(
-      "_id participantEmail participantName certificateData"
+      "_id eventId eventName participantEmail participantName certificateData verificationCode verificationStatus"
     );
 
     const certificate = certificates.find(
@@ -622,6 +635,15 @@ export const downloadCertificate = async (req, res, next) => {
     );
 
     if (!certificate || !certificate.certificateData) {
+      await writeCertificateAuditLog({
+        eventId: eventId || null,
+        action: "DOWNLOADED",
+        outcome: "FAILED",
+        certificateStatus: "NOT_FOUND",
+        message: "Certificate download failed: certificate not found.",
+        ...auditActor
+      });
+
       return res.status(404).json({
         success: false,
         message: "Certificate not found"
@@ -629,10 +651,25 @@ export const downloadCertificate = async (req, res, next) => {
     }
 
     const pdfBuffer = Buffer.from(certificate.certificateData, "base64");
+    const downloadFileName = buildCertificateDownloadFileName(certificate.participantName);
+
+    await writeCertificateAuditLog({
+      certificateId: certificate._id,
+      eventId: certificate.eventId,
+      action: "DOWNLOADED",
+      outcome: "SUCCESS",
+      verificationCode: certificate.verificationCode,
+      certificateStatus: certificate.verificationStatus || "VALID",
+      participantName: certificate.participantName,
+      participantEmail: certificate.participantEmail,
+      eventName: certificate.eventName,
+      message: "Certificate downloaded successfully.",
+      ...auditActor
+    });
 
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="certificate_${certificate.participantName.replace(/\s/g, "_")}.pdf"`,
+      "Content-Disposition": `attachment; filename="${downloadFileName}"`,
       "Content-Length": pdfBuffer.length
     });
 

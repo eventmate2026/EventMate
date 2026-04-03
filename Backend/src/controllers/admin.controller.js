@@ -259,7 +259,7 @@ export const getCertificateAuditLogs = async (req, res, next) => {
 
     const filter = {};
 
-    if (["ISSUED", "VERIFIED", "REVOKED"].includes(action)) {
+    if (["ISSUED", "VERIFIED", "REVOKED", "DOWNLOADED"].includes(action)) {
       filter.action = action;
     }
     if (["SUCCESS", "FAILED"].includes(outcome)) {

@@ -66,6 +66,8 @@ const normalizeRegistration = (item) => {
     totalParticipants: Number(item?.totalParticipants || 0) || 0,
     createdAt: item?.createdAt || null,
     isTeamLeader: Boolean(item?.isTeamLeader),
+    participantName: String(item?.participantName || item?.qr?.name || "").trim() || null,
+    participantEmail: String(item?.participantEmail || item?.qr?.email || "").trim().toLowerCase() || null,
     feedbackSubmitted: Boolean(item?.feedbackSubmitted),
     feedbackSubmittedAt: item?.feedbackSubmittedAt || null,
     certificateIssued: Boolean(item?.certificateIssued),

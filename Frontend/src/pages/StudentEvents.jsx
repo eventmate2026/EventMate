@@ -7,10 +7,9 @@ import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
-import {
-  loadSubmittedFeedbackEventIds,
-  resolveStudentEventAction,
-} from "../lib/studentEventWorkflow";
+import { emitToast } from "../lib/toastBus";
+import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
+import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
 
 const statusStyles = {
   current: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
@@ -208,7 +207,6 @@ export default function StudentEvents() {
           .filter((row) => String(row?.eventId || "").trim())
           .map((row) => [String(row.eventId).trim(), row])
       );
-      const feedbackSubmittedIds = loadSubmittedFeedbackEventIds();
       setRegistrationWarning(registrationInfo.warning);
       setRegistrationRows(registrationInfo.rows || []);
 
@@ -224,7 +222,6 @@ export default function StudentEvents() {
               registration: myRegistration,
               registrationOpen: card.registrationOpen,
               isCompletedEvent: card.status === "completed",
-              feedbackSubmittedIds,
             }),
           };
         })
@@ -267,7 +264,7 @@ export default function StudentEvents() {
     goToEventRegistration(eventId);
   };
 
-  const handlePrimaryAction = (event) => {
+  const handlePrimaryAction = async (event) => {
     const action = event?.primaryAction;
     if (!action) return;
 
@@ -289,12 +286,23 @@ export default function StudentEvents() {
     }
 
     if (action.key === "certificate") {
-      const certificateUrl = String(event?.myRegistration?.certificateUrl || "").trim();
-      if (certificateUrl) {
-        window.open(certificateUrl, "_blank", "noopener,noreferrer");
+      if (!event?.myRegistration) {
+        navigate("/student-dashboard/my-certificates");
         return;
       }
-      navigate("/student-dashboard/my-certificates");
+      try {
+        await downloadStudentCertificate({
+          eventId: event.myRegistration.eventId || event.id,
+          participantEmail: event.myRegistration.participantEmail,
+          certificateUrl: event.myRegistration.certificateUrl,
+          participantName: event.myRegistration.participantName,
+        });
+      } catch (downloadError) {
+        emitToast({
+          type: "error",
+          text: downloadError?.message || "Unable to download this certificate right now.",
+        });
+      }
     }
   };
 
