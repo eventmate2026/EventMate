@@ -4,6 +4,8 @@ import EventRegistration from "../models/EventRegistration.model.js";
 import MemberVerification from "../models/MemberVerification.model.js";
 import TeamInvitation from "../models/TeamInvitation.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
+import Feedback from "../models/Feedback.model.js";
+import Certificate from "../models/Certificate.model.js";
 import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
@@ -1285,26 +1287,45 @@ export const getMyRegistrations = async (userId) => {
     : { registeredBy: userId };
 
   const registrations = await EventRegistration.find(registrationQuery)
-    .populate("event", "title category schedule venue status posterUrl")
+    .populate("event", "title category schedule venue status posterUrl isTeamEvent")
     .sort({ createdAt: -1 });
 
   const result = await Promise.all(
     registrations.map(async (reg) => {
       const lookupEmail = userEmail || normalizeEmail(reg?.teamLeader?.email);
+      const eventId = reg?.event?._id || reg?.event;
       const isTeamLeader =
         reg?.registeredBy?.toString() === userId.toString() ||
         (userEmail && normalizeEmail(reg?.teamLeader?.email) === userEmail);
-      const qr = lookupEmail
-        ? await ParticipantQR.findOne({
-            registration: reg._id,
-            email: lookupEmail
-          }).select("qrImageUrl role attendanceMarked")
-        : null;
+      const [qr, feedback, certificate] = await Promise.all([
+        lookupEmail
+          ? ParticipantQR.findOne({
+              registration: reg._id,
+              email: lookupEmail
+            }).select("qrImageUrl role attendanceMarked")
+          : null,
+        Feedback.findOne({
+          event: eventId,
+          registration: reg._id
+        }).select("_id createdAt"),
+        lookupEmail
+          ? Certificate.findOne({
+              eventId,
+              participantEmail: lookupEmail
+            }).select("_id certificateUrl certificateType issuedAt")
+          : null
+      ]);
 
       return {
         ...reg.toObject(),
         qr: qr || null,
-        isTeamLeader
+        isTeamLeader,
+        feedbackSubmitted: Boolean(feedback),
+        feedbackSubmittedAt: feedback?.createdAt || null,
+        certificateIssued: Boolean(certificate),
+        certificateIssuedAt: certificate?.issuedAt || null,
+        certificateUrl: String(certificate?.certificateUrl || "").trim() || null,
+        certificateType: String(certificate?.certificateType || "").trim() || null
       };
     })
   );

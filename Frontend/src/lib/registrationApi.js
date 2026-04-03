@@ -55,6 +55,7 @@ const normalizeRegistration = (item) => {
     eventId: resolveEventId(item),
     eventTitle: String(item?.event?.title || "").trim(),
     eventCategory: String(eventDoc?.category || "").trim(),
+    eventIsTeamEvent: Boolean(eventDoc?.isTeamEvent),
     eventStatus: String(eventDoc?.status || "").trim(),
     eventPosterUrl: String(eventDoc?.posterUrl || "").trim(),
     eventLocation,
@@ -65,6 +66,12 @@ const normalizeRegistration = (item) => {
     totalParticipants: Number(item?.totalParticipants || 0) || 0,
     createdAt: item?.createdAt || null,
     isTeamLeader: Boolean(item?.isTeamLeader),
+    feedbackSubmitted: Boolean(item?.feedbackSubmitted),
+    feedbackSubmittedAt: item?.feedbackSubmittedAt || null,
+    certificateIssued: Boolean(item?.certificateIssued),
+    certificateIssuedAt: item?.certificateIssuedAt || null,
+    certificateUrl: String(item?.certificateUrl || "").trim() || null,
+    certificateType: String(item?.certificateType || "").trim() || null,
     qr: qrImageUrl
       ? {
           qrImageUrl,

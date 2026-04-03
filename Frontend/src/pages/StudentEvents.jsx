@@ -7,6 +7,10 @@ import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
+import {
+  loadSubmittedFeedbackEventIds,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const statusStyles = {
   current: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
@@ -78,9 +82,19 @@ const filterEvents = (list, term) => {
   });
 };
 
-const EventCard = ({ event, onRegister, onViewDetails, showRegister = true, metaBadge = null }) => {
-  const isCompleted = event.status === "completed";
-  const showRegisterButton = showRegister && (event.registrationOpen || event.isRegistered);
+const resolvePrimaryActionClass = (actionKey) => {
+  if (actionKey === "certificate") {
+    return "bg-violet-600 text-white hover:bg-violet-700";
+  }
+  if (actionKey === "feedback") {
+    return "bg-emerald-600 text-white hover:bg-emerald-700";
+  }
+  return "border border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-500/20";
+};
+
+const EventCard = ({ event, onPrimaryAction, onViewDetails, metaBadge = null }) => {
+  const action = event.primaryAction;
+  const showPrimaryAction = Boolean(action) && (event.registrationOpen || event.isRegistered);
 
   return (
     <div className="eventmate-panel bg-white dark:bg-gray-900 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full border border-gray-100 dark:border-white/10 group">
@@ -132,21 +146,15 @@ const EventCard = ({ event, onRegister, onViewDetails, showRegister = true, meta
         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2 mb-4">
           {event.description}
         </p>
-        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
-          {showRegisterButton && (
+        <div className={`mt-auto grid ${showPrimaryAction ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
+          {showPrimaryAction && (
             <button
               type="button"
-              onClick={() => onRegister(event.id)}
-              disabled={event.isRegistered || !event.registrationOpen || isCompleted}
-              className="w-full py-2 rounded-lg border border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 text-xs font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
+              onClick={() => onPrimaryAction(event)}
+              disabled={action.disabled}
+              className={`w-full py-2 rounded-lg text-xs font-semibold transition disabled:opacity-60 ${resolvePrimaryActionClass(action.key)}`}
             >
-              {event.isRegistered
-                ? "Registered"
-                : isCompleted
-                  ? "Closed"
-                  : event.registrationOpen
-                    ? "Register"
-                    : "Closed"}
+              {action.label}
             </button>
           )}
           <button
@@ -195,11 +203,31 @@ export default function StudentEvents() {
       const registeredIds = new Set(
         (registrationInfo.rows || []).map((row) => row.eventId).filter(Boolean)
       );
+      const registrationByEventId = new Map(
+        (registrationInfo.rows || [])
+          .filter((row) => String(row?.eventId || "").trim())
+          .map((row) => [String(row.eventId).trim(), row])
+      );
+      const feedbackSubmittedIds = loadSubmittedFeedbackEventIds();
       setRegistrationWarning(registrationInfo.warning);
       setRegistrationRows(registrationInfo.rows || []);
 
       const mapped = publicEvents
-        .map((event) => mapApiEventToCard(event, { registeredIds }))
+        .map((event) => {
+          const card = mapApiEventToCard(event, { registeredIds });
+          const myRegistration = registrationByEventId.get(String(card.id).trim()) || null;
+          return {
+            ...card,
+            myRegistration,
+            primaryAction: resolveStudentEventAction({
+              eventId: card.id,
+              registration: myRegistration,
+              registrationOpen: card.registrationOpen,
+              isCompletedEvent: card.status === "completed",
+              feedbackSubmittedIds,
+            }),
+          };
+        })
         .sort((a, b) => {
           const rankDiff = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
           if (rankDiff !== 0) return rankDiff;
@@ -237,6 +265,37 @@ export default function StudentEvents() {
 
   const handleRegister = (eventId) => {
     goToEventRegistration(eventId);
+  };
+
+  const handlePrimaryAction = (event) => {
+    const action = event?.primaryAction;
+    if (!action) return;
+
+    if (action.key === "register") {
+      handleRegister(event.id);
+      return;
+    }
+
+    if (action.key === "qr") {
+      const registrationId = String(event?.myRegistration?.id || "").trim();
+      if (!registrationId) return;
+      navigate(`/student-dashboard/my-events/qr/${encodeURIComponent(registrationId)}`);
+      return;
+    }
+
+    if (action.key === "feedback") {
+      navigate("/student-dashboard/feedback-pending");
+      return;
+    }
+
+    if (action.key === "certificate") {
+      const certificateUrl = String(event?.myRegistration?.certificateUrl || "").trim();
+      if (certificateUrl) {
+        window.open(certificateUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      navigate("/student-dashboard/my-certificates");
+    }
   };
 
   const upcomingEvents = useMemo(() => {
@@ -373,7 +432,7 @@ export default function StudentEvents() {
                   <EventCard
                     key={event.id}
                     event={event}
-                    onRegister={handleRegister}
+                    onPrimaryAction={handlePrimaryAction}
                     onViewDetails={goToEventDetails}
                   />
                 ))}
@@ -412,9 +471,8 @@ export default function StudentEvents() {
                   <EventCard
                     key={event.id}
                     event={event}
-                    onRegister={handleRegister}
+                    onPrimaryAction={handlePrimaryAction}
                     onViewDetails={goToEventDetails}
-                    showRegister={false}
                     metaBadge={resolveCompletionBadge(event)}
                   />
                 ))}

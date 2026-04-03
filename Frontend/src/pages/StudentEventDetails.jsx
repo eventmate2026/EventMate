@@ -23,6 +23,10 @@ import { formatEventDate, mapApiEventToDetails } from "../data/studentEventApiDa
 import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
+import {
+  loadSubmittedFeedbackEventIds,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -317,17 +321,36 @@ export default function StudentEventDetails({ mode = "details" }) {
     );
   });
   const isCoordinatorBlocked = isAssignedCoordinator || (isCoordinatorAccount && isTeamRegistration);
-  const registerCtaLabel = isRegistered
-    ? "Registered"
-    : isAssignedCoordinator
-      ? "Coordinator Assigned"
-      : isCoordinatorAccount && isTeamRegistration
-        ? "Coordinator Account"
-      : event?.registrationOpen
-        ? "Register"
-        : "Registration Closed";
+  const feedbackSubmittedIds = useMemo(() => loadSubmittedFeedbackEventIds(), [normalizedEventId]);
+  const detailPrimaryAction = useMemo(() => {
+    if (isCoordinatorBlocked) {
+      return {
+        key: "blocked",
+        label: isAssignedCoordinator ? "Coordinator Assigned" : "Coordinator Account",
+        disabled: true,
+      };
+    }
+
+    return resolveStudentEventAction({
+      eventId: normalizedEventId,
+      registration: teamRegistrationInfo,
+      registrationOpen: Boolean(event?.registrationOpen),
+      isCompletedEvent: event?.status === "completed",
+      feedbackSubmittedIds,
+    });
+  }, [
+    event?.registrationOpen,
+    event?.status,
+    feedbackSubmittedIds,
+    isAssignedCoordinator,
+    isCoordinatorBlocked,
+    normalizedEventId,
+    teamRegistrationInfo,
+  ]);
   const canRegister = Boolean(event?.registrationOpen) && !isRegistered && !isCoordinatorBlocked;
-  const showSidebarRegisterButton = Boolean(event?.registrationOpen || isRegistered || isCoordinatorBlocked);
+  const showSidebarRegisterButton = Boolean(
+    isCoordinatorBlocked || event?.registrationOpen || isRegistered || teamRegistrationInfo
+  );
   const organizerLabel = [event?.organizerName, event?.organizerDepartment].filter(Boolean).join(" • ") || event?.organizerName || "Organizer";
   const coordinatorEmailSet = useMemo(() => {
     const emails = coordinatorList.map((coordinator) => normalizeEmail(coordinator?.email)).filter(Boolean);
@@ -569,13 +592,22 @@ export default function StudentEventDetails({ mode = "details" }) {
       setModal(popupPayload);
       invalidateMyRegistrationsCache();
       setIsRegistered(true);
+      const registrationId = response.data?.data?._id || response.data?.data?.id;
+      setTeamRegistrationInfo((prev) => ({
+        ...(prev || {}),
+        id: String(registrationId || ""),
+        eventId: normalizedEventId,
+        status: registrationStatus || "Confirmed",
+        qr: prev?.qr || null,
+        feedbackSubmitted: false,
+        certificateIssued: false,
+        certificateUrl: null,
+      }));
       setEvent((prev) =>
         prev
           ? { ...prev, participantCount: Number(prev.participantCount || 0) + headCount }
           : prev
       );
-
-      const registrationId = response.data?.data?._id || response.data?.data?.id;
       if (registrationId) {
         if (isTeamRegistration) {
           setPendingTeamRegistrationId(String(registrationId));
@@ -591,6 +623,36 @@ export default function StudentEventDetails({ mode = "details" }) {
       setMessage(payload);
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handlePrimaryAction = () => {
+    if (!detailPrimaryAction) return;
+
+    if (detailPrimaryAction.key === "register") {
+      navigate(registerPath);
+      return;
+    }
+
+    if (detailPrimaryAction.key === "qr") {
+      const registrationId = String(teamRegistrationInfo?.id || "").trim();
+      if (!registrationId) return;
+      navigate(`/student-dashboard/my-events/qr/${encodeURIComponent(registrationId)}`);
+      return;
+    }
+
+    if (detailPrimaryAction.key === "feedback") {
+      navigate("/student-dashboard/feedback-pending");
+      return;
+    }
+
+    if (detailPrimaryAction.key === "certificate") {
+      const certificateUrl = String(teamRegistrationInfo?.certificateUrl || "").trim();
+      if (certificateUrl) {
+        window.open(certificateUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      navigate("/student-dashboard/my-certificates");
     }
   };
 
@@ -1121,11 +1183,11 @@ export default function StudentEventDetails({ mode = "details" }) {
                       {showSidebarRegisterButton && (
                         <button
                           type="button"
-                          onClick={() => navigate(registerPath)}
-                          disabled={isRegistered || isCoordinatorBlocked || !event.registrationOpen}
+                          onClick={handlePrimaryAction}
+                          disabled={detailPrimaryAction?.disabled}
                           className="mt-4 w-full rounded-lg bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-60"
                         >
-                          {registerCtaLabel}
+                          {detailPrimaryAction?.label || "Register"}
                         </button>
                       )}
 
@@ -1162,7 +1224,13 @@ export default function StudentEventDetails({ mode = "details" }) {
 
                 {isRegistered ? (
                   <div className="rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/15 p-4 text-sm text-emerald-700 dark:text-emerald-300">
-                    You are already registered for this event.
+                    {detailPrimaryAction?.key === "certificate"
+                      ? "You completed the event workflow. Your certificate action is ready."
+                      : detailPrimaryAction?.key === "feedback"
+                        ? "Attendance is marked. Your next step is to submit feedback."
+                        : detailPrimaryAction?.key === "qr"
+                          ? "You are already registered for this event. Your QR pass is available."
+                          : "You are already registered for this event."}
                   </div>
                 ) : null}
 

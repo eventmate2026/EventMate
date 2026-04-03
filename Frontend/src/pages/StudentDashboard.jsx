@@ -6,9 +6,13 @@ import SummaryApi from "../api/SummaryApi";
 import { mapApiEventToCard } from "../data/studentEventApiData";
 import { extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
-import { fetchRegisteredEventIds } from "../lib/registrationApi";
+import { fetchMyRegistrations } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
+import {
+  loadSubmittedFeedbackEventIds,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const statusRank = {
   current: 0,
@@ -47,10 +51,21 @@ const resolveDashboardStatus = (event) => {
   return "upcoming";
 };
 
-const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
+const resolvePrimaryActionClass = (actionKey) => {
+  if (actionKey === "certificate") {
+    return "bg-violet-600 text-white hover:bg-violet-700";
+  }
+  if (actionKey === "feedback") {
+    return "bg-emerald-600 text-white hover:bg-emerald-700";
+  }
+  return "border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-500/20";
+};
+
+const EventCard = ({ event, onRegister, onViewDetails, onPrimaryAction, registering }) => {
   const dashboardStatus = resolveDashboardStatus(event);
   const statusLabel = dashboardStatus === "current" ? "Live" : dashboardStatus === "completed" ? "Completed" : "Upcoming";
-  const showRegisterButton = event.registrationOpen || event.isRegistered;
+  const action = event.primaryAction;
+  const showPrimaryAction = Boolean(action) && (event.registrationOpen || event.isRegistered);
 
   return (
     <div className="eventmate-panel bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col h-full border border-gray-100 dark:border-gray-700 group">
@@ -99,15 +114,15 @@ const EventCard = ({ event, onRegister, onViewDetails, registering }) => {
         <p className="text-base text-gray-600 dark:text-gray-300 leading-relaxed line-clamp-2 mb-6">
           {event.description}
         </p>
-        <div className={`mt-auto grid ${showRegisterButton ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
-          {showRegisterButton && (
+        <div className={`mt-auto grid ${showPrimaryAction ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
+          {showPrimaryAction && (
             <button
               type="button"
-              onClick={() => onRegister(event.id)}
-              disabled={event.isRegistered || registering || !event.registrationOpen}
-              className="w-full py-2.5 rounded-xl border-2 border-indigo-500 text-indigo-600 dark:border-indigo-300 dark:text-indigo-200 text-sm font-semibold hover:bg-indigo-50 dark:hover:bg-indigo-500/20 transition disabled:opacity-60"
+              onClick={() => onPrimaryAction(event)}
+              disabled={action.disabled || (action.key === "register" && (registering || !event.registrationOpen))}
+              className={`w-full py-2.5 rounded-xl text-sm font-semibold transition disabled:opacity-60 ${resolvePrimaryActionClass(action.key)}`}
             >
-              {registering ? "Registering..." : event.isRegistered ? "Registered" : event.registrationOpen ? "Register" : "Closed"}
+              {registering && action.key === "register" ? "Registering..." : action.label}
             </button>
           )}
           <button
@@ -142,14 +157,37 @@ export default function StudentDashboard() {
     try {
       const [publicResponse, registrationInfo] = await Promise.all([
         api({ ...SummaryApi.get_public_events, cacheTTL: 90000 }),
-        fetchRegisteredEventIds(),
+        fetchMyRegistrations(),
       ]);
-      const registeredIds = registrationInfo.ids;
+      const registrationRows = registrationInfo.rows || [];
+      const registeredIds = new Set(
+        registrationRows.map((row) => String(row?.eventId || "").trim()).filter(Boolean)
+      );
+      const registrationByEventId = new Map(
+        registrationRows
+          .filter((row) => String(row?.eventId || "").trim())
+          .map((row) => [String(row.eventId).trim(), row])
+      );
+      const feedbackSubmittedIds = loadSubmittedFeedbackEventIds();
       setRegistrationWarning(registrationInfo.warning);
       const publicEvents = extractEventList(publicResponse.data);
 
       const allMapped = publicEvents
-        .map((event) => mapApiEventToCard(event, { registeredIds }))
+        .map((event) => {
+          const card = mapApiEventToCard(event, { registeredIds });
+          const myRegistration = registrationByEventId.get(String(card.id).trim()) || null;
+          return {
+            ...card,
+            myRegistration,
+            primaryAction: resolveStudentEventAction({
+              eventId: card.id,
+              registration: myRegistration,
+              registrationOpen: card.registrationOpen,
+              isCompletedEvent: resolveDashboardStatus(card) === "completed",
+              feedbackSubmittedIds,
+            }),
+          };
+        })
         .sort((a, b) => {
           const rankDiff =
             (statusRank[resolveDashboardStatus(a)] ?? 9) -
@@ -220,6 +258,37 @@ export default function StudentDashboard() {
     const normalizedId = String(eventId || "").trim();
     if (!normalizedId) return;
     navigate(`/student-dashboard/events/${encodeURIComponent(normalizedId)}/register`);
+  };
+
+  const handlePrimaryAction = (event) => {
+    const action = event?.primaryAction;
+    if (!action) return;
+
+    if (action.key === "register") {
+      handleRegister(event.id);
+      return;
+    }
+
+    if (action.key === "qr") {
+      const registrationId = String(event?.myRegistration?.id || "").trim();
+      if (!registrationId) return;
+      navigate(`/student-dashboard/my-events/qr/${encodeURIComponent(registrationId)}`);
+      return;
+    }
+
+    if (action.key === "feedback") {
+      navigate("/student-dashboard/feedback-pending");
+      return;
+    }
+
+    if (action.key === "certificate") {
+      const certificateUrl = String(event?.myRegistration?.certificateUrl || "").trim();
+      if (certificateUrl) {
+        window.open(certificateUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+      navigate("/student-dashboard/my-certificates");
+    }
   };
 
   const recommendedEvents = useMemo(() => {
@@ -352,6 +421,7 @@ export default function StudentDashboard() {
                     event={event}
                     registering={false}
                     onRegister={handleRegister}
+                    onPrimaryAction={handlePrimaryAction}
                     onViewDetails={goToEventDetails}
                   />
                 ))}

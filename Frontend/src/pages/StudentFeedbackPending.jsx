@@ -8,13 +8,15 @@ import {
   Star,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { fetchMyRegistrations } from "../lib/registrationApi";
+import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { emitToast } from "../lib/toastBus";
-
-const FEEDBACK_SUBMITTED_KEY = "eventmate:feedback-submitted-events";
+import {
+  loadSubmittedFeedbackEventIds,
+  saveSubmittedFeedbackEventIds,
+} from "../lib/studentEventWorkflow";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1469493338021-0f1816e69d86?auto=format&fit=crop&w=900&q=80";
@@ -55,19 +57,6 @@ const isEventCompleted = (row) => {
   return Date.now() > eventDate;
 };
 
-const loadSubmittedEventIds = () => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(FEEDBACK_SUBMITTED_KEY) || "[]");
-    return new Set(Array.isArray(parsed) ? parsed.map((item) => String(item)) : []);
-  } catch {
-    return new Set();
-  }
-};
-
-const saveSubmittedEventIds = (ids) => {
-  localStorage.setItem(FEEDBACK_SUBMITTED_KEY, JSON.stringify(Array.from(ids)));
-};
-
 export default function StudentFeedbackPending() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
@@ -77,7 +66,7 @@ export default function StudentFeedbackPending() {
   const [expandedEventId, setExpandedEventId] = useState("");
   const [submittingEventId, setSubmittingEventId] = useState("");
   const [drafts, setDrafts] = useState({});
-  const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedEventIds());
+  const [submittedEventIds, setSubmittedEventIds] = useState(() => loadSubmittedFeedbackEventIds());
 
   useEffect(() => {
     const loadRows = async () => {
@@ -90,6 +79,7 @@ export default function StudentFeedbackPending() {
         setRows(
           response.rows
             .filter((row) => isEventCompleted(row))
+            .filter((row) => !row?.feedbackSubmitted)
             .filter((row) => !submittedEventIds.has(String(row?.eventId || "").trim()))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
@@ -140,7 +130,7 @@ export default function StudentFeedbackPending() {
     setSubmittedEventIds((prev) => {
       const next = new Set(prev);
       next.add(normalized);
-      saveSubmittedEventIds(next);
+      saveSubmittedFeedbackEventIds(next);
       return next;
     });
     setExpandedEventId((prev) => (prev === normalized ? "" : prev));
@@ -199,6 +189,7 @@ export default function StudentFeedbackPending() {
         type: "success",
         text: response.data?.message || "Feedback submitted successfully.",
       });
+      invalidateMyRegistrationsCache();
       markEventAsSubmitted(eventId);
     } catch (submitError) {
       const backendMessage = submitError?.response?.data?.message || "Unable to submit feedback.";
@@ -207,6 +198,7 @@ export default function StudentFeedbackPending() {
           type: "success",
           text: "Feedback for this event was already submitted. Removed from pending queue.",
         });
+        invalidateMyRegistrationsCache();
         markEventAsSubmitted(eventId);
       } else {
         emitToast({ type: "error", text: backendMessage });

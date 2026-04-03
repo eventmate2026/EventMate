@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Calendar, CalendarDays, Loader2, MapPin, Search } from "lucide-react";
 import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
+import {
+  loadSubmittedFeedbackEventIds,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -70,18 +74,28 @@ const mapToUiRow = (registration) => {
   const phase = deriveEventPhase(registration);
   const registrationStatus = normalizeStatus(registration?.status);
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
+  const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
+  const certificateIssued = Boolean(registration?.certificateIssued || registration?.certificateUrl);
 
-  const primaryLabel = attendanceMarked
-    ? "Attended"
-    : registrationStatus === "Confirmed"
-      ? "Registered"
-      : registrationStatus;
+  const primaryLabel = certificateIssued
+    ? "Certificate Ready"
+    : feedbackSubmitted
+      ? "Feedback Submitted"
+      : attendanceMarked
+        ? "Attended"
+        : registrationStatus === "Confirmed"
+          ? "Registered"
+          : registrationStatus;
 
-  const primaryLabelClass = attendanceMarked
-    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
-    : registrationStatus === "Confirmed"
-      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
-      : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
+  const primaryLabelClass = certificateIssued
+    ? "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300"
+    : feedbackSubmitted
+      ? "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300"
+      : attendanceMarked
+        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+        : registrationStatus === "Confirmed"
+          ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"
+          : "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
 
   return {
     ...registration,
@@ -94,7 +108,17 @@ const mapToUiRow = (registration) => {
   };
 };
 
-const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
+const resolvePrimaryActionClass = (actionKey) => {
+  if (actionKey === "certificate") {
+    return "bg-violet-600 text-white hover:bg-violet-700";
+  }
+  if (actionKey === "feedback") {
+    return "bg-emerald-600 text-white hover:bg-emerald-700";
+  }
+  return "border border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15";
+};
+
+const MyEventCard = ({ row, action, onPrimaryAction, onViewDetails }) => (
   <article className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-3 sm:p-4">
     <div className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4">
       <div className="relative h-28 sm:h-28 overflow-hidden rounded-xl">
@@ -141,19 +165,23 @@ const MyEventCard = ({ row, onViewQr, onViewDetails }) => (
         </div>
         <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
           Registration status: <span className="font-semibold">{row.registrationStatus}</span>.{" "}
-          {row.qr?.attendanceMarked
-            ? "Attendance has been marked for this event."
-            : "Use your QR code at check-in when the event starts."}
+          {action.key === "certificate"
+            ? "Your final post-event step is ready."
+            : action.key === "feedback"
+              ? "Attendance is complete. Share your feedback to finish the workflow."
+              : row.qr?.attendanceMarked
+                ? "Attendance has been marked for this event."
+                : "Use your QR code at check-in when the event starts."}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
           <button
             type="button"
-            onClick={() => onViewQr(row.id)}
-            disabled={!row.hasQr}
-            className="w-full sm:w-auto rounded-lg border border-indigo-300 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/40 dark:text-indigo-200 dark:hover:bg-indigo-500/15"
+            onClick={() => onPrimaryAction(row, action)}
+            disabled={action.disabled}
+            className={`w-full sm:w-auto rounded-lg px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${resolvePrimaryActionClass(action.key)}`}
           >
-            {row.hasQr ? "View QR" : "QR Pending"}
+            {action.label}
           </button>
           <button
             type="button"
@@ -177,6 +205,7 @@ export default function StudentMyEvents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
+  const feedbackSubmittedIds = useMemo(() => loadSubmittedFeedbackEventIds(), []);
 
   useToastFeedback(error, {
     defaultType: "error",
@@ -230,6 +259,20 @@ export default function StudentMyEvents() {
     });
   }, [activeTab, rows, searchTerm]);
 
+  const visibleRows = useMemo(
+    () =>
+      filteredRows.map((row) => ({
+        row,
+        action: resolveStudentEventAction({
+          eventId: row.eventId,
+          registration: row,
+          isCompletedEvent: row.phase === "completed",
+          feedbackSubmittedIds,
+        }),
+      })),
+    [feedbackSubmittedIds, filteredRows]
+  );
+
   const tabCounts = useMemo(() => {
     const upcoming = rows.filter((row) => row.phase === "upcoming").length;
     const completed = rows.filter((row) => row.phase === "completed").length;
@@ -246,10 +289,37 @@ export default function StudentMyEvents() {
     navigate(`/student-dashboard/my-events/qr/${encodeURIComponent(normalizedId)}`);
   };
 
+  const openFeedback = () => {
+    navigate("/student-dashboard/feedback-pending");
+  };
+
+  const openCertificate = (row) => {
+    const certificateUrl = String(row?.certificateUrl || "").trim();
+    if (certificateUrl) {
+      window.open(certificateUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    navigate("/student-dashboard/my-certificates");
+  };
+
   const openEventDetails = (eventId) => {
     const normalizedId = String(eventId || "").trim();
     if (!normalizedId) return;
     navigate(`/student-dashboard/events/${encodeURIComponent(normalizedId)}`);
+  };
+
+  const handlePrimaryAction = (row, action) => {
+    if (action.key === "certificate") {
+      openCertificate(row);
+      return;
+    }
+    if (action.key === "feedback") {
+      openFeedback();
+      return;
+    }
+    if (action.key === "qr") {
+      openQr(row.id);
+    }
   };
 
   return (
@@ -338,13 +408,14 @@ export default function StudentMyEvents() {
           <div className="mt-6 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
             Your events are unavailable right now.
           </div>
-        ) : filteredRows.length > 0 ? (
+        ) : visibleRows.length > 0 ? (
           <div className="mt-6 space-y-4 border-indigo-300/70 sm:border-l-2 sm:pl-4">
-            {filteredRows.map((row) => (
+            {visibleRows.map(({ row, action }) => (
               <MyEventCard
                 key={row.id || `${row.eventId}-${row.createdAt || "row"}`}
                 row={row}
-                onViewQr={openQr}
+                action={action}
+                onPrimaryAction={handlePrimaryAction}
                 onViewDetails={openEventDetails}
               />
             ))}
