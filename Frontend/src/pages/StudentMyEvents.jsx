@@ -5,7 +5,10 @@ import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { emitToast } from "../lib/toastBus";
 import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
-import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
+import {
+  isStudentEventWorkflowCompleted,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const FALLBACK_BANNER =
   "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80";
@@ -266,7 +269,7 @@ export default function StudentMyEvents() {
         action: resolveStudentEventAction({
           eventId: row.eventId,
           registration: row,
-          isCompletedEvent: row.phase === "completed",
+          isCompletedEvent: isStudentEventWorkflowCompleted(row.eventStatus),
         }),
       })),
     [filteredRows]

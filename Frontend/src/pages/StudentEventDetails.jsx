@@ -24,7 +24,10 @@ import { extractEventItem, extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { fetchMyRegistrations, invalidateMyRegistrationsCache } from "../lib/registrationApi";
 import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
-import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
+import {
+  isStudentEventWorkflowCompleted,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const registrationTypeLabels = {
   INDIVIDUAL: "Single Participant",
@@ -332,7 +335,7 @@ export default function StudentEventDetails({ mode = "details" }) {
       eventId: normalizedEventId,
       registration: teamRegistrationInfo,
       registrationOpen: Boolean(event?.registrationOpen),
-      isCompletedEvent: event?.status === "completed",
+      isCompletedEvent: isStudentEventWorkflowCompleted(teamRegistrationInfo?.eventStatus),
     });
   }, [
     event?.registrationOpen,

@@ -9,7 +9,10 @@ import { fetchMyRegistrations } from "../lib/registrationApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { emitToast } from "../lib/toastBus";
 import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
-import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
+import {
+  isStudentEventWorkflowCompleted,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const statusStyles = {
   current: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
@@ -221,7 +224,7 @@ export default function StudentEvents() {
               eventId: card.id,
               registration: myRegistration,
               registrationOpen: card.registrationOpen,
-              isCompletedEvent: card.status === "completed",
+              isCompletedEvent: isStudentEventWorkflowCompleted(myRegistration?.eventStatus),
             }),
           };
         })

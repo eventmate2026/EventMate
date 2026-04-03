@@ -1,4 +1,22 @@
 const normalizeId = (value) => String(value || "").trim();
+const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+
+export const isStudentEventWorkflowCompleted = (value) =>
+  normalizeStatus(value) === "completed";
+
+export const isFeedbackPendingForRegistration = (registration) => {
+  const confirmed = String(registration?.status || "").trim() === "Confirmed";
+  const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
+  const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
+  const hasEventId = Boolean(normalizeId(registration?.eventId));
+  return (
+    hasEventId &&
+    isStudentEventWorkflowCompleted(registration?.eventStatus) &&
+    confirmed &&
+    attendanceMarked &&
+    !feedbackSubmitted
+  );
+};
 
 export const resolveStudentEventAction = ({
   eventId,

@@ -14,6 +14,7 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { emitToast } from "../lib/toastBus";
+import { isFeedbackPendingForRegistration } from "../lib/studentEventWorkflow";
 
 const FALLBACK_POSTER =
   "https://images.unsplash.com/photo-1469493338021-0f1816e69d86?auto=format&fit=crop&w=900&q=80";
@@ -45,15 +46,6 @@ const formatTimeRange = (startTime, endTime) => {
   return "Time TBD";
 };
 
-const isEventCompleted = (row) => {
-  const status = String(row?.eventStatus || "").trim();
-  if (status === "Completed") return true;
-
-  const eventDate = new Date(row?.eventStartDate || 0).getTime();
-  if (Number.isNaN(eventDate)) return false;
-  return Date.now() > eventDate;
-};
-
 export default function StudentFeedbackPending() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
@@ -74,8 +66,7 @@ export default function StudentFeedbackPending() {
         setWarning(response.warning);
         setRows(
           response.rows
-            .filter((row) => isEventCompleted(row))
-            .filter((row) => !row?.feedbackSubmitted)
+            .filter((row) => isFeedbackPendingForRegistration(row))
             .sort((a, b) => {
               const aTime = new Date(a?.eventStartDate || 0).getTime();
               const bTime = new Date(b?.eventStartDate || 0).getTime();
@@ -96,13 +87,11 @@ export default function StudentFeedbackPending() {
   const feedbackRows = useMemo(
     () =>
       rows.map((row) => {
-        const attended = Boolean(row?.qr?.attendanceMarked);
-        const confirmed = String(row?.status || "").trim() === "Confirmed";
         return {
           ...row,
-          attended,
-          confirmed,
-          canSubmit: attended && confirmed && Boolean(row?.eventId),
+          attended: true,
+          confirmed: true,
+          canSubmit: true,
           badgeDate: formatMonthDay(row?.eventStartDate),
         };
       }),

@@ -10,7 +10,11 @@ import { fetchMyRegistrations } from "../lib/registrationApi";
 import { computeProfileProgress } from "../lib/profileProgress";
 import { getStoredUser, subscribeAuthUpdates } from "../lib/auth";
 import { downloadStudentCertificate } from "../lib/studentCertificateDownload";
-import { resolveStudentEventAction } from "../lib/studentEventWorkflow";
+import {
+  isFeedbackPendingForRegistration,
+  isStudentEventWorkflowCompleted,
+  resolveStudentEventAction,
+} from "../lib/studentEventWorkflow";
 
 const statusRank = {
   current: 0,
@@ -180,7 +184,7 @@ export default function StudentDashboard() {
               eventId: card.id,
               registration: myRegistration,
               registrationOpen: card.registrationOpen,
-              isCompletedEvent: resolveDashboardStatus(card) === "completed",
+              isCompletedEvent: isStudentEventWorkflowCompleted(myRegistration?.eventStatus),
             }),
           };
         })
@@ -324,11 +328,31 @@ export default function StudentDashboard() {
         }
       : null;
 
+  const pendingFeedbackCount = useMemo(
+    () => (myEvents || []).filter((event) => isFeedbackPendingForRegistration(event?.myRegistration)).length,
+    [myEvents]
+  );
+
+  const certificateCount = useMemo(
+    () =>
+      (myEvents || []).filter((event) =>
+        Boolean(event?.myRegistration?.certificateIssued || event?.myRegistration?.certificateUrl)
+      ).length,
+    [myEvents]
+  );
+
+  const browseEventsCount = useMemo(() => {
+    const joinedIds = new Set(myEvents.map((event) => event.id));
+    return events.filter(
+      (event) => !joinedIds.has(event.id) && Boolean(event.registrationOpen)
+    ).length;
+  }, [events, myEvents]);
+
   const quickActions = [
     {
       id: "browse-events",
       title: "Browse Events",
-      subtitle: "Find new activities",
+      subtitle: `${browseEventsCount} available`,
       icon: Search,
       iconClass: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300",
       path: "/student-dashboard/events",
@@ -345,7 +369,7 @@ export default function StudentDashboard() {
     {
       id: "my-certificates",
       title: "My Certificates",
-      subtitle: "See earned",
+      subtitle: `${certificateCount} earned`,
       icon: BadgeCheck,
       iconClass: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
       path: "/student-dashboard/my-certificates",
@@ -353,7 +377,7 @@ export default function StudentDashboard() {
     {
       id: "feedback",
       title: "Feedback",
-      subtitle: "Pending",
+      subtitle: `${pendingFeedbackCount} pending`,
       icon: MessageSquareMore,
       iconClass: "bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300",
       path: "/student-dashboard/feedback-pending",
