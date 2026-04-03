@@ -11,6 +11,7 @@ import EventRegistration from "../models/EventRegistration.model.js";
 import Feedback from "../models/Feedback.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { sendNotification } from "./notification.service.js";
+import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1383,7 +1384,7 @@ const certificateEmailTemplate = ({
   eventName,
   certificateType,
   position,
-  certificateUrl,
+  dashboardUrl,
   verificationCode
 }) => {
   const isWinner = certificateType === "winner";
@@ -1416,8 +1417,7 @@ const certificateEmailTemplate = ({
         </p>
 
         <div style="text-align: center; margin: 32px 0;">
-          <a href="${certificateUrl}" 
-             download
+          <a href="${dashboardUrl}" 
              style="
                display: inline-block;
                padding: 14px 32px;
@@ -1428,12 +1428,12 @@ const certificateEmailTemplate = ({
                font-weight: bold;
                font-size: 15px;
              ">
-            Download Certificate
+            Open EventMate
           </a>
         </div>
 
         <p style="font-size: 13px; color: #9ca3af; text-align: center;">
-          You can also view and download your certificate anytime from your EventMate dashboard.
+          Sign in and open My Certificates in EventMate to securely download your certificate.
         </p>
 
       </div>
@@ -1479,7 +1479,11 @@ const issueCertificateForParticipant = async ({
     : "TBA";
   const venue = event.venue?.location || event.venue?.mode || "TBA";
   const backendBaseUrl = getBackendBaseUrl();
+  const frontendBaseUrl = getPrimaryFrontendUrl();
   const certificateUrl = `${backendBaseUrl}/api/certificates/download/${event._id}/${buildCertificateEmailSlug(participantEmail)}`;
+  const dashboardUrl = frontendBaseUrl
+    ? `${frontendBaseUrl}/student-dashboard/my-certificates`
+    : certificateUrl;
   let certificateRecord = null;
   let verificationCode = null;
   let duplicateParticipantCertificate = false;
@@ -1538,7 +1542,7 @@ const issueCertificateForParticipant = async ({
     eventName: event.title,
     certificateType: resolvedType,
     position: resolvedPosition,
-    certificateUrl,
+    dashboardUrl,
     verificationCode: certificateRecord.verificationCode
   });
 

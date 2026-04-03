@@ -20,6 +20,7 @@ import notificationRoutes from "./routes/notification.routes.js";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(morgan("dev"));
 const corsOriginValidator = createCorsOriginValidator();
 

@@ -8,42 +8,144 @@ import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
+const GENERIC_FORGOT_PASSWORD_MESSAGE =
+  "If an account exists for that email, a password reset OTP has been sent.";
 
 const resolveDepartment = (user) =>
   String(user?.professionalProfile?.department || user?.academicProfile?.branch || "").trim();
+const normalizeText = (value = "") => String(value || "").trim();
+const normalizeMobileDigits = (value = "") => String(value || "").replace(/\D/g, "");
 
-// ---------------- PROFILE ----------------
-export const getProfileController = asyncHandler(async (req, res) => {
-  res.json({ success: true, user: req.user });
+const buildSafeUserResponse = (user) => ({
+  _id: user?._id || null,
+  fullName: normalizeText(user?.fullName),
+  email: normalizeText(user?.email).toLowerCase(),
+  role: user?.role || "STUDENT",
+  mobileNumber: normalizeMobileDigits(user?.mobileNumber),
+  collegeName: normalizeText(user?.collegeName),
+  educationLevel: normalizeText(user?.educationLevel),
+  academicProfile: {
+    branch: normalizeText(user?.academicProfile?.branch),
+    year: normalizeText(user?.academicProfile?.year),
+  },
+  professionalProfile: {
+    department: normalizeText(user?.professionalProfile?.department),
+    occupation: normalizeText(user?.professionalProfile?.occupation),
+  },
+  avatar: user?.avatar || null,
+  isLoggedIn: true,
 });
 
-// ---------------- UPDATE PROFILE ----------------
-export const updateProfileController = asyncHandler(async (req, res) => {
-  const update = { ...req.body };
-  delete update.role; // role cannot be changed
-  delete update.email; // email cannot be changed by user
+const buildProfileUpdateDoc = (payload = {}) => {
+  const set = {};
   const unset = {};
 
-  if (Object.prototype.hasOwnProperty.call(update, "mobileNumber")) {
-    const digits = String(update.mobileNumber || "").replace(/\D/g, "");
+  if (Object.prototype.hasOwnProperty.call(payload, "fullName")) {
+    const fullName = normalizeText(payload.fullName);
+    if (fullName) set.fullName = fullName;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "mobileNumber")) {
+    const digits = normalizeMobileDigits(payload.mobileNumber);
     if (digits) {
-      update.mobileNumber = digits;
+      set.mobileNumber = digits;
     } else {
-      delete update.mobileNumber;
       unset.mobileNumber = "";
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(payload, "collegeName")) {
+    const collegeName = normalizeText(payload.collegeName);
+    if (collegeName) {
+      set.collegeName = collegeName;
+    } else {
+      unset.collegeName = "";
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, "educationLevel")) {
+    set.educationLevel = normalizeText(payload.educationLevel);
+  }
+
+  if (
+    payload.academicProfile &&
+    typeof payload.academicProfile === "object" &&
+    !Array.isArray(payload.academicProfile)
+  ) {
+    if (Object.prototype.hasOwnProperty.call(payload.academicProfile, "branch")) {
+      const branch = normalizeText(payload.academicProfile.branch);
+      if (branch) {
+        set["academicProfile.branch"] = branch;
+      } else {
+        unset["academicProfile.branch"] = "";
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload.academicProfile, "year")) {
+      const year = normalizeText(payload.academicProfile.year);
+      if (year) {
+        set["academicProfile.year"] = year;
+      } else {
+        unset["academicProfile.year"] = "";
+      }
+    }
+  }
+
+  if (
+    payload.professionalProfile &&
+    typeof payload.professionalProfile === "object" &&
+    !Array.isArray(payload.professionalProfile)
+  ) {
+    if (Object.prototype.hasOwnProperty.call(payload.professionalProfile, "department")) {
+      const department = normalizeText(payload.professionalProfile.department);
+      if (department) {
+        set["professionalProfile.department"] = department;
+      } else {
+        unset["professionalProfile.department"] = "";
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload.professionalProfile, "occupation")) {
+      const occupation = normalizeText(payload.professionalProfile.occupation);
+      if (occupation) {
+        set["professionalProfile.occupation"] = occupation;
+      } else {
+        unset["professionalProfile.occupation"] = "";
+      }
+    }
+  }
+
   const updateDoc = {};
-  if (Object.keys(update).length) updateDoc.$set = update;
+  if (Object.keys(set).length) updateDoc.$set = set;
   if (Object.keys(unset).length) updateDoc.$unset = unset;
+  return updateDoc;
+};
+
+// ---------------- PROFILE ----------------
+export const getProfileController = asyncHandler(async (req, res) => {
+  res.json({ success: true, user: buildSafeUserResponse(req.user) });
+});
+
+// ---------------- UPDATE PROFILE ----------------
+export const updateProfileController = asyncHandler(async (req, res) => {
+  const updateDoc = buildProfileUpdateDoc(req.body);
+  if (!Object.keys(updateDoc).length) {
+    return res.status(400).json({
+      success: false,
+      message: "No valid profile fields were provided."
+    });
+  }
 
   const user = await User.findByIdAndUpdate(req.user._id, updateDoc, {
     new: true,
     runValidators: true,
     context: "query",
   });
-  res.json({ success: true, message: "Profile updated", user });
+  res.json({
+    success: true,
+    message: "Profile updated",
+    user: buildSafeUserResponse(user)
+  });
 });
 
 // ---------------- UPLOAD AVATAR ----------------
@@ -62,7 +164,9 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  if (!user) {
+    return res.json({ success: true, message: GENERIC_FORGOT_PASSWORD_MESSAGE });
+  }
 
   const otp = generateOtp();
   user.otp = otp;
@@ -80,7 +184,7 @@ export const forgotPasswordController = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  res.json({ success: true, message: "OTP sent to email" });
+  res.json({ success: true, message: GENERIC_FORGOT_PASSWORD_MESSAGE });
 });
 
 // ---------------- RESET PASSWORD ----------------
@@ -93,8 +197,8 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: "Email and OTP are required" });
   }
 
-  const user = await User.findOne({ email }).select("+otp +otpExpiry");
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  const user = await User.findOne({ email }).select("+otp +otpExpiry +refreshToken");
+  if (!user) return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
 
   if (!user.otp || !user.otpExpiry || String(user.otp) !== otp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -105,6 +209,10 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
   user.password = await bcrypt.hash(newPassword, 10);
   user.otp = null;
   user.otpExpiry = null;
+  user.refreshToken = null;
+  user.passwordChangedAt = new Date();
+  user.failedLoginAttempts = 0;
+  user.lockoutUntil = null;
   await user.save();
 
   res.json({ success: true, message: "Password reset successful" });

@@ -10,6 +10,10 @@ import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
 import { validateRegister } from "../validators/auth.validator.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
 import { sendPendingTeamInvitesForUser } from "../services/registration.service.js";
+import {
+  SESSION_EXPIRED_MESSAGE,
+  validateSessionState
+} from "../utils/sessionValidation.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
 
@@ -84,6 +88,8 @@ const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }
 
 const isSelfRegisteredStudent = (user) =>
   !user?.createdBy && String(user?.role || "STUDENT").trim().toUpperCase() === "STUDENT";
+const GENERIC_VERIFICATION_RESEND_MESSAGE =
+  "If an unverified account exists for that email, a new OTP has been sent.";
 
 // ---------------- REGISTER ----------------
 export const registerUserController = asyncHandler(async (req, res) => {
@@ -161,12 +167,11 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
   }
 
   const user = await User.findOne({ email: normalizedEmail });
-  if (!user) {
-    return res.status(404).json({ success: false, message: "User not found" });
-  }
-
-  if (user.emailVerified) {
-    return res.status(400).json({ success: false, message: "Email is already verified" });
+  if (!user || user.emailVerified) {
+    return res.json({
+      success: true,
+      message: GENERIC_VERIFICATION_RESEND_MESSAGE
+    });
   }
 
   const { otp, otpExpiry } = buildVerificationOtpPayload();
@@ -182,7 +187,10 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
       "We couldn't resend the verification OTP right now. Please try again in a moment.",
   });
 
-  res.json({ success: true, message: "A new OTP has been sent to your email." });
+  res.json({
+    success: true,
+    message: GENERIC_VERIFICATION_RESEND_MESSAGE
+  });
 });
 
 // ---------------- VERIFY EMAIL ----------------
@@ -190,7 +198,7 @@ export const verifyEmailController = asyncHandler(async (req, res) => {
   const normalizedEmail = normalizeEmail(req.body?.email);
   const submittedOtp = String(req.body?.otp || "").trim();
   const user = await User.findOne({ email: normalizedEmail }).select("+otp +otpExpiry");
-  if (!user) return res.status(404).json({ success: false, message: "User not found" });
+  if (!user) return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
 
   if (!submittedOtp || String(user.otp || "") !== submittedOtp || user.otpExpiry < Date.now())
     return res.status(400).json({ success: false, message: "Invalid or expired OTP" });
@@ -319,17 +327,32 @@ export const logoutController = asyncHandler(async (req, res) => {
 export const refreshTokenController = asyncHandler(async (req, res) => {
   const { refreshToken } = req.body;
   if (!refreshToken)
-    return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
+    return res.status(401).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
 
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.userId).select("+refreshToken");
 
     if (!user || user.refreshToken?.trim() !== refreshToken?.trim()) {
-      return res.status(403).json({ success: false, message: "Session expired. Please log in again." });
+      return res.status(403).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
     }
 
     const settings = await getSecuritySettings();
+    const validation = validateSessionState({
+      user,
+      settings,
+      issuedAtSeconds: decoded?.iat
+    });
+    if (!validation.valid) {
+      if (validation.statusCode !== 503) {
+        user.refreshToken = null;
+        await persistAuthUser(user);
+      }
+      return res.status(validation.statusCode).json({
+        success: false,
+        message: validation.message
+      });
+    }
     const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
     const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
@@ -346,6 +369,6 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
       refreshToken: newRefreshToken,
     });
   } catch (err) {
-    return res.status(403).json({ success: false, message: "Session expired. Please log in again." });
+    return res.status(403).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
   }
 });

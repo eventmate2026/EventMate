@@ -100,7 +100,7 @@ router.post(
   generateSelectedCertificates
 );
 
-// Public download
-router.get("/download/:eventId/:emailSlug", downloadCertificate);
+// Authenticated download
+router.get("/download/:eventId/:emailSlug", authMiddleware, downloadCertificate);
 
 export default router;

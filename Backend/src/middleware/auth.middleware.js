@@ -1,34 +1,35 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
+import {
+  extractBearerToken,
+  SESSION_EXPIRED_MESSAGE,
+  validateSessionState
+} from "../utils/sessionValidation.js";
 
 export default async function authMiddleware(req, res, next) {
   try {
-    console.log("Auth midleware hit");
-    const token = req.headers.authorization?.split(" ")[1];
+    const token = extractBearerToken(req.headers.authorization);
     if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const settings = await getSecuritySettings();
-    if (settings?.tokenInvalidBefore && decoded?.iat) {
-      const invalidBeforeSeconds = Math.floor(settings.tokenInvalidBefore.getTime() / 1000);
-      if (decoded.iat < invalidBeforeSeconds) {
-        return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
-      }
-    }
     const user = await User.findById(decoded.userId);
-    if (!user) return res.status(401).json({ success: false, message: "User not found" });
-
-    if (settings?.maintenanceMode && user.role !== "MAIN_ADMIN") {
-      return res.status(503).json({
+    const validation = validateSessionState({
+      user,
+      settings,
+      issuedAtSeconds: decoded?.iat
+    });
+    if (!validation.valid) {
+      return res.status(validation.statusCode).json({
         success: false,
-        message: "System is under maintenance. Please try again later.",
+        message: validation.message
       });
     }
 
     req.user = user;
     next();
   } catch {
-    res.status(401).json({ success: false, message: "Session expired. Please log in again." });
+    res.status(401).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
   }
 }

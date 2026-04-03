@@ -602,15 +602,41 @@ export const verifyCertificate = async (req, res, next) => {
 };
 
 /* ================================================
-   DOWNLOAD CERTIFICATE (PUBLIC)
+   DOWNLOAD CERTIFICATE (AUTHENTICATED)
 ================================================ */
 export const downloadCertificate = async (req, res, next) => {
   try {
     const { eventId, emailSlug } = req.params;
     const normalizedSlug = String(emailSlug || "").trim().toLowerCase();
     const auditActor = resolveAuditActorContext(req);
+    const requesterId = String(req.user?._id || "").trim();
+    const requesterEmail = String(req.user?.email || "").trim().toLowerCase();
+    const requesterRole = String(req.user?.role || "").trim().toUpperCase();
+    const isAdmin = requesterRole === "MAIN_ADMIN";
+    const event = await Event.findById(eventId).select("_id createdBy organizer");
 
-    if (!normalizedSlug) {
+    if (!event) {
+      await writeCertificateAuditLog({
+        eventId: eventId || null,
+        action: "DOWNLOADED",
+        outcome: "FAILED",
+        certificateStatus: "NOT_FOUND",
+        message: "Certificate download failed: event not found.",
+        ...auditActor
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: "Event not found"
+      });
+    }
+
+    const isOwnerOrganizer =
+      requesterRole === "ORGANIZER" &&
+      (String(event?.createdBy || "").trim() === requesterId ||
+        String(event?.organizer?.organizerId || "").trim() === requesterId);
+
+    if (!normalizedSlug && !requesterEmail) {
       await writeCertificateAuditLog({
         eventId: eventId || null,
         action: "DOWNLOADED",
@@ -626,13 +652,22 @@ export const downloadCertificate = async (req, res, next) => {
       });
     }
 
-    const certificates = await Certificate.find({ eventId }).select(
-      "_id eventId eventName participantEmail participantName certificateData verificationCode verificationStatus"
-    );
-
-    const certificate = certificates.find(
-      (item) => buildCertificateEmailSlug(item.participantEmail) === normalizedSlug
-    );
+    let certificate = null;
+    if (isAdmin || isOwnerOrganizer) {
+      const certificates = await Certificate.find({ eventId }).select(
+        "_id eventId eventName participantEmail participantName certificateData verificationCode verificationStatus"
+      );
+      certificate = certificates.find(
+        (item) => buildCertificateEmailSlug(item.participantEmail) === normalizedSlug
+      );
+    } else if (requesterEmail) {
+      certificate = await Certificate.findOne({
+        eventId,
+        participantEmail: requesterEmail
+      }).select(
+        "_id eventId eventName participantEmail participantName certificateData verificationCode verificationStatus"
+      );
+    }
 
     if (!certificate || !certificate.certificateData) {
       await writeCertificateAuditLog({
@@ -647,6 +682,27 @@ export const downloadCertificate = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Certificate not found"
+      });
+    }
+
+    if (certificate.verificationStatus === "REVOKED") {
+      await writeCertificateAuditLog({
+        certificateId: certificate._id,
+        eventId: certificate.eventId,
+        action: "DOWNLOADED",
+        outcome: "FAILED",
+        verificationCode: certificate.verificationCode,
+        certificateStatus: "REVOKED",
+        participantName: certificate.participantName,
+        participantEmail: certificate.participantEmail,
+        eventName: certificate.eventName,
+        message: "Certificate download blocked because the certificate is revoked.",
+        ...auditActor
+      });
+
+      return res.status(403).json({
+        success: false,
+        message: "This certificate has been revoked and can no longer be downloaded."
       });
     }
 

@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2, RefreshCcw } from "lucide-react";
-import { io } from "socket.io-client";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { SOCKET_BASE_URL } from "../lib/backendUrl";
 import { getStoredUser } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
 import PageBackButton from "../components/PageBackButton";
+import { createAuthenticatedSocket } from "../lib/socketClient";
 
 const parseNotifications = (payload) => {
   if (Array.isArray(payload?.data)) return payload.data;
@@ -197,21 +196,9 @@ export default function AdminNotifications() {
     const userId = getUserId();
     if (!userId) return undefined;
 
-    if (SOCKET_BASE_URL !== null) {
-      const socket = io(SOCKET_BASE_URL, {
-        transports: ["polling", "websocket"],
-        withCredentials: true,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 800,
-        timeout: 8000,
-      });
-
+    const socket = createAuthenticatedSocket();
+    if (socket) {
       socketRef.current = socket;
-
-      socket.on("connect", () => {
-        socket.emit("join", userId);
-      });
 
       socket.on("notification", () => {
         fetchNotificationsAndContacts();

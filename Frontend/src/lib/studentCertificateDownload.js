@@ -234,7 +234,6 @@ export const downloadStudentCertificate = async ({
         method: "get",
         url,
         responseType: "blob",
-        skipAuth: true,
         skipCache: true,
         headers: {
           Accept: "application/pdf,application/octet-stream,*/*",
@@ -264,6 +263,17 @@ export const downloadStudentCertificate = async ({
 
       return { downloaded: true, fileName };
     } catch (error) {
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        const blobMessage = await extractErrorMessageFromBlob(error?.response?.data);
+        downloadError = new Error(
+          sanitizeUserMessage(
+            blobMessage,
+            "Please sign in to EventMate to download your certificate."
+          )
+        );
+        continue;
+      }
+
       if (error?.response?.status === 404) {
         downloadError = new Error(CERTIFICATE_DOWNLOAD_FALLBACK);
         continue;

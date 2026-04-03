@@ -13,8 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import AvatarWithFrame from './AvatarWithFrame';
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
-import { io } from "socket.io-client";
-import { SOCKET_BASE_URL } from "../lib/backendUrl";
+import { createAuthenticatedSocket } from "../lib/socketClient";
 
 const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
   const navigate = useNavigate();
@@ -84,21 +83,9 @@ const Navbar = ({ activePage, setActivePage, user, onLogout }) => {
 
     let intervalId = null;
     if (userId) {
-      if (SOCKET_BASE_URL !== null) {
-        const socket = io(SOCKET_BASE_URL, {
-          transports: ["polling", "websocket"],
-          withCredentials: true,
-          reconnection: true,
-          reconnectionAttempts: Infinity,
-          reconnectionDelay: 800,
-          timeout: 8000,
-        });
-
+      const socket = createAuthenticatedSocket();
+      if (socket) {
         socketRef.current = socket;
-
-        socket.on("connect", () => {
-          socket.emit("join", userId);
-        });
 
         socket.on("notification", () => {
           if (!mounted) return;
