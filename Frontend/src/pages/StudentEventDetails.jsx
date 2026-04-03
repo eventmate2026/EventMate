@@ -1237,6 +1237,8 @@ export default function StudentEventDetails({ mode = "details" }) {
                       ? "You completed the event workflow. Your certificate action is ready."
                       : detailPrimaryAction?.key === "feedback-submitted"
                         ? "Your feedback is saved. The certificate button will unlock after issuance."
+                      : detailPrimaryAction?.key === "winner-pending"
+                        ? "Winner selection is still pending. Feedback will unlock after the organizer marks the results."
                       : detailPrimaryAction?.key === "feedback"
                         ? "Attendance is marked. Your next step is to submit feedback."
                         : detailPrimaryAction?.key === "qr"

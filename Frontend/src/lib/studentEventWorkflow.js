@@ -1,20 +1,35 @@
 const normalizeId = (value) => String(value || "").trim();
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
+const isConfirmedRegistration = (registration) =>
+  String(registration?.status || "").trim() === "Confirmed";
+const canTeamRegistrationSubmitFeedback = (registration) =>
+  !Boolean(registration?.eventIsTeamEvent) || Boolean(registration?.isTeamLeader);
+const isWinnerRankingReadyForFeedback = (registration) => {
+  if (!isStudentEventWorkflowCompleted(registration?.eventStatus)) return false;
+  return registration?.winnerRankingComplete === true;
+};
 
-export const isStudentEventWorkflowCompleted = (value) =>
-  normalizeStatus(value) === "completed";
-
-export const isFeedbackPendingForRegistration = (registration) => {
-  const confirmed = String(registration?.status || "").trim() === "Confirmed";
+const isFeedbackEligibleWithoutWinnerRanking = (registration) => {
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
   const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
   const hasEventId = Boolean(normalizeId(registration?.eventId));
   return (
     hasEventId &&
     isStudentEventWorkflowCompleted(registration?.eventStatus) &&
-    confirmed &&
+    isConfirmedRegistration(registration) &&
     attendanceMarked &&
-    !feedbackSubmitted
+    !feedbackSubmitted &&
+    canTeamRegistrationSubmitFeedback(registration)
+  );
+};
+
+export const isStudentEventWorkflowCompleted = (value) =>
+  normalizeStatus(value) === "completed";
+
+export const isFeedbackPendingForRegistration = (registration) => {
+  return (
+    isFeedbackEligibleWithoutWinnerRanking(registration) &&
+    isWinnerRankingReadyForFeedback(registration)
   );
 };
 
@@ -32,6 +47,8 @@ export const resolveStudentEventAction = ({
   const attendanceMarked = Boolean(registration?.qr?.attendanceMarked);
   const feedbackSubmitted = Boolean(registration?.feedbackSubmitted);
   const certificateReady = Boolean(registration?.certificateIssued || registration?.certificateUrl);
+  const feedbackEligibleWithoutWinnerRanking = isFeedbackEligibleWithoutWinnerRanking(registration);
+  const winnerRankingReady = isWinnerRankingReadyForFeedback(registration);
 
   if (hasRegistration && certificateReady) {
     return {
@@ -49,7 +66,15 @@ export const resolveStudentEventAction = ({
     };
   }
 
-  if (hasRegistration && attendanceMarked && isCompletedEvent) {
+  if (hasRegistration && feedbackEligibleWithoutWinnerRanking && !winnerRankingReady) {
+    return {
+      key: "winner-pending",
+      label: "Winner Results Pending",
+      disabled: true,
+    };
+  }
+
+  if (hasRegistration && attendanceMarked && isCompletedEvent && winnerRankingReady) {
     return {
       key: "feedback",
       label: "Give Feedback",

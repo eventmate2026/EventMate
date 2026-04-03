@@ -9,8 +9,13 @@ import Certificate from "../models/Certificate.model.js";
 import User from "../models/User.model.js";
 import sendEmail from "../config/sendEmail.js";
 import { getPrimaryFrontendUrl } from "../config/clientOrigins.js";
+import { isEventWinnerRankingComplete } from "./certificate.service.js";
 import { generateQRsForRegistration } from "./qr.service.js";
 import { sendNotification } from "./notification.service.js";
+import {
+  clearWinnerRankingReminder,
+  ensureWinnerRankingReadyForFeedback
+} from "./winnerRankingReminder.service.js";
 
 const notifyAssignedCoordinators = async (event, payloadBuilder) => {
   const coordinators = event?.studentCoordinators || [];
@@ -1287,8 +1292,38 @@ export const getMyRegistrations = async (userId) => {
     : { registeredBy: userId };
 
   const registrations = await EventRegistration.find(registrationQuery)
-    .populate("event", "title category schedule venue status posterUrl isTeamEvent")
+    .populate(
+      "event",
+      "title category schedule venue status posterUrl isTeamEvent createdBy organizer feedback"
+    )
     .sort({ createdAt: -1 });
+
+  const winnerRankingStateByEventId = new Map();
+
+  const getWinnerRankingState = async (eventDoc) => {
+    const eventId = String(eventDoc?._id || "").trim();
+    if (!eventId) {
+      return {
+        winnerRankingComplete: null,
+        feedbackBlockedReason: null
+      };
+    }
+
+    if (winnerRankingStateByEventId.has(eventId)) {
+      return winnerRankingStateByEventId.get(eventId);
+    }
+
+    const promise = (async () => {
+      const { rankingComplete } = await ensureWinnerRankingReadyForFeedback(eventDoc);
+      return {
+        winnerRankingComplete: rankingComplete,
+        feedbackBlockedReason: rankingComplete ? null : "WINNER_RANKING_PENDING"
+      };
+    })();
+
+    winnerRankingStateByEventId.set(eventId, promise);
+    return promise;
+  };
 
   const result = await Promise.all(
     registrations.map(async (reg) => {
@@ -1315,6 +1350,23 @@ export const getMyRegistrations = async (userId) => {
             }).select("_id certificateUrl certificateType issuedAt")
           : null
       ]);
+      const feedbackSubmitted = Boolean(feedback);
+      const registrationConfirmed = String(reg?.status || "").trim() === "Confirmed";
+      const attendanceMarked = Boolean(qr?.attendanceMarked);
+      const eventCompleted = String(reg?.event?.status || "").trim() === "Completed";
+      const feedbackOwner = !Boolean(reg?.event?.isTeamEvent) || Boolean(isTeamLeader);
+      const needsWinnerRankingCheck =
+        eventCompleted &&
+        registrationConfirmed &&
+        attendanceMarked &&
+        !feedbackSubmitted &&
+        feedbackOwner;
+      const winnerRankingState = needsWinnerRankingCheck
+        ? await getWinnerRankingState(reg?.event)
+        : {
+            winnerRankingComplete: null,
+            feedbackBlockedReason: null
+          };
 
       return {
         ...reg.toObject(),
@@ -1322,12 +1374,14 @@ export const getMyRegistrations = async (userId) => {
         participantName: String(qr?.name || reg?.teamLeader?.name || "").trim() || null,
         participantEmail: lookupEmail || null,
         isTeamLeader,
-        feedbackSubmitted: Boolean(feedback),
+        feedbackSubmitted,
         feedbackSubmittedAt: feedback?.createdAt || null,
         certificateIssued: Boolean(certificate),
         certificateIssuedAt: certificate?.issuedAt || null,
         certificateUrl: String(certificate?.certificateUrl || "").trim() || null,
-        certificateType: String(certificate?.certificateType || "").trim() || null
+        certificateType: String(certificate?.certificateType || "").trim() || null,
+        winnerRankingComplete: winnerRankingState.winnerRankingComplete,
+        feedbackBlockedReason: winnerRankingState.feedbackBlockedReason
       };
     })
   );
@@ -1671,6 +1725,11 @@ export const tagWinner = async (registrationId, position, taggedBy) => {
   registration.winner.isWinner = true;
   registration.winner.position = position;
   await registration.save();
+
+  const rankingComplete = await isEventWinnerRankingComplete(event._id);
+  if (rankingComplete) {
+    await clearWinnerRankingReminder(event._id);
+  }
 
   return {
     position,

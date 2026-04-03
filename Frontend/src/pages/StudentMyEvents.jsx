@@ -171,6 +171,8 @@ const MyEventCard = ({ row, action, onPrimaryAction, onViewDetails }) => (
             ? "Your final post-event step is ready."
             : action.key === "feedback-submitted"
               ? "Your feedback is saved. Certificate download will unlock here after issuance."
+            : action.key === "winner-pending"
+              ? "Winner selection is still pending. Feedback will open after the organizer marks results."
             : action.key === "feedback"
               ? "Attendance is complete. Share your feedback to finish the workflow."
               : row.qr?.attendanceMarked

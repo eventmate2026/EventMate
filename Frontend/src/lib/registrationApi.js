@@ -74,6 +74,12 @@ const normalizeRegistration = (item) => {
     certificateIssuedAt: item?.certificateIssuedAt || null,
     certificateUrl: String(item?.certificateUrl || "").trim() || null,
     certificateType: String(item?.certificateType || "").trim() || null,
+    winnerRankingComplete:
+      typeof item?.winnerRankingComplete === "boolean"
+        ? item.winnerRankingComplete
+        : null,
+    feedbackBlockedReason:
+      String(item?.feedbackBlockedReason || "").trim() || null,
     qr: qrImageUrl
       ? {
           qrImageUrl,

@@ -374,7 +374,11 @@ const EventSchema = new mongoose.Schema(
 
     feedback: {
       enabled: Boolean,
-      averageRating: Number
+      averageRating: Number,
+      winnerReminderSentAt: {
+        type: Date,
+        default: null
+      }
     },
 
     /* ================= VISIBILITY ================= */

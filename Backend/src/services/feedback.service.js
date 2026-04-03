@@ -2,8 +2,9 @@ import Event from "../models/Event.model.js";
 import EventRegistration from "../models/EventRegistration.model.js";
 import ParticipantQR from "../models/ParticipantQR.model.js";
 import Feedback from "../models/Feedback.model.js";
-import { generateCertificatesForRegistration, isEventWinnerRankingComplete } from "./certificate.service.js";
+import { generateCertificatesForRegistration } from "./certificate.service.js";
 import { sendNotification } from "./notification.service.js";
+import { ensureWinnerRankingReadyForFeedback } from "./winnerRankingReminder.service.js";
 
 /* ================================================
    SUBMIT FEEDBACK
@@ -57,6 +58,13 @@ export const submitFeedback = async (eventId, userId, payload) => {
     throw new Error("Feedback already submitted for this event");
   }
 
+  const { rankingComplete } = await ensureWinnerRankingReadyForFeedback(event);
+  if (!rankingComplete) {
+    throw new Error(
+      "Feedback will open after the organizer completes winner marking for this event"
+    );
+  }
+
   const feedback = await Feedback.create({
     event: eventId,
     eventName: event.title,
@@ -92,7 +100,6 @@ export const submitFeedback = async (eventId, userId, payload) => {
   }
 
   const certificateEnabled = Boolean(event?.certificate?.isEnabled);
-  const rankingComplete = await isEventWinnerRankingComplete(event._id);
   const certificateReady = certificateEnabled && rankingComplete;
 
   if (certificateReady) {
