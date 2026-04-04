@@ -87,6 +87,7 @@ const buildEmailDeliveryLogDetails = (error) => {
   if (cause?.responseCode) details.responseCode = cause.responseCode;
   if (cause?.provider) details.provider = cause.provider;
   if (cause?.statusCode) details.statusCode = cause.statusCode;
+  if (cause?.smtpFallbackError) details.smtpFallbackError = cause.smtpFallbackError;
   if (typeof cause?.details === "string" && cause.details.trim()) {
     details.details = cause.details.trim().slice(0, 400);
   }
