@@ -1,20 +1,6 @@
 import nodemailer from "nodemailer";
 
 const DEFAULT_FROM_NAME = "EventMate";
-const CONSUMER_MAIL_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "yahoo.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "msn.com",
-  "icloud.com",
-  "me.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-]);
 
 const normalizeRecipients = (value) => {
   if (Array.isArray(value)) {
@@ -27,18 +13,6 @@ const normalizeRecipients = (value) => {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-};
-
-const getEmailDomain = (value) => {
-  const email = String(value || "").trim().toLowerCase();
-  const atIndex = email.lastIndexOf("@");
-  if (atIndex === -1) return "";
-  return email.slice(atIndex + 1);
-};
-
-const canUseSendGridFromAddress = (value) => {
-  const domain = getEmailDomain(value);
-  return Boolean(domain) && !CONSUMER_MAIL_DOMAINS.has(domain);
 };
 
 const resolveMailConfig = () => {
@@ -148,18 +122,7 @@ const sendViaSendGrid = async ({ to, subject, html, config }) => {
 const sendEmail = async (to, subject, html) => {
   const config = resolveMailConfig();
   const hasSmtpConfig = Boolean(config.emailUsername && config.emailPassword);
-  const sendgridFromEligible = canUseSendGridFromAddress(config.sendgridFromEmail);
-  const hasSendGridConfig = Boolean(
-    config.sendgridApiKey && config.sendgridFromEmail && sendgridFromEligible
-  );
-
-  if (config.sendgridApiKey && config.sendgridFromEmail && !sendgridFromEligible && !hasSmtpConfig) {
-    const error = new Error(
-      "SendGrid requires a domain-based From address. Consumer mailbox senders like gmail.com must use SMTP or a custom domain."
-    );
-    error.statusCode = 503;
-    throw error;
-  }
+  const hasSendGridConfig = Boolean(config.sendgridApiKey && config.sendgridFromEmail);
 
   if (!hasSmtpConfig && !hasSendGridConfig) {
     const error = new Error("Email service is not configured.");
@@ -167,7 +130,17 @@ const sendEmail = async (to, subject, html) => {
     throw error;
   }
 
+  let sendgridError = null;
   let smtpError = null;
+
+  if (hasSendGridConfig) {
+    try {
+      await sendViaSendGrid({ to, subject, html, config });
+      return;
+    } catch (error) {
+      sendgridError = error;
+    }
+  }
 
   if (hasSmtpConfig) {
     try {
@@ -178,9 +151,9 @@ const sendEmail = async (to, subject, html) => {
     }
   }
 
-  if (hasSendGridConfig) {
-    await sendViaSendGrid({ to, subject, html, config });
-    return;
+  if (sendgridError) {
+    sendgridError.statusCode = sendgridError.statusCode || 503;
+    throw sendgridError;
   }
 
   if (smtpError) {
