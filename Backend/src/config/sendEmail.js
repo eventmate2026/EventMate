@@ -133,15 +133,6 @@ const sendEmail = async (to, subject, html) => {
   let sendgridError = null;
   let smtpError = null;
 
-  if (hasSendGridConfig) {
-    try {
-      await sendViaSendGrid({ to, subject, html, config });
-      return;
-    } catch (error) {
-      sendgridError = error;
-    }
-  }
-
   if (hasSmtpConfig) {
     try {
       await sendViaSmtp({ to, subject, html, config });
@@ -151,14 +142,34 @@ const sendEmail = async (to, subject, html) => {
     }
   }
 
-  if (sendgridError) {
-    sendgridError.statusCode = sendgridError.statusCode || 503;
-    throw sendgridError;
+  if (hasSendGridConfig) {
+    try {
+      await sendViaSendGrid({ to, subject, html, config });
+      return;
+    } catch (error) {
+      sendgridError = error;
+    }
   }
 
   if (smtpError) {
+    if (sendgridError) {
+      sendgridError.statusCode = sendgridError.statusCode || 503;
+      sendgridError.smtpFallbackError = {
+        message: smtpError.message || "SMTP delivery failed.",
+        code: smtpError.code || null,
+        command: smtpError.command || null,
+        responseCode: smtpError.responseCode || null,
+      };
+      throw sendgridError;
+    }
+
     smtpError.statusCode = smtpError.statusCode || 503;
     throw smtpError;
+  }
+
+  if (sendgridError) {
+    sendgridError.statusCode = sendgridError.statusCode || 503;
+    throw sendgridError;
   }
 
   const error = new Error("Email service is not configured.");
