@@ -76,10 +76,48 @@ const buildEmailDeliveryError = (
   return error;
 };
 
+const buildEmailDeliveryLogDetails = (error) => {
+  const cause = error?.cause || error;
+  const details = {
+    message: cause?.message || error?.message || "Unknown email delivery error",
+  };
+
+  if (cause?.code) details.code = cause.code;
+  if (cause?.command) details.command = cause.command;
+  if (cause?.responseCode) details.responseCode = cause.responseCode;
+  if (cause?.provider) details.provider = cause.provider;
+  if (cause?.statusCode) details.statusCode = cause.statusCode;
+  if (typeof cause?.details === "string" && cause.details.trim()) {
+    details.details = cause.details.trim().slice(0, 400);
+  }
+
+  return details;
+};
+
+const logVerificationOtpEmailFailure = (email, error) => {
+  console.error("Verification OTP email delivery failed:", {
+    email,
+    ...buildEmailDeliveryLogDetails(error),
+  });
+};
+
+const buildOtpStateSnapshot = (user) => ({
+  otp: user?.otp ?? null,
+  otpExpiry: user?.otpExpiry ?? null,
+});
+
+const restoreOtpState = async (user, snapshot) => {
+  if (!user) return;
+  user.otp = snapshot?.otp ?? null;
+  user.otpExpiry = snapshot?.otpExpiry ?? null;
+  await persistAuthUser(user);
+};
+
 const sendVerificationOtpEmail = async ({ email, fullName, otp, failureMessage }) => {
   try {
     await sendEmail(email, "Verify Email - EventMate", verifyEmailTemplate({ name: fullName, otp }));
   } catch (error) {
+    logVerificationOtpEmailFailure(email, error);
     const deliveryError = buildEmailDeliveryError(failureMessage);
     deliveryError.cause = error;
     throw deliveryError;
@@ -99,7 +137,7 @@ export const registerUserController = asyncHandler(async (req, res) => {
 
   const normalizedEmail = normalizeEmail(email);
   const normalizedFullName = String(fullName || "").trim();
-  const existingUser = await User.findOne({ email: normalizedEmail });
+  const existingUser = await User.findOne({ email: normalizedEmail }).select("+otp +otpExpiry");
   const hashedPassword = await bcrypt.hash(password, 10);
   const { otp, otpExpiry } = buildVerificationOtpPayload();
 
@@ -118,17 +156,23 @@ export const registerUserController = asyncHandler(async (req, res) => {
     existingUser.fullName = normalizedFullName;
     existingUser.email = normalizedEmail;
     existingUser.password = hashedPassword;
+    const previousOtpState = buildOtpStateSnapshot(existingUser);
     existingUser.otp = otp;
     existingUser.otpExpiry = otpExpiry;
     await persistAuthUser(existingUser);
 
-    await sendVerificationOtpEmail({
-      email: normalizedEmail,
-      fullName: normalizedFullName,
-      otp,
-      failureMessage:
-        "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
-    });
+    try {
+      await sendVerificationOtpEmail({
+        email: normalizedEmail,
+        fullName: normalizedFullName,
+        otp,
+        failureMessage:
+          "Account exists but we couldn't deliver a new verification OTP right now. Please try again.",
+      });
+    } catch (error) {
+      await restoreOtpState(existingUser, previousOtpState);
+      throw error;
+    }
 
     return res.status(200).json({
       success: true,
@@ -153,11 +197,19 @@ export const registerUserController = asyncHandler(async (req, res) => {
         "We couldn't deliver the verification OTP right now. Please try signing up again in a moment.",
     });
   } catch (error) {
-    await User.deleteOne({ _id: user._id });
-    throw error;
+    return res.status(202).json({
+      success: true,
+      otpSent: false,
+      message:
+        "Account created, but we couldn't deliver the verification OTP right now. Open Verify Email and use Resend OTP in a moment.",
+    });
   }
 
-  res.status(201).json({ success: true, message: "Registered successfully. OTP sent to email." });
+  res.status(201).json({
+    success: true,
+    otpSent: true,
+    message: "Registered successfully. OTP sent to email."
+  });
 });
 
 export const resendVerificationOtpController = asyncHandler(async (req, res) => {
@@ -166,7 +218,7 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
     return res.status(400).json({ success: false, message: "Email is required" });
   }
 
-  const user = await User.findOne({ email: normalizedEmail });
+  const user = await User.findOne({ email: normalizedEmail }).select("+otp +otpExpiry");
   if (!user || user.emailVerified) {
     return res.json({
       success: true,
@@ -175,17 +227,23 @@ export const resendVerificationOtpController = asyncHandler(async (req, res) => 
   }
 
   const { otp, otpExpiry } = buildVerificationOtpPayload();
+  const previousOtpState = buildOtpStateSnapshot(user);
   user.otp = otp;
   user.otpExpiry = otpExpiry;
   await persistAuthUser(user);
 
-  await sendVerificationOtpEmail({
-    email: normalizedEmail,
-    fullName: user.fullName || "User",
-    otp,
-    failureMessage:
-      "We couldn't resend the verification OTP right now. Please try again in a moment.",
-  });
+  try {
+    await sendVerificationOtpEmail({
+      email: normalizedEmail,
+      fullName: user.fullName || "User",
+      otp,
+      failureMessage:
+        "We couldn't resend the verification OTP right now. Please try again in a moment.",
+    });
+  } catch (error) {
+    await restoreOtpState(user, previousOtpState);
+    throw error;
+  }
 
   res.json({
     success: true,

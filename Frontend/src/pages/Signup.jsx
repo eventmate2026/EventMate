@@ -89,7 +89,8 @@ export default function Signup() {
 
       const apiMessage =
         response.data?.message || "Registration successful. Check your email for the OTP.";
-      emitToast({ type: "success", text: apiMessage });
+      const otpSent = response.data?.otpSent !== false;
+      emitToast({ type: otpSent ? "success" : "info", text: apiMessage });
       storePendingVerificationEmail(email);
       setFormData({
         fullName: "",
@@ -102,7 +103,7 @@ export default function Signup() {
       setTimeout(
         () =>
           navigate(`/verify-email?email=${encodeURIComponent(email)}`, {
-            state: { email },
+            state: otpSent ? { email } : { email, message: apiMessage },
           }),
         800
       );
