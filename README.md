@@ -1,124 +1,103 @@
-# EventMate
+🎓 EventMate – Smart College Event Manager with QR & Certificates
 
 
-==================== AUDIT REPORT: OVERALL CODE STATUS ====================
-Date: 2026-03-19
 
-Project overview
-- Frontend: React + Vite + Tailwind + Axios + Socket.IO client
-- Backend: Node.js + Express + MongoDB + JWT auth + Socket.IO
-- Deployment target: Frontend on Vercel, Backend on Render, DB on MongoDB Atlas
+🚀 Live Application
 
-What was checked
-- Production API URL usage
-- Hardcoded localhost fallbacks
-- CORS config
-- Backend start script and Render port binding
-- Auth token storage and restore flow
-- Axios request/response interceptors
-- Refresh token handling
-- Certificate link generation
-- Deployment env expectations
+🔗 Deployed Link:
+https://eventmate-app.vercel.app/
 
-Main findings
-- Frontend had production-risk URL fallback behavior that could still point API/socket usage to localhost-like targets in deployed builds.
-- Backend certificate download links could fall back to localhost if BACKEND_URL was missing.
-- The expected "auth only in React memory" issue was not the main problem in this codebase.
-- Auth was already using localStorage, bearer tokens, and 401 refresh handling.
-- One real auth hardening gap existed: ProtectedRoute could redirect to /login too early if reload happened while only refreshToken was recoverable.
+📝 Feedback Form:
+https://forms.gle/j1s7MK9kGRyGPCRo9
 
-Already correct before fixes
-- Backend CORS middleware was already present and correctly wired.
-- Backend package.json already had the start script: node server.js
-- Backend server already used process.env.PORT || 5000
-- Login already stored accessToken, refreshToken, and user through shared auth helpers.
-- Axios already added Authorization header.
-- Axios already refreshed tokens on 401.
+📌 Project Overview
 
-Fixes applied
+EventMate is a full-stack web application designed to digitize and automate college event management.
 
-1. Frontend deployment-safe URL handling
-- Frontend now reads VITE_API_URL from frontend/Vercel env instead of leaking it from Backend/.env into production builds.
-- Local development uses the Vite proxy for /api and /socket.io.
-- Production no longer falls back to hardcoded localhost behavior for API/socket usage.
+It replaces traditional manual processes with a secure, scalable, and user-friendly system.
 
-Files updated
-- Frontend/vite.config.js
-- Frontend/src/lib/backendUrl.js
-- Frontend/src/components/NotificationInbox.jsx
-- Frontend/src/components/StudentNavbar.jsx
-- Frontend/src/pages/AdminNotifications.jsx
-- Frontend/.env
-- Frontend/.env.example
-- Frontend/README.md
+✨ Key Features
+🔐 JWT-Based Authentication & Authorization
+👥 Role-Based Access Control (Admin, Organizer, Coordinator, Student)
+📅 Event Creation & Management
+📝 Event Registration System
+📲 QR Code-Based Attendance Tracking
+🏆 Automatic Certificate Generation (PDF)
+🔔 Real-Time Notifications (Socket.io)
+☁️ Cloud Media Storage (Cloudinary Integration)
 
-2. Backend certificate link fix
-- Certificate URLs now require BACKEND_URL or Render's external URL.
-- Backend no longer silently generates localhost certificate links in deployed environments.
+🛠️ Tech Stack
 
-File updated
-- Backend/src/services/certificate.service.js
+🎨 Frontend
+React.js
+Axios
+Tailwind CSS / CSS
 
-3. Auth bootstrap/session recovery fix
-- Protected routes now try to recover the session before redirecting.
-- If accessToken is missing but refreshToken exists, the app calls refresh-token.
-- If token exists but stored user snapshot is missing, the app refetches profile data.
-- Redirect to /login now happens only after that bootstrap check finishes.
+⚙️ Backend
+Node.js
+Express.js
+MongoDB Atlas
 
-Files updated
-- Frontend/src/App.jsx
-- Frontend/src/lib/auth.js
+🔧 Tools & Services
+Socket.io (Real-time communication)
+Cloudinary (Media storage)
+Nodemailer / SMTP (Email service)
+QR Code Generator
+PDF Generator
 
-Current auth flow status
-- Login stores accessToken, refreshToken, and user in localStorage.
-- Protected routes read stored auth on reload.
-- Axios attaches Authorization: Bearer <token>.
-- 401 responses trigger refresh-token flow.
-- Logout clears accessToken, refreshToken, and user.
-- Session recovery on reload is now stronger than before.
 
-Deployment variables still required
 
-Frontend (Vercel)
-- VITE_API_URL=https://your-backend.onrender.com
+▶️ How to Run Locally
 
-Backend (Render)
-- BACKEND_URL=https://your-backend.onrender.com
-- FRONTEND_URL=https://your-frontend.vercel.app
-- MONGO_URI
-- JWT_SECRET
-- JWT_REFRESH_SECRET
-- EMAIL_USERNAME
-- EMAIL_PASSWORD
-- CLOUDINARY_CLOUD_NAME
-- CLOUDINARY_API_KEY
-- CLOUDINARY_API_SECRET
+1️⃣ Clone Repository
+git clone https://github.com/eventmate2026/EventMate.git
+cd EventMate
 
-Manual deployment checks still needed
-- MongoDB Atlas Network Access / IP allowlist
-- Actual env vars configured in Render
-- Actual env vars configured in Vercel
-- Gmail App Password validity if Gmail SMTP is used
+2️⃣ Setup Backend
+cd backend
+npm install
+npm run dev
 
-Verification performed
-- Frontend production build completed successfully with npm.cmd run build
-- Build passed after the auth and deployment-safe URL fixes
-- Existing Vite large chunk warnings remain, but they are performance warnings, not auth failures
+3️⃣ Setup Frontend
+cd frontend
+npm install
+npm run dev
 
-Final status
-- Frontend production API usage is deployment-safe
-- Frontend socket usage is deployment-safe
-- Backend certificate links are deployment-safe
-- Auth persistence is present
-- 401 refresh flow is present
-- Session bootstrap on reload is now stronger
-- The suspected logout issue was not mainly caused by React-only in-memory auth
+4️⃣ Run Application
+http://localhost:5173
 
-Recommended final deployment test
-1. Login
-2. Refresh the page
-3. Switch mobile/desktop responsive mode
-4. Open a protected page
-5. Wait for access token expiry
-6. Confirm auto-refresh keeps the session alive
+🔄 System Workflow
+User registers & logs in
+Organizer creates events
+Students register for events
+QR code generated for each participant
+Coordinator scans QR for attendance
+Certificates generated automatically
+Users download certificates from dashboard
 
+👨‍💻 Team Members
+👑 Aditya Jambhulkar – Team Leader & UI/UX Designer
+⚙️ Abhinay Borkar – Backend Developer
+💻 Dakshat Nagrale – Frontend Developer
+🧩 Saksham Khaire – Frontend Supporter
+🗄️ Tanvi Uttarwar – Database Manager
+🧪 Tushar Waratkar – Tester
+🔧 Sujal Shende – Backend Supporter
+📄 Samyak Waghmare – Documentation
+
+📢 Feedback
+
+We highly appreciate your feedback 🙌
+
+👉 https://forms.gle/j1s7MK9kGRyGPCRo9
+
+⏱ Takes only 2–3 minutes
+
+📄 License
+
+This project is developed for academic purposes (MSBTE Diploma Final Year Project).
+
+🙏 Acknowledgement
+
+We sincerely thank our guide Mrs. Priyanka Singh
+and Bajaj Chandrapur Polytechnic, Chandrapur for their continuous support.
