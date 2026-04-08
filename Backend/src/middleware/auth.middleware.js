@@ -6,6 +6,10 @@ import {
   SESSION_EXPIRED_MESSAGE,
   validateSessionState
 } from "../utils/sessionValidation.js";
+import {
+  getActiveUserSession,
+  touchUserSession,
+} from "../services/session.service.js";
 
 export default async function authMiddleware(req, res, next) {
   try {
@@ -25,6 +29,28 @@ export default async function authMiddleware(req, res, next) {
         success: false,
         message: validation.message
       });
+    }
+
+    const sessionId = String(decoded?.sessionId || "").trim();
+    if (sessionId) {
+      const session = await getActiveUserSession({
+        userId: user._id,
+        sessionId,
+      });
+
+      if (!session) {
+        return res.status(401).json({
+          success: false,
+          message: SESSION_EXPIRED_MESSAGE,
+        });
+      }
+
+      req.currentSession = session;
+      req.sessionId = sessionId;
+      await touchUserSession({ sessionId, req });
+    } else {
+      req.currentSession = null;
+      req.sessionId = null;
     }
 
     req.user = user;

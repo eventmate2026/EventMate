@@ -3,7 +3,8 @@ import User from "../models/User.model.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
-import { buildEventEndDateTime, COMPLETION_GRACE_MS } from "../utils/eventTime.js";
+import { buildEventEndDateTime } from "../utils/eventTime.js";
+import { autoCompleteOverdueEvents } from "../services/eventLifecycle.service.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
@@ -200,6 +201,7 @@ export const publishEvent = async (req, res, next) => {
 //getPublishedEvents
 export const getPublishedEvents = async (req, res, next) => {
   try {
+    await autoCompleteOverdueEvents();
     
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -402,6 +404,7 @@ export const updateEvent = async (req, res, next) => {
 //get an published event by id
 export const getEvent = async (req, res, next) => {
   try {
+    await autoCompleteOverdueEvents();
     const { id } = req.params;
 
     const event = await Event.findById(id);
@@ -556,6 +559,7 @@ export const assignCoordinator = async (req, res, next) => {
 // Organizer sees their own events (all statuses)
 export const getMyEvents = async (req, res, next) => {
   try {
+    await autoCompleteOverdueEvents();
     const events = await Event.find({ createdBy: req.user._id })
       .sort({ createdAt: -1 });
 
@@ -662,6 +666,7 @@ export const completeEvent = async (req, res, next) => {
 // Coordinator sees events assigned to their account (all statuses)
 export const getMyAssignedEvents = async (req, res, next) => {
   try {
+    await autoCompleteOverdueEvents();
     const allowedRoles = ["STUDENT_COORDINATOR", "STUDENT"];
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({

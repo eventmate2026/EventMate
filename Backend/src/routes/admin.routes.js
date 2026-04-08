@@ -2,6 +2,7 @@ import express from "express";
 import authMiddleware from "../middleware/auth.middleware.js";
 import roleMiddleware from "../middleware/role.middleware.js";
 import { getAllUsersController, updateUserController, deleteUserController,
+  getAdminSystemLiveData,
   getCoordinators,
   getOrganizers,
   getOrganizerEventCounts,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
+router.get("/system-live-data", roleMiddleware("MAIN_ADMIN"), getAdminSystemLiveData);
 router.get("/users", getAllUsersController);
 router.put("/users/:id", roleMiddleware("MAIN_ADMIN"), updateUserController);
 router.delete("/users/:id", roleMiddleware("MAIN_ADMIN"), deleteUserController);

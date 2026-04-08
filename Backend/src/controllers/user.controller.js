@@ -6,6 +6,12 @@ import sendEmail from "../config/sendEmail.js";
 import forgotPasswordTemplate from "../utils/forgotPasswordTemplate.js";
 import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import verifyEmailTemplate from "../utils/verifyEmailTemplate.js";
+import {
+  countUserLoginsSince,
+  listUserSessions,
+  revokeAllUserSessions,
+  revokeUserSession,
+} from "../services/session.service.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
 const GENERIC_FORGOT_PASSWORD_MESSAGE =
@@ -33,8 +39,35 @@ const buildSafeUserResponse = (user) => ({
     occupation: normalizeText(user?.professionalProfile?.occupation),
   },
   avatar: user?.avatar || null,
+  emailVerified: Boolean(user?.emailVerified),
+  lastLoginAt: user?.lastLoginAt || null,
+  passwordChangedAt: user?.passwordChangedAt || null,
   isLoggedIn: true,
 });
+
+const ACTIVE_SESSION_WINDOW_MS = 15 * 60 * 1000;
+
+const toSessionDto = (session, currentSessionId) => {
+  const sessionId = String(session?.sessionId || "");
+  const isCurrent = Boolean(currentSessionId) && sessionId === String(currentSessionId);
+  const lastActiveAt = session?.lastActiveAt || session?.updatedAt || session?.createdAt || null;
+  const lastActiveTime = new Date(lastActiveAt || 0).getTime();
+  const isActive = !Number.isNaN(lastActiveTime) && Date.now() - lastActiveTime <= ACTIVE_SESSION_WINDOW_MS;
+
+  return {
+    id: sessionId,
+    device: session?.deviceLabel || "Unknown device",
+    browser: session?.browser || "Browser",
+    os: session?.os || "Unknown OS",
+    deviceType: session?.deviceType || "Unknown",
+    ipAddress: session?.ipAddress || "Unknown",
+    location: session?.ipAddress ? `IP ${session.ipAddress}` : "Unknown network",
+    createdAt: session?.createdAt || null,
+    lastActiveAt,
+    current: isCurrent,
+    status: isActive ? "active" : "idle",
+  };
+};
 
 const buildProfileUpdateDoc = (payload = {}) => {
   const set = {};
@@ -123,7 +156,67 @@ const buildProfileUpdateDoc = (payload = {}) => {
 
 // ---------------- PROFILE ----------------
 export const getProfileController = asyncHandler(async (req, res) => {
-  res.json({ success: true, user: buildSafeUserResponse(req.user) });
+  res.json({
+    success: true,
+    user: buildSafeUserResponse(req.user),
+    currentSessionId: req.sessionId || null,
+  });
+});
+
+export const getMySessionsController = asyncHandler(async (req, res) => {
+  const [sessions, loginsLast30] = await Promise.all([
+    listUserSessions(req.user?._id),
+    countUserLoginsSince(
+      req.user?._id,
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    ),
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    currentSessionId: req.sessionId || null,
+    summary: {
+      activeSessions: sessions.length,
+      loginsLast30,
+      lastLoginAt: req.user?.lastLoginAt || null,
+    },
+    data: sessions.map((session) => toSessionDto(session, req.sessionId)),
+  });
+});
+
+export const terminateMySessionController = asyncHandler(async (req, res) => {
+  const targetSessionId = String(req.params?.sessionId || "").trim();
+  if (!targetSessionId) {
+    return res.status(400).json({
+      success: false,
+      message: "Session id is required.",
+    });
+  }
+
+  if (req.sessionId && targetSessionId === String(req.sessionId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Use logout to end your current session.",
+    });
+  }
+
+  const session = await revokeUserSession({
+    sessionId: targetSessionId,
+    userId: req.user?._id,
+    reason: "TERMINATED_BY_USER",
+  });
+
+  if (!session) {
+    return res.status(404).json({
+      success: false,
+      message: "Session not found.",
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Session terminated successfully.",
+  });
 });
 
 // ---------------- UPDATE PROFILE ----------------
@@ -214,6 +307,10 @@ export const resetPasswordController = asyncHandler(async (req, res) => {
   user.failedLoginAttempts = 0;
   user.lockoutUntil = null;
   await user.save();
+  await revokeAllUserSessions({
+    userId: user._id,
+    reason: "PASSWORD_RESET",
+  });
 
   res.json({ success: true, message: "Password reset successful" });
 });

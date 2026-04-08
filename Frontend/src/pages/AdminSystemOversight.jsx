@@ -6,6 +6,7 @@ import {
   Download,
   Loader2,
   MoreHorizontal,
+  RefreshCcw,
   Search,
   ShieldAlert,
 } from "lucide-react";
@@ -13,23 +14,6 @@ import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
-
-const toList = (payload) => {
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (Array.isArray(payload?.events)) return payload.events;
-  return [];
-};
-
-const formatDate = (value) => {
-  if (!value) return "Date TBD";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Date TBD";
-  return parsed.toLocaleDateString([], {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-  });
-};
 
 const formatDateTime = (value) => {
   if (!value) return "Recently";
@@ -65,17 +49,6 @@ const downloadCsv = (filename, rows) => {
   URL.revokeObjectURL(url);
 };
 
-const deriveEventState = (event) => {
-  const now = Date.now();
-  const start = new Date(event?.schedule?.startDate || "").getTime();
-  const end = new Date(event?.schedule?.endDate || "").getTime();
-
-  if (event?.status === "Cancelled") return "Closed";
-  if (!Number.isNaN(start) && now < start) return "Pending";
-  if (!Number.isNaN(start) && !Number.isNaN(end) && now >= start && now <= end) return "Active";
-  return "Closed";
-};
-
 const typeToBadge = (type) => {
   const value = String(type || "").toUpperCase();
   if (value === "CONTACT") return "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300";
@@ -90,54 +63,49 @@ const typeToBadge = (type) => {
 export default function AdminSystemOversight() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [contacts, setContacts] = useState([]);
-  const [notifications, setNotifications] = useState([]);
+  const [oversightData, setOversightData] = useState(null);
   const [search, setSearch] = useState("");
   const [activeControlId, setActiveControlId] = useState(null);
   const [actionBusyId, setActionBusyId] = useState(null);
   const [actionNotice, setActionNotice] = useState(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
 
   useToastFeedback(error, {
     defaultType: "error",
     errorFallback: "We couldn't load system oversight right now.",
   });
 
+  const loadOversightData = async ({ showLoader = true } = {}) => {
+    if (showLoader) setLoading(true);
+    setError(null);
+    try {
+      const response = await api({
+        ...SummaryApi.get_admin_system_live_data,
+        skipCache: true,
+        skipDedupe: true,
+      });
+      const nextData = response.data?.data?.oversight || null;
+      setOversightData(nextData);
+      setLastSyncedAt(response.data?.data?.generatedAt || new Date().toISOString());
+    } catch (loadError) {
+      setOversightData(null);
+      setError(loadError?.response?.data?.message || "Unable to load oversight data.");
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [eventsResponse, contactsResponse, notificationsResponse] = await Promise.all([
-          api({
-            ...SummaryApi.get_public_events,
-            params: { page: 1, limit: 200 },
-            cacheTTL: 45000,
-          }),
-          api({
-            ...SummaryApi.get_contacts,
-            cacheTTL: 20000,
-          }),
-          api({
-            ...SummaryApi.get_my_notifications,
-            cacheTTL: 12000,
-          }),
-        ]);
+    let intervalId = null;
 
-        setEvents(toList(eventsResponse.data));
-        setContacts(toList(contactsResponse.data));
-        setNotifications(toList(notificationsResponse.data));
-      } catch (loadError) {
-        setEvents([]);
-        setContacts([]);
-        setNotifications([]);
-        setError(loadError?.response?.data?.message || "Unable to load oversight data.");
-      } finally {
-        setLoading(false);
-      }
+    void loadOversightData({ showLoader: true });
+    intervalId = setInterval(() => {
+      void loadOversightData({ showLoader: false });
+    }, 30000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
     };
-
-    load();
   }, []);
 
   useEffect(() => {
@@ -149,30 +117,7 @@ export default function AdminSystemOversight() {
     return () => document.removeEventListener("click", handleDocumentClick);
   }, []);
 
-  const eventRows = useMemo(() => {
-    return toList({ data: events })
-      .map((event) => {
-        const present = Number(event?.attendance?.totalPresent || 0);
-        const capacity = Number(event?.registration?.maxParticipants || 0);
-        const utilization = capacity > 0 ? Math.min(100, Math.round((present / capacity) * 100)) : 0;
-        return {
-          id: String(event?._id || ""),
-          title: String(event?.title || "Untitled Event"),
-          organizer: String(event?.organizer?.name || "Organizer"),
-          department: String(event?.organizer?.department || "Department not set"),
-          status: String(event?.status || ""),
-          state: deriveEventState(event),
-          present,
-          capacity,
-          utilization,
-          dateLabel: formatDate(event?.schedule?.startDate),
-        };
-      })
-      .sort((a, b) => {
-        const rank = { Active: 0, Pending: 1, Closed: 2 };
-        return (rank[a.state] ?? 9) - (rank[b.state] ?? 9);
-      });
-  }, [events]);
+  const eventRows = oversightData?.events || [];
 
   const filteredRows = useMemo(() => {
     const query = String(search || "").trim().toLowerCase();
@@ -184,56 +129,28 @@ export default function AdminSystemOversight() {
     );
   }, [eventRows, search]);
 
-  const kpis = useMemo(() => {
-    const totalAttendance = eventRows.reduce((sum, row) => sum + row.present, 0);
-    const totalCapacity = eventRows.reduce((sum, row) => sum + row.capacity, 0);
-    const liveEvents = eventRows.filter((row) => row.state === "Active").length;
-    const pendingEvents = eventRows.filter((row) => row.state === "Pending").length;
-    const pendingContacts = contacts.filter(
-      (item) => String(item?.status || "").toLowerCase() === "pending"
-    ).length;
-
-    return {
-      liveEvents,
-      totalAttendance,
-      pendingApprovals: pendingEvents + pendingContacts,
-      avgUtilization: totalCapacity > 0 ? ((totalAttendance / totalCapacity) * 100).toFixed(1) : "0.0",
-    };
-  }, [contacts, eventRows]);
-
-  const historyRows = useMemo(() => {
-    return notifications
-      .map((item) => ({
-        id: String(item?._id || `${item?.type}-${item?.createdAt}`),
-        title: String(item?.title || "System update"),
-        message: String(item?.message || "No message provided."),
-        type: String(item?.type || "SYSTEM"),
-        createdAt: item?.createdAt || null,
-      }))
-      .slice(0, 5);
-  }, [notifications]);
-
-  const uptime = useMemo(() => {
-    const penalty = Math.min(2.4, kpis.pendingApprovals * 0.08);
-    return (99.9 - penalty).toFixed(1);
-  }, [kpis.pendingApprovals]);
-
-  const alerts = useMemo(() => {
-    const rows = [];
-    if (kpis.pendingApprovals > 0) {
-      rows.push(`${kpis.pendingApprovals} pending approvals require review`);
-    }
-    if (Number(kpis.avgUtilization) < 35) {
-      rows.push("Event capacity utilization is below target threshold");
-    }
-    if (kpis.liveEvents === 0) {
-      rows.push("No active live events right now");
-    }
-    if (rows.length === 0) {
-      rows.push("No critical system alerts detected");
-    }
-    return rows;
-  }, [kpis.avgUtilization, kpis.liveEvents, kpis.pendingApprovals]);
+  const kpis = oversightData?.kpis || {
+    liveEvents: 0,
+    totalAttendance: 0,
+    totalRegisteredParticipants: 0,
+    pendingApprovals: 0,
+    pendingPaymentReviews: 0,
+    pendingMemberVerifications: 0,
+    pendingContacts: 0,
+    avgUtilization: 0,
+  };
+  const historyRows = oversightData?.history || [];
+  const health = oversightData?.health || {
+    score: 0,
+    maintenanceMode: false,
+    activeSessions: 0,
+    lockedUsers: 0,
+    pendingContacts: 0,
+    pendingPaymentReviews: 0,
+    pendingMemberVerifications: 0,
+    trackedEvents: 0,
+  };
+  const alerts = oversightData?.alerts || [];
 
   const handleExport = () => {
     const rows = filteredRows.map((row) => ({
@@ -241,9 +158,12 @@ export default function AdminSystemOversight() {
       Organizer: row.organizer,
       Department: row.department,
       State: row.state,
-      Attendance: row.present,
+      Registered: row.registered,
+      Present: row.present,
       Capacity: row.capacity,
-      Utilization: `${row.utilization}%`,
+      FillRate: `${row.utilization}%`,
+      AttendanceRate: `${Number(row.attendanceRate || 0)}%`,
+      FeedbackCount: row.feedbackCount,
       Date: row.dateLabel,
     }));
     downloadCsv("system-oversight-report.csv", rows);
@@ -281,16 +201,7 @@ export default function AdminSystemOversight() {
         ...config,
         url: config.url.replace(":eventId", row.id),
       });
-
-      setEvents((prev) => {
-        if (!Array.isArray(prev)) return prev;
-        if (action === "cancel") {
-          return prev.filter((item) => String(item?._id || "") !== row.id);
-        }
-        return prev.map((item) =>
-          String(item?._id || "") === row.id ? { ...item, status: "Completed" } : item
-        );
-      });
+      await loadOversightData({ showLoader: false });
 
       setActionNotice({
         type: "success",
@@ -318,12 +229,27 @@ export default function AdminSystemOversight() {
         <PageBackButton to="/admin-dashboard" label="Back to Dashboard" />
 
         <header className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-5 sm:p-6">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-            System-Wide Event Oversight
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-            Monitor and manage active, pending, and completed university events.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                System-Wide Event Oversight
+              </h1>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                Live monitoring across active, pending, and completed university events.
+              </p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                Last synced: {formatDateTime(lastSyncedAt)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => loadOversightData({ showLoader: false })}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-white/10 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-white/10"
+            >
+              <RefreshCcw size={15} />
+              Refresh
+            </button>
+          </div>
         </header>
 
         {loading && (
@@ -338,29 +264,33 @@ export default function AdminSystemOversight() {
             <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-300">Total Live Events</p>
-                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpis.liveEvents}</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{Number(kpis.liveEvents || 0)}</p>
                 <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-300">Live operations in progress</p>
               </article>
 
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-300">Total Attendance</p>
-                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpis.totalAttendance.toLocaleString()}</p>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">Across monitored events</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{Number(kpis.totalAttendance || 0).toLocaleString()}</p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
+                  {Number(kpis.totalRegisteredParticipants || 0).toLocaleString()} registered system-wide
+                </p>
               </article>
 
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-300">Pending Approvals</p>
-                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpis.pendingApprovals}</p>
-                <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">Needs immediate review</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{Number(kpis.pendingApprovals || 0)}</p>
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-300">
+                  {Number(kpis.pendingPaymentReviews || 0)} payment reviews | {Number(kpis.pendingContacts || 0)} contacts
+                </p>
               </article>
 
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">
                 <p className="text-xs text-slate-500 dark:text-slate-300">Avg. Capacity Util.</p>
-                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpis.avgUtilization}%</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{Number(kpis.avgUtilization || 0).toFixed(1)}%</p>
                 <div className="mt-3 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700">
                   <div
                     className="h-full rounded-full bg-violet-500"
-                    style={{ width: `${Math.max(4, Math.min(100, Number(kpis.avgUtilization)))}%` }}
+                    style={{ width: `${Math.max(4, Math.min(100, Number(kpis.avgUtilization || 0)))}%` }}
                   />
                 </div>
               </article>
@@ -395,7 +325,7 @@ export default function AdminSystemOversight() {
                       <th className="px-3 py-3">Event Details</th>
                       <th className="px-3 py-3">Organizer</th>
                       <th className="px-3 py-3">Status</th>
-                      <th className="px-3 py-3">Attendance Progress</th>
+                      <th className="px-3 py-3">Participation</th>
                       <th className="px-3 py-3 text-center">Emergency Controls</th>
                     </tr>
                   </thead>
@@ -418,6 +348,13 @@ export default function AdminSystemOversight() {
                           <td className="px-3 py-3">
                             <p className="text-slate-800 dark:text-slate-100">{row.organizer}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-300">{row.department}</p>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              {row.feedbackCount > 0 && row.averageRating
+                                ? `${row.feedbackCount} feedback | ${row.averageRating} rating`
+                                : row.feedbackCount > 0
+                                  ? `${row.feedbackCount} feedback submitted`
+                                  : "No feedback submitted yet"}
+                            </p>
                           </td>
                           <td className="px-3 py-3">
                             <span
@@ -435,6 +372,11 @@ export default function AdminSystemOversight() {
                           <td className="px-3 py-3">
                             <p className="text-xs text-slate-600 dark:text-slate-300">
                               {row.present} / {row.capacity || "N/A"} · {row.utilization}%
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                              {Number(row.registered || 0)} registered
+                              {Number(row.registered || 0) > 0 ? ` | ${Number(row.attendanceRate || 0)}% checked in` : ""}
+                              {Number(row.pendingQueue || 0) > 0 ? ` | ${Number(row.pendingQueue || 0)} in queue` : ""}
                             </p>
                             <div className="mt-1 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700">
                               <div
@@ -543,12 +485,12 @@ export default function AdminSystemOversight() {
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Oversight Health</h2>
                 <div className="mt-3">
                   <div className="flex items-center justify-between text-sm">
-                    <p className="text-slate-600 dark:text-slate-300">API Uptime</p>
-                    <p className="font-semibold text-emerald-600 dark:text-emerald-300">{uptime}%</p>
+                    <p className="text-slate-600 dark:text-slate-300">Operational Score</p>
+                    <p className="font-semibold text-emerald-600 dark:text-emerald-300">{Number(health.score || 0).toFixed(1)}%</p>
                   </div>
                   <div className="mt-2 grid grid-cols-6 gap-1">
                     {Array.from({ length: 6 }).map((_, index) => {
-                      const fillLimit = Math.round((Number(uptime) / 100) * 6);
+                      const fillLimit = Math.round((Number(health.score || 0) / 100) * 6);
                       return (
                         <span
                           key={index}
@@ -564,6 +506,13 @@ export default function AdminSystemOversight() {
                 </div>
 
                 <div className="mt-4 rounded-xl border border-slate-200 dark:border-white/10 p-3">
+                  <div className="mb-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>{health.maintenanceMode ? "Maintenance mode enabled" : "Maintenance mode disabled"}</span>
+                    <span>{Number(health.activeSessions || 0)} active device session(s)</span>
+                  </div>
+                  <div className="mb-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    {Number(health.trackedEvents || 0)} tracked event(s) | {Number(health.lockedUsers || 0)} locked user(s) | {Number(health.pendingMemberVerifications || 0)} verification queue
+                  </div>
                   <p className="text-sm font-semibold text-slate-900 dark:text-white inline-flex items-center gap-1.5">
                     <ShieldAlert size={14} className="text-rose-500" />
                     System Alerts
@@ -594,7 +543,7 @@ export default function AdminSystemOversight() {
 
                 <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
                   <Clock3 size={12} className="text-indigo-500" />
-                  Updated from live API data on page load.
+                  Updated from live system data every 30 seconds.
                 </p>
               </aside>
             </section>

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../models/User.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import generateOtp from "../utils/generateOtp.js";
@@ -14,6 +15,14 @@ import {
   SESSION_EXPIRED_MESSAGE,
   validateSessionState
 } from "../utils/sessionValidation.js";
+import {
+  createUserSession,
+  getActiveUserSession,
+  hashSessionToken,
+  revokeAllUserSessions,
+  revokeUserSession,
+  rotateUserSession,
+} from "../services/session.service.js";
 
 const VERIFICATION_OTP_TTL_MS = 10 * 60 * 1000;
 
@@ -59,7 +68,10 @@ const buildAuthUser = (user) => {
     educationLevel: user.educationLevel || "",
     academicProfile: user.academicProfile || {},
     professionalProfile: user.professionalProfile || {},
-    avatar: user.avatar || null
+    avatar: user.avatar || null,
+    emailVerified: Boolean(user.emailVerified),
+    lastLoginAt: user.lastLoginAt || null,
+    passwordChangedAt: user.passwordChangedAt || null,
   };
 };
 
@@ -276,7 +288,7 @@ export const loginController = asyncHandler(async (req, res) => {
   if (!email || !password)
     return res.status(400).json({ success: false, message: "Email and password required" });
 
-  const user = await User.findOne({ email }).select("+password +refreshToken");
+  const user = await User.findOne({ email }).select("+password");
   if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
   const settings = await getSecuritySettings();
@@ -347,13 +359,20 @@ export const loginController = asyncHandler(async (req, res) => {
 
   const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
   const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
+  const sessionId = crypto.randomUUID();
 
-  const accessToken = generateAccessToken(user._id, `${accessMinutes}m`);
-  const refreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
+  const accessToken = generateAccessToken({ userId: user._id, sessionId }, `${accessMinutes}m`);
+  const refreshToken = generateRefreshToken({ userId: user._id, sessionId }, `${refreshDays}d`);
 
-  user.refreshToken = refreshToken;
   user.lastLoginAt = new Date();
   await persistAuthUser(user);
+  await createUserSession({
+    userId: user._id,
+    sessionId,
+    refreshToken,
+    expiresAt: new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000),
+    req,
+  });
 
   sendPendingTeamInvitesForUser(user).catch((error) => {
     console.error("Pending team invite check failed:", error.message);
@@ -374,9 +393,24 @@ export const logoutController = asyncHandler(async (req, res) => {
   if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
   const user = await User.findById(userId).select("+refreshToken");
+  const sessionId = req.sessionId || null;
+
   if (user) {
     user.refreshToken = null;
     await persistAuthUser(user);
+  }
+
+  if (sessionId) {
+    await revokeUserSession({
+      sessionId,
+      userId,
+      reason: "SIGNED_OUT",
+    });
+  } else {
+    await revokeAllUserSessions({
+      userId,
+      reason: "SIGNED_OUT_LEGACY",
+    });
   }
 
   res.json({ success: true, message: "Logged out successfully" });
@@ -391,8 +425,9 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
   try {
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await User.findById(decoded.userId).select("+refreshToken");
+    const sessionId = String(decoded?.sessionId || "").trim();
 
-    if (!user || user.refreshToken?.trim() !== refreshToken?.trim()) {
+    if (!user) {
       return res.status(403).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
     }
 
@@ -412,15 +447,40 @@ export const refreshTokenController = asyncHandler(async (req, res) => {
         message: validation.message
       });
     }
+
+    if (sessionId) {
+      const session = await getActiveUserSession({
+        userId: user._id,
+        sessionId,
+        includeRefreshTokenHash: true,
+      });
+
+      if (!session || session.refreshTokenHash !== hashSessionToken(refreshToken)) {
+        return res.status(403).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
+      }
+    } else if (user.refreshToken?.trim() !== refreshToken?.trim()) {
+      return res.status(403).json({ success: false, message: SESSION_EXPIRED_MESSAGE });
+    }
+
     const accessMinutes = clampNumber(settings?.accessTokenLifetimeMinutes, 5, 120, 15);
     const refreshDays = clampNumber(settings?.refreshTokenLifetimeDays, 1, 30, 7);
 
     // Generate new tokens
-    const newAccessToken = generateAccessToken(user._id, `${accessMinutes}m`);
-    const newRefreshToken = generateRefreshToken(user._id, `${refreshDays}d`);
+    const tokenPayload = sessionId ? { userId: user._id, sessionId } : user._id;
+    const newAccessToken = generateAccessToken(tokenPayload, `${accessMinutes}m`);
+    const newRefreshToken = generateRefreshToken(tokenPayload, `${refreshDays}d`);
 
-    user.refreshToken = newRefreshToken;
-    await persistAuthUser(user);
+    if (sessionId) {
+      await rotateUserSession({
+        sessionId,
+        refreshToken: newRefreshToken,
+        expiresAt: new Date(Date.now() + refreshDays * 24 * 60 * 60 * 1000),
+        req,
+      });
+    } else {
+      user.refreshToken = newRefreshToken;
+      await persistAuthUser(user);
+    }
 
     res.json({
       success: true,

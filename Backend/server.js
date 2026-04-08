@@ -13,6 +13,10 @@ import {
   extractBearerToken,
   validateSessionState
 } from "./src/utils/sessionValidation.js";
+import {
+  getActiveUserSession,
+  touchUserSession,
+} from "./src/services/session.service.js";
 
 dotenv.config();
 
@@ -52,6 +56,28 @@ io.use(async (socket, next) => {
 
     if (!validation.valid) {
       return next(new Error(validation.message));
+    }
+
+    const sessionId = String(decoded?.sessionId || "").trim();
+    if (sessionId) {
+      const session = await getActiveUserSession({
+        userId: user._id,
+        sessionId,
+      });
+      if (!session) {
+        return next(new Error("Session expired. Please log in again."));
+      }
+      socket.data.sessionId = sessionId;
+      await touchUserSession({
+        sessionId,
+        req: {
+          headers: socket.handshake.headers,
+          ip: socket.handshake.address,
+        },
+        force: true,
+      });
+    } else {
+      socket.data.sessionId = null;
     }
 
     socket.data.userId = String(user._id);

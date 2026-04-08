@@ -1,4 +1,11 @@
 import jwt from "jsonwebtoken";
 
-export default (id, expiresIn = "7d") =>
-  jwt.sign({ userId: id }, process.env.JWT_REFRESH_SECRET, { expiresIn });
+const buildPayload = (value) => {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value;
+  }
+  return { userId: value };
+};
+
+export default (payload, expiresIn = "7d") =>
+  jwt.sign(buildPayload(payload), process.env.JWT_REFRESH_SECRET, { expiresIn });

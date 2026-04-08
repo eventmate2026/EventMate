@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -60,7 +60,7 @@ function downloadCsv(filename, rows) {
 }
 
 export default function AdminDashboard() {
-  const [users, setUsers] = useState([]);
+  const [systemData, setSystemData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -70,123 +70,50 @@ export default function AdminDashboard() {
     errorFallback: "We couldn't load admin metrics right now.",
   });
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchDashboardData = async ({ showLoader = true } = {}) => {
+    if (showLoader) setLoading(true);
     setError(null);
     try {
-      const response = await api({ ...SummaryApi.get_all_users, cacheTTL: 90000 });
-      setUsers(response.data?.users || []);
-      setLastUpdated(new Date().toISOString());
+      const response = await api({
+        ...SummaryApi.get_admin_system_live_data,
+        skipCache: true,
+        skipDedupe: true,
+      });
+      const nextData = response.data?.data || null;
+      setSystemData(nextData);
+      setLastUpdated(nextData?.generatedAt || new Date().toISOString());
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load dashboard data.");
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
+    let intervalId = null;
+
+    void fetchDashboardData({ showLoader: true });
+    intervalId = setInterval(() => {
+      void fetchDashboardData({ showLoader: false });
+    }, 30000);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
-  const metrics = useMemo(() => {
-    const totalUsers = users.length;
-    const activeUsers = users.filter((user) => user.isActive).length;
-    const verifiedUsers = users.filter((user) => user.emailVerified).length;
-    const blockedUsers = totalUsers - activeUsers;
-    const now = Date.now();
-    const last30Days = now - 30 * 24 * 60 * 60 * 1000;
-    const recentlyJoined = users.filter((user) => {
-      const createdAt = new Date(user.createdAt).getTime();
-      return !Number.isNaN(createdAt) && createdAt >= last30Days;
-    }).length;
-
-    const roleCounts = users.reduce(
-      (acc, user) => {
-        if (acc[user.role] !== undefined) acc[user.role] += 1;
-        return acc;
-      },
-      { MAIN_ADMIN: 0, ORGANIZER: 0, STUDENT_COORDINATOR: 0, STUDENT: 0 }
-    );
-
-    const verificationRate = totalUsers ? ((verifiedUsers / totalUsers) * 100).toFixed(1) : "0.0";
-
-    return {
-      totalUsers,
-      activeUsers,
-      verifiedUsers,
-      blockedUsers,
-      recentlyJoined,
-      verificationRate,
-      roleCounts,
-    };
-  }, [users]);
-
-  const securityAlerts = useMemo(() => {
-    const alerts = [];
-    users.forEach((user) => {
-      const createdAt = new Date(user.createdAt).getTime();
-      const ageInDays = Number.isNaN(createdAt) ? 0 : Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24));
-
-      if (!user.emailVerified && ageInDays > 3) {
-        alerts.push({
-          id: `verify-${user._id}`,
-          timestamp: user.createdAt,
-          event: `Unverified account older than ${ageInDays} days`,
-          source: user.email,
-          severity: ageInDays > 14 ? "High" : "Medium",
-          action: "Review",
-        });
-      }
-
-      if (!user.isActive && user.emailVerified) {
-        alerts.push({
-          id: `inactive-${user._id}`,
-          timestamp: user.updatedAt || user.createdAt,
-          event: "Verified account is currently inactive",
-          source: user.email,
-          severity: "Info",
-          action: "Monitor",
-        });
-      }
-    });
-
-    return alerts
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 6);
-  }, [users]);
-
-  const recentActivity = useMemo(() => {
-    const feed = [];
-    users.forEach((user) => {
-      const department = resolveUserDepartment(user);
-      if (user.createdAt) {
-        feed.push({
-          id: `joined-${user._id}`,
-          type: "joined",
-          name: user.fullName,
-          avatar: user.avatar || null,
-          department,
-          detail: `${ROLE_LABELS[user.role] || user.role} account created`,
-          time: user.createdAt,
-        });
-      }
-      if (user.lastLoginAt) {
-        feed.push({
-          id: `login-${user._id}`,
-          type: "login",
-          name: user.fullName,
-          avatar: user.avatar || null,
-          department,
-          detail: "Successful login activity recorded",
-          time: user.lastLoginAt,
-        });
-      }
-    });
-
-    return feed
-      .sort((a, b) => new Date(b.time) - new Date(a.time))
-      .slice(0, 4);
-  }, [users]);
+  const users = systemData?.users || [];
+  const metrics = systemData?.userMetrics || {
+    totalUsers: 0,
+    activeUsers: 0,
+    verifiedUsers: 0,
+    blockedUsers: 0,
+    recentlyJoined: 0,
+    verificationRate: 0,
+    roleCounts: { MAIN_ADMIN: 0, ORGANIZER: 0, STUDENT_COORDINATOR: 0, STUDENT: 0 },
+  };
+  const securityAlerts = systemData?.securityAlerts || [];
+  const recentActivity = systemData?.recentActivity || [];
 
   const exportReport = () => {
     const rows = users.map((user) => ({
@@ -205,29 +132,29 @@ export default function AdminDashboard() {
   const cardConfig = [
     {
       title: "Total Accounts",
-      value: metrics.totalUsers.toLocaleString(),
+      value: Number(metrics.totalUsers || 0).toLocaleString(),
       sub: `${metrics.recentlyJoined} joined in last 30 days`,
       icon: Users,
       accent: "from-indigo-500 to-blue-500",
     },
     {
       title: "Verified Users",
-      value: `${metrics.verifiedUsers.toLocaleString()} (${metrics.verificationRate}%)`,
+      value: `${Number(metrics.verifiedUsers || 0).toLocaleString()} (${Number(metrics.verificationRate || 0).toFixed(1)}%)`,
       sub: "Verification coverage",
       icon: ShieldCheck,
       accent: "from-emerald-500 to-teal-500",
     },
     {
       title: "Active Users",
-      value: metrics.activeUsers.toLocaleString(),
+      value: Number(metrics.activeUsers || 0).toLocaleString(),
       sub: `${metrics.blockedUsers} inactive accounts`,
       icon: UserCheck,
       accent: "from-violet-500 to-fuchsia-500",
     },
     {
       title: "Role Distribution",
-      value: `${metrics.roleCounts.STUDENT} students`,
-      sub: `${metrics.roleCounts.ORGANIZER} organizers | ${metrics.roleCounts.STUDENT_COORDINATOR} coordinators`,
+      value: `${Number(metrics.roleCounts?.STUDENT || 0)} students`,
+      sub: `${Number(metrics.roleCounts?.ORGANIZER || 0)} organizers | ${Number(metrics.roleCounts?.STUDENT_COORDINATOR || 0)} coordinators`,
       icon: Activity,
       accent: "from-amber-500 to-orange-500",
     },
@@ -240,12 +167,12 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">System Overview</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">Real-time metrics generated from current user records.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-300 mt-1">Live metrics generated from users, devices, and current system activity.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={fetchUsers}
+                onClick={() => fetchDashboardData({ showLoader: false })}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 text-sm font-medium text-slate-700 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-white/10"
               >
                 <RefreshCcw size={15} />

@@ -2,6 +2,10 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 import { getSecuritySettings } from "../services/securitySettings.service.js";
 import { extractBearerToken, validateSessionState } from "../utils/sessionValidation.js";
+import {
+  getActiveUserSession,
+  touchUserSession,
+} from "../services/session.service.js";
 
 export default async function optionalAuthMiddleware(req, res, next) {
   try {
@@ -24,6 +28,25 @@ export default async function optionalAuthMiddleware(req, res, next) {
         });
       }
       return next();
+    }
+
+    const sessionId = String(decoded?.sessionId || "").trim();
+    if (sessionId) {
+      const session = await getActiveUserSession({
+        userId: user._id,
+        sessionId,
+      });
+
+      if (!session) {
+        return next();
+      }
+
+      req.currentSession = session;
+      req.sessionId = sessionId;
+      await touchUserSession({ sessionId, req });
+    } else {
+      req.currentSession = null;
+      req.sessionId = null;
     }
 
     req.user = user;

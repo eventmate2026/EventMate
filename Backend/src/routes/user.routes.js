@@ -4,7 +4,7 @@ import roleMiddleware from "../middleware/role.middleware.js";
 import upload from "../middleware/multer.middleware.js";
 import { otpRequestLimiter, passwordResetLimiter } from "../middleware/rateLimit.middleware.js";
 
-import { getProfileController, updateProfileController, uploadAvatarController, forgotPasswordController, resetPasswordController,
+import { getProfileController, getMySessionsController, terminateMySessionController, updateProfileController, uploadAvatarController, forgotPasswordController, resetPasswordController,
   createOrganizer,
   createCoordinator,
   promoteCoordinator
@@ -17,6 +17,8 @@ router.post("/reset-password", passwordResetLimiter, resetPasswordController);
 router.use(authMiddleware);
 
 router.get("/profile", getProfileController);
+router.get("/sessions", getMySessionsController);
+router.delete("/sessions/:sessionId", terminateMySessionController);
 router.put("/profile", updateProfileController);
 router.post("/avatar", upload.single("avatar"), uploadAvatarController);
 

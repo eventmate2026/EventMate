@@ -45,6 +45,16 @@ const SummaryApi = {
     method: "put",
   },
 
+  get_my_sessions: {
+    url: "/api/user/sessions",
+    method: "get",
+  },
+
+  terminate_my_session: {
+    url: "/api/user/sessions/:sessionId",
+    method: "delete",
+  },
+
   upload_avatar: {
     url: "/api/user/avatar",
     method: "post",
@@ -326,6 +336,11 @@ const SummaryApi = {
   /* ================= ADMIN ================= */
   get_all_users: {
     url: "/api/admin/users",
+    method: "get",
+  },
+
+  get_admin_system_live_data: {
+    url: "/api/admin/system-live-data",
     method: "get",
   },
 

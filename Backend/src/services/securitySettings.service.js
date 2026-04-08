@@ -1,5 +1,6 @@
 import SecuritySettings from "../models/SecuritySettings.model.js";
 import User from "../models/User.model.js";
+import { revokeEverySession } from "./session.service.js";
 
 const DEFAULT_SETTINGS = {
   maxFailedLoginAttempts: 5,
@@ -36,7 +37,10 @@ export const invalidateAllSessions = async (userId = null, { rotate = false } = 
   if (userId) settings.updatedBy = userId;
   await settings.save();
 
-  await User.updateMany({}, { $set: { refreshToken: null } });
+  await Promise.all([
+    User.updateMany({}, { $set: { refreshToken: null } }),
+    revokeEverySession({ reason: rotate ? "ROTATED_SIGNING_KEY" : "FORCED_LOGOUT" }),
+  ]);
   return settings;
 };
 
