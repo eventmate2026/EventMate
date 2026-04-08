@@ -7,14 +7,18 @@ import Footer from "./components/Footer";
 import api from "./lib/api";
 import SummaryApi from "./api/SummaryApi";
 import {
+  AUTH_IDLE_TIMEOUT_MS,
   clearAuth,
+  getLastAuthActivityAt,
   getStoredRefreshToken,
   getStoredToken,
   getStoredUser,
   storeAuth,
   subscribeAuthUpdates,
+  touchAuthActivity,
 } from "./lib/auth";
 import { logoutUser } from "./lib/logout";
+import { emitToast } from "./lib/toastBus";
 
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -290,6 +294,10 @@ const routeMotionTransition = {
   duration: 0.32,
   ease: [0.22, 1, 0.36, 1],
 };
+
+const AUTH_ACTIVITY_STORAGE_KEY = "lastAuthActivityAt";
+const AUTH_IDLE_TIMEOUT_MINUTES = Math.round(AUTH_IDLE_TIMEOUT_MS / 60000);
+const AUTH_ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart", "mousedown"];
 
 const clampPercentage = (value) => Math.max(0, Math.min(100, value));
 
@@ -570,6 +578,8 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const [user, setUser] = useState(() => getStoredUser());
   const hideTopNav = location.pathname.startsWith("/student-dashboard");
+  const idleLogoutTimerRef = useRef(null);
+  const idleLogoutInFlightRef = useRef(false);
 
   useEffect(() => {
     const unsubscribe = subscribeAuthUpdates(() => {
@@ -577,6 +587,108 @@ function DashboardLayout() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    const clearIdleTimer = () => {
+      if (idleLogoutTimerRef.current) {
+        window.clearTimeout(idleLogoutTimerRef.current);
+        idleLogoutTimerRef.current = null;
+      }
+    };
+
+    if (!user || !getStoredToken()) {
+      clearIdleTimer();
+      idleLogoutInFlightRef.current = false;
+      return undefined;
+    }
+
+    const logoutForInactivity = async () => {
+      if (idleLogoutInFlightRef.current) return;
+      idleLogoutInFlightRef.current = true;
+
+      try {
+        await logoutUser();
+      } finally {
+        emitToast({
+          type: "info",
+          text: `Signed out after ${AUTH_IDLE_TIMEOUT_MINUTES} minutes of inactivity.`,
+        });
+        navigate("/login", { replace: true });
+        idleLogoutInFlightRef.current = false;
+      }
+    };
+
+    const scheduleIdleCheck = () => {
+      clearIdleTimer();
+
+      if (!getStoredUser() || !getStoredToken()) {
+        return;
+      }
+
+      const referenceTime = getLastAuthActivityAt() || touchAuthActivity(true);
+      const remainingMs = AUTH_IDLE_TIMEOUT_MS - (Date.now() - referenceTime);
+
+      if (remainingMs <= 0) {
+        void logoutForInactivity();
+        return;
+      }
+
+      idleLogoutTimerRef.current = window.setTimeout(() => {
+        void logoutForInactivity();
+      }, remainingMs);
+    };
+
+    const handleActivity = () => {
+      if (idleLogoutInFlightRef.current) return;
+      touchAuthActivity();
+      scheduleIdleCheck();
+    };
+
+    const handleStorage = (event) => {
+      if (
+        event.key === null ||
+        event.key === AUTH_ACTIVITY_STORAGE_KEY ||
+        event.key === "user" ||
+        event.key === "accessToken" ||
+        event.key === "refreshToken"
+      ) {
+        scheduleIdleCheck();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        scheduleIdleCheck();
+      }
+    };
+
+    const handleFocus = () => {
+      scheduleIdleCheck();
+    };
+
+    if (!getLastAuthActivityAt()) {
+      touchAuthActivity(true);
+    }
+
+    scheduleIdleCheck();
+
+    AUTH_ACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, handleActivity, true);
+    });
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearIdleTimer();
+      AUTH_ACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, handleActivity, true);
+      });
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [navigate, user?._id]);
 
   const handleLogout = async () => {
     await logoutUser();

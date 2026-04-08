@@ -1,7 +1,11 @@
 const USER_KEY = "user";
 const ACCESS_TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
+const LAST_AUTH_ACTIVITY_KEY = "lastAuthActivityAt";
 const AUTH_UPDATED_EVENT = "eventmate:auth-updated";
+const AUTH_ACTIVITY_WRITE_THROTTLE_MS = 15000;
+
+export const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 const getStorage = () => {
   if (typeof window === "undefined") return null;
@@ -61,6 +65,25 @@ const normalizeUser = (user) => {
   };
 };
 
+export const getLastAuthActivityAt = () => {
+  const value = Number(readStorage(LAST_AUTH_ACTIVITY_KEY) || 0);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+};
+
+export const touchAuthActivity = (force = false) => {
+  const storage = getStorage();
+  if (!storage) return 0;
+
+  const now = Date.now();
+  const previous = getLastAuthActivityAt();
+  if (!force && previous && now - previous < AUTH_ACTIVITY_WRITE_THROTTLE_MS) {
+    return previous;
+  }
+
+  writeStorage(LAST_AUTH_ACTIVITY_KEY, String(now));
+  return now;
+};
+
 export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   const finalAccessToken = accessToken || token;
   if (finalAccessToken) {
@@ -78,6 +101,9 @@ export const storeAuth = ({ accessToken, refreshToken, token, user }) => {
   const normalized = normalizeUser(user);
   if (normalized) {
     writeStorage(USER_KEY, JSON.stringify(normalized));
+    if (finalAccessToken) {
+      touchAuthActivity(true);
+    }
   } else if (user === null) {
     removeStorage(USER_KEY);
   }
@@ -101,6 +127,7 @@ export const clearAuth = () => {
   removeStorage(ACCESS_TOKEN_KEY);
   removeStorage(REFRESH_TOKEN_KEY);
   removeStorage(USER_KEY);
+  removeStorage(LAST_AUTH_ACTIVITY_KEY);
   emitAuthUpdated();
 };
 

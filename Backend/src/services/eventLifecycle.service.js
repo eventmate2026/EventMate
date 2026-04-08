@@ -1,6 +1,18 @@
 import Event from "../models/Event.model.js";
 import { buildEventEndDateTime } from "../utils/eventTime.js";
 
+export const shouldAutoCompleteEvent = (event, { now = new Date() } = {}) => {
+  if (String(event?.status || "").trim() !== "Published") return false;
+
+  const endDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
+
+  if (!endDateTime) return false;
+  return now >= endDateTime;
+};
+
 export const autoCompleteOverdueEvents = async ({ now = new Date() } = {}) => {
   const publishedEvents = await Event.find({ status: "Published" }).select(
     "_id title schedule.startDate schedule.endDate schedule.endTime"
@@ -9,13 +21,7 @@ export const autoCompleteOverdueEvents = async ({ now = new Date() } = {}) => {
   const updates = [];
 
   for (const event of publishedEvents) {
-    const endDateTime = buildEventEndDateTime(
-      event?.schedule?.endDate || event?.schedule?.startDate,
-      event?.schedule?.endTime
-    );
-
-    if (!endDateTime) continue;
-    if (now < endDateTime) continue;
+    if (!shouldAutoCompleteEvent(event, { now })) continue;
 
     updates.push(
       Event.updateOne(

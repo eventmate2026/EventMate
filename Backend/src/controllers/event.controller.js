@@ -4,7 +4,10 @@ import uploadImageCloudinary from "../utils/uploadImageCloudinary.js";
 import {asyncHandler} from "../utils/asyncHandler.js";
 import { sendNotification } from "../services/notification.service.js";
 import { buildEventEndDateTime } from "../utils/eventTime.js";
-import { autoCompleteOverdueEvents } from "../services/eventLifecycle.service.js";
+import {
+  autoCompleteOverdueEvents,
+  shouldAutoCompleteEvent
+} from "../services/eventLifecycle.service.js";
 
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const normalizeDepartment = (value = "") => String(value || "").trim();
@@ -13,11 +16,12 @@ const resolveUserDepartment = (user) =>
 const isEventOver = (event) => {
   const status = String(event?.status || "").trim().toLowerCase();
   if (status === "completed" || status === "cancelled" || status === "canceled") return true;
-  const endValue = event?.schedule?.endDate || event?.schedule?.startDate;
-  if (!endValue) return false;
-  const endTime = new Date(endValue).getTime();
-  if (Number.isNaN(endTime)) return false;
-  return Date.now() > endTime;
+  const endDateTime = buildEventEndDateTime(
+    event?.schedule?.endDate || event?.schedule?.startDate,
+    event?.schedule?.endTime
+  );
+  if (!endDateTime) return false;
+  return Date.now() > endDateTime.getTime();
 };
 
 const parseVisibilityPayload = (raw) => {
@@ -182,14 +186,35 @@ export const publishEvent = async (req, res, next) => {
       });
     }
 
+    if (event.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Completed event does not need publishing"
+      });
+    }
+
+    if (event.status === "Cancelled") {
+      return res.status(400).json({
+        success: false,
+        message: "Cancelled event cannot be published"
+      });
+    }
+
     event.status = "Published";
     event.updatedBy = req.user._id;
+
+    if (shouldAutoCompleteEvent(event)) {
+      event.status = "Completed";
+    }
 
     await event.save();
 
     return res.status(200).json({
       success: true,
-      message: "Event published successfully",
+      message:
+        event.status === "Completed"
+          ? "Event schedule already ended, so it was automatically marked completed."
+          : "Event published successfully",
       data: event
     });
 
