@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import useToastFeedback from "../hooks/useToastFeedback";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import PageBackButton from "../components/PageBackButton";
@@ -128,8 +129,6 @@ export default function AdminContactCenter() {
       setUsers(extractUsersList(usersResponse?.data));
       setEvents(extractEventList(eventsResponse?.data));
     } catch (loadError) {
-      setUsers([]);
-      setEvents([]);
       setError(loadError?.response?.data?.message || "Unable to load user directory.");
     } finally {
       setLoading(false);
@@ -157,7 +156,6 @@ export default function AdminContactCenter() {
       if (!rows.length) setReceipts([]);
     } catch (loadError) {
       setGroupsError(loadError?.response?.data?.message || "Unable to load sent messages.");
-      setSentGroups([]);
     } finally {
       setGroupsLoading(false);
     }
@@ -177,7 +175,6 @@ export default function AdminContactCenter() {
       setReceipts(rows);
     } catch (loadError) {
       setReceiptsError(loadError?.response?.data?.message || "Unable to load read receipts.");
-      setReceipts([]);
     } finally {
       setReceiptsLoading(false);
     }
@@ -580,7 +577,16 @@ export default function AdminContactCenter() {
           </div>
         )}
 
-        {!loading && !error && (
+        {error && !loading && (
+          <AdminStatusBanner
+            title="Contact directory refresh interrupted"
+            message="We couldn't load the latest user directory. Existing admin messaging data is still available below."
+            actionLabel="Retry"
+            onAction={loadDirectory}
+          />
+        )}
+
+        {!loading && (
           <>
             <section className="eventmate-panel rounded-3xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/70 p-5 sm:p-6 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">

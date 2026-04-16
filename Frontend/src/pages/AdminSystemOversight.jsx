@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
 
@@ -88,7 +89,6 @@ export default function AdminSystemOversight() {
       setOversightData(nextData);
       setLastSyncedAt(response.data?.data?.generatedAt || new Date().toISOString());
     } catch (loadError) {
-      setOversightData(null);
       setError(loadError?.response?.data?.message || "Unable to load oversight data.");
     } finally {
       if (showLoader) setLoading(false);
@@ -151,6 +151,7 @@ export default function AdminSystemOversight() {
     trackedEvents: 0,
   };
   const alerts = oversightData?.alerts || [];
+  const hasOversightData = Boolean(oversightData);
 
   const handleExport = () => {
     const rows = filteredRows.map((row) => ({
@@ -252,14 +253,27 @@ export default function AdminSystemOversight() {
           </div>
         </header>
 
-        {loading && (
+        {loading && !hasOversightData && (
           <article className="eventmate-panel rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 text-sm text-slate-600 dark:text-slate-300 inline-flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" />
             Loading system oversight...
           </article>
         )}
 
-        {!loading && !error && (
+        {error && (
+          <AdminStatusBanner
+            title={hasOversightData ? "Oversight refresh interrupted" : "System oversight is temporarily unavailable"}
+            message={
+              hasOversightData
+                ? "The live oversight feed could not be refreshed. Showing the most recent admin snapshot."
+                : "We couldn't refresh the live oversight feed. Retry to restore this admin page."
+            }
+            actionLabel="Retry"
+            onAction={() => loadOversightData({ showLoader: true })}
+          />
+        )}
+
+        {!loading && (hasOversightData || !error) && (
           <>
             <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <article className="eventmate-kpi rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4">

@@ -1,11 +1,35 @@
 const normalizeOrigin = (value) => String(value || "").trim().replace(/\/+$/, "");
 
+const LOOPBACK_HOSTNAMES = ["localhost", "127.0.0.1", "[::1]"];
+
+const expandLoopbackAliases = (origin) => {
+  const normalizedOrigin = normalizeOrigin(origin);
+  if (!normalizedOrigin) return [];
+
+  try {
+    const parsed = new URL(normalizedOrigin);
+    const hostname = String(parsed.hostname || "").trim().toLowerCase();
+
+    if (!LOOPBACK_HOSTNAMES.includes(hostname)) {
+      return [normalizedOrigin];
+    }
+
+    return LOOPBACK_HOSTNAMES.map((aliasHostname) => {
+      const aliasUrl = new URL(parsed.toString());
+      aliasUrl.hostname = aliasHostname;
+      return normalizeOrigin(aliasUrl.toString());
+    });
+  } catch {
+    return [normalizedOrigin];
+  }
+};
+
 const collectOrigins = (...values) =>
   Array.from(
     new Set(
       values
         .flatMap((value) => String(value || "").split(","))
-        .map(normalizeOrigin)
+        .flatMap(expandLoopbackAliases)
         .filter(Boolean)
     )
   );

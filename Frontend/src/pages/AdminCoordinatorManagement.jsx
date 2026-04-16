@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2, Pencil, Search, Trash2, UserPlus, X } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
@@ -313,8 +314,18 @@ export default function AdminCoordinatorManagement() {
           </div>
 
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading coordinators...</p>}
+          {error && !loading && (
+            <div className="mt-6">
+              <AdminStatusBanner
+                title="Coordinator workspace refresh interrupted"
+                message="We couldn't load the latest coordinator data. Retry to refresh this admin page."
+                actionLabel="Retry"
+                onAction={fetchCoordinators}
+              />
+            </div>
+          )}
 
-          {!loading && !error && (
+          {!loading && (
             <div className="mt-6 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>

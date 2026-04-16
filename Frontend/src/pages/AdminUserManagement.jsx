@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Download, Eye, RefreshCcw, Search, ShieldCheck, Trash2, UserCog, Users, X } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
@@ -294,8 +295,18 @@ export default function AdminUserManagement() {
           </p>
 
           {loading && <p className="mt-6 text-sm text-slate-500 dark:text-slate-300">Loading users...</p>}
+          {error && !loading && (
+            <div className="mt-6">
+              <AdminStatusBanner
+                title="User directory refresh interrupted"
+                message="We couldn't load the latest user list. Retry to refresh this admin page."
+                actionLabel="Retry"
+                onAction={fetchUsers}
+              />
+            </div>
+          )}
 
-          {!loading && !error && (
+          {!loading && (
             <div className="mt-6 overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>

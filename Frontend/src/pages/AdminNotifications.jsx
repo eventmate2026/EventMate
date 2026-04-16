@@ -5,6 +5,7 @@ import SummaryApi from "../api/SummaryApi";
 import { getStoredUser } from "../lib/auth";
 import { extractEventList } from "../lib/backendAdapters";
 import useToastFeedback from "../hooks/useToastFeedback";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import PageBackButton from "../components/PageBackButton";
 import { createAuthenticatedSocket } from "../lib/socketClient";
 
@@ -178,9 +179,6 @@ export default function AdminNotifications() {
       setContactsMap(nextContactsMap);
       emitUnreadCount(Number(notificationResponse?.data?.unreadCount ?? rows.filter((item) => !item?.isRead).length));
     } catch (error) {
-      setItems([]);
-      setContactsMap({});
-      emitUnreadCount(0);
       setWarning(error?.response?.data?.message || "Unable to load notifications.");
     } finally {
       setLoading(false);
@@ -314,6 +312,18 @@ export default function AdminNotifications() {
               Unread: <span className="font-semibold text-slate-800 dark:text-slate-100">{unreadCount}</span>
             </p>
           </div>
+
+          {warning && !loading && (
+            <div className="mb-4">
+              <AdminStatusBanner
+                tone="warning"
+                title="Notification refresh interrupted"
+                message="We couldn't load the latest inbox update. Existing notifications remain visible below."
+                actionLabel="Retry"
+                onAction={fetchNotificationsAndContacts}
+              />
+            </div>
+          )}
 
           {loading && (
             <p className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">

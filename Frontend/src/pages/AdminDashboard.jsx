@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import useToastFeedback from "../hooks/useToastFeedback";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import { resolveUserDepartment } from "../lib/userDepartment";
@@ -114,6 +115,7 @@ export default function AdminDashboard() {
   };
   const securityAlerts = systemData?.securityAlerts || [];
   const recentActivity = systemData?.recentActivity || [];
+  const hasDashboardData = Boolean(systemData);
 
   const exportReport = () => {
     const rows = users.map((user) => ({
@@ -192,8 +194,20 @@ export default function AdminDashboard() {
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Last synced: {formatDateTime(lastUpdated)}</p>
         </section>
 
-        {loading && <p className="text-sm text-slate-500 dark:text-slate-300">Loading admin metrics...</p>}
-        {!loading && !error && (
+        {loading && !hasDashboardData && <p className="text-sm text-slate-500 dark:text-slate-300">Loading admin metrics...</p>}
+        {error && (
+          <AdminStatusBanner
+            title={hasDashboardData ? "Dashboard refresh interrupted" : "Admin overview is temporarily unavailable"}
+            message={
+              hasDashboardData
+                ? "The latest metrics could not be refreshed. Showing the most recent admin snapshot."
+                : "The dashboard data could not be loaded. Retry to restore the admin view."
+            }
+            actionLabel="Retry"
+            onAction={() => fetchDashboardData({ showLoader: true })}
+          />
+        )}
+        {!loading && (hasDashboardData || !error) && (
           <>
             <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {cardConfig.map((card) => {

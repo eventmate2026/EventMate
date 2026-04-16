@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import AvatarWithFrame from "../components/AvatarWithFrame";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
@@ -332,7 +333,18 @@ export default function AdminOrganizerManagement() {
             </p>
           )}
 
-          {!loading && !error && (
+          {error && !loading && (
+            <div className="mt-6">
+              <AdminStatusBanner
+                title="Organizer workspace refresh interrupted"
+                message="We couldn't load the latest organizer data. Retry to refresh this admin page."
+                actionLabel="Retry"
+                onAction={fetchOrganizersWorkspace}
+              />
+            </div>
+          )}
+
+          {!loading && (
             <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 dark:bg-white/5">

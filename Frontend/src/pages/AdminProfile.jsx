@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import { getStoredUser, storeAuth } from "../lib/auth";
 import useToastFeedback from "../hooks/useToastFeedback";
 import { logoutUser } from "../lib/logout";
@@ -318,6 +319,15 @@ export default function AdminProfile() {
             <Loader2 size={14} className="animate-spin" />
             Loading profile data...
           </div>
+        )}
+
+        {error && !loading && (
+          <AdminStatusBanner
+            title="Profile refresh interrupted"
+            message="We couldn't refresh the latest admin profile details. The most recent profile snapshot is still shown below."
+            actionLabel="Retry"
+            onAction={() => window.location.reload()}
+          />
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../lib/api";
 import SummaryApi from "../api/SummaryApi";
+import AdminStatusBanner from "../components/AdminStatusBanner";
 import PageBackButton from "../components/PageBackButton";
 import useToastFeedback from "../hooks/useToastFeedback";
 
@@ -140,8 +141,6 @@ export default function AdminCertificatesAuditLogs() {
           lastAuditAt: registryResponse.data?.summary?.lastAuditAt || null
         });
       } catch (loadError) {
-        setRegistryRows([]);
-        setAuditRows([]);
         setError(loadError?.response?.data?.message || "Unable to load certificate authority data.");
       } finally {
         setLoading(false);
@@ -314,7 +313,16 @@ export default function AdminCertificatesAuditLogs() {
           </article>
         )}
 
-        {!loading && !error && (
+        {error && (
+          <AdminStatusBanner
+            title="Certificate authority data could not be refreshed"
+            message="We couldn't load the latest registry or audit-log snapshot. Retry to refresh this admin page."
+            actionLabel="Retry"
+            onAction={() => loadData({ silent: false })}
+          />
+        )}
+
+        {!loading && (
           <>
             <section className="eventmate-panel rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-gray-900/70 p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
